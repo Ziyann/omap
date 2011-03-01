@@ -924,6 +924,22 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.be_id = OMAP_ABE_DAI_MODEM,
 		.ignore_suspend = 1,
 	},
+	{
+		.name = OMAP_ABE_BE_VXREC,
+		.stream_name = "VXREC Capture",
+
+		/* ABE components - VxREC */
+		.cpu_dai_name = "omap-abe-vxrec-dai",
+		.platform_name = "aess",
+
+		/* no codec needed */
+		.codec_dai_name = "null-codec-dai",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1,
+		.be_id = OMAP_ABE_DAI_VXREC,
+		.ignore_suspend = 1,
+	},
 };
 
 /* Audio machine driver */
