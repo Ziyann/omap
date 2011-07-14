@@ -325,6 +325,7 @@ obj-y					+= $(disp-m) $(disp-y)
 obj-y					+= common-board-devices.o
 
 obj-$(CONFIG_OMAP_REMOTE_PROC)		+= remoteproc.o
+
 obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
 obj-$(CONFIG_SEC_MODEM)			+= board-tuna-modems.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_dmm.o
@@ -335,3 +336,5 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
 endif
 
 obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
+
+obj-$(CONFIG_ION_OMAP)			+= omap4_ion.o
