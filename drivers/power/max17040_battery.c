@@ -420,6 +420,10 @@ static int __devinit max17040_probe(struct i2c_client *client,
 	if (!chip->pdata->limit_recharging_time)
 		chip->pdata->limit_recharging_time = 5400;
 
+	if (!chip->pdata->skip_reset);
+		max17040_reset(client);
+	max17040_get_version(client);
+	INIT_DELAYED_WORK_DEFERRABLE(&chip->work, max17040_work);
 	ret = power_supply_register(&client->dev, &chip->battery);
 	if (ret) {
 		dev_err(&client->dev, "failed: power supply register\n");
@@ -427,11 +431,6 @@ static int __devinit max17040_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	if (!chip->pdata->skip_reset);
-		max17040_reset(client);
-	max17040_get_version(client);
-
-	INIT_DELAYED_WORK_DEFERRABLE(&chip->work, max17040_work);
 	schedule_delayed_work(&chip->work, MAX17040_DELAY);
 
 	if (HAS_ALERT_INTERRUPT(chip->ver) && chip->pdata->use_fuel_alert) {
