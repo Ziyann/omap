@@ -91,6 +91,7 @@ struct omap_uart_port_info {
 	void (*set_noidle)(struct platform_device *);
 	void (*enable_wakeup)(struct platform_device *, bool);
 	void (*rts_mux_write)(u16 val, int num);
+	void (*wake_peer)(struct uart_port *);
 };
 
 struct uart_omap_dma {

@@ -994,6 +994,15 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	serial_omap_port_disable(up);
 }
 
+static void serial_omap_wake_peer(struct uart_port *port)
+{
+	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
+
+	if (pdata->wake_peer)
+		pdata->wake_peer(port);
+}
+
 static void serial_omap_release_port(struct uart_port *port)
 {
 	dev_dbg(port->dev, "serial_omap_release_port+\n");
@@ -1235,6 +1244,7 @@ static struct uart_ops serial_omap_pops = {
 	.set_termios	= serial_omap_set_termios,
 	.pm		= serial_omap_pm,
 	.set_wake	= serial_omap_set_wake,
+	.wake_peer	= serial_omap_wake_peer,
 	.type		= serial_omap_type,
 	.release_port	= serial_omap_release_port,
 	.request_port	= serial_omap_request_port,
