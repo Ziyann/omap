@@ -350,6 +350,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
 	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+#ifdef CONFIG_DEBUG_LL
+	if (bdata->id == console_uart_id)
+		omap_up.autosuspend_timeout = -1;
+	else
+#endif
 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
 	if (info->rts_mux_driver_control)
 		omap_up.rts_mux_write = omap_rts_mux_write;
