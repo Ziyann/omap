@@ -739,6 +739,7 @@ struct twl4030_codec_vibra_data {
 	int initial_vibrate;
 	int (*init)(void);
 	void (*exit)(void);
+	u8  voltage_raise_speed;
 };
 
 struct twl4030_codec_data {
