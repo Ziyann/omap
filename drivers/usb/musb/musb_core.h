@@ -118,6 +118,8 @@ struct musb_ep;
 #define MUSB_CONFIG_PROC_FS
 #endif
 
+extern void musb_hz_mode_work(struct work_struct *);
+
 /****************************** PERIPHERAL ROLE *****************************/
 
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
@@ -390,6 +392,7 @@ struct musb {
 	struct wake_lock	musb_wakelock;
 	struct work_struct	irq_work;
 	struct workqueue_struct	*otg_notifier_wq;
+	struct work_struct	hz_mode_work;
 	u16			hwvers;
 
 /* this hub status bit is reserved by USB 2.0 and not seen by usbcore */
