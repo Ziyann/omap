@@ -582,6 +582,10 @@ source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
+<<<<<<< HEAD
 source "drivers/misc/modem_if/Kconfig"
+=======
+source "drivers/misc/gc-core/Kconfig"
+>>>>>>> 7357341... Include gc-core into omap build system.
 
 endif # MISC_DEVICES
