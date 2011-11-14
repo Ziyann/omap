@@ -1319,6 +1319,12 @@ static void omap2_gpio_set_wakeupenables(struct gpio_bank *bank)
 
 	bank->context.pad_set_wakeupenable = 0;
 
+	if (pm_runtime_get_sync(bank->dev) < 0) {
+		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_get_sync "
+				"failed\n", __func__, bank->id);
+		return;
+	}
+
 	pad_wakeup = __raw_readl(bank->base + bank->regs->irqenable);
 
 	/*
@@ -1339,6 +1345,12 @@ static void omap2_gpio_set_wakeupenables(struct gpio_bank *bank)
 			bank->context.pad_set_wakeupenable |= BIT(i);
 			omap_mux_set_wakeupenable(bank->mux[i]);
 		}
+	}
+
+	if (pm_runtime_put_sync_suspend(bank->dev) < 0) {
+		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_put_sync "
+				"failed\n", __func__, bank->id);
+		return;
 	}
 }
 
