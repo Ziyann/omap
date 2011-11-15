@@ -57,7 +57,7 @@ const struct lpddr2_timings lpddr2_elpida_timings_400_mhz = {
 	.tZQINIT	= 1000,
 	.tDQSCKMAXx2	= 11,
 	.tRASmax	= 70,
-	.tFAW		= 50
+	.tFAW		= 50,
 };
 
 const struct lpddr2_timings lpddr2_elpida_timings_333_mhz = {
@@ -80,7 +80,7 @@ const struct lpddr2_timings lpddr2_elpida_timings_333_mhz = {
 	.tZQINIT	= 1000,
 	.tDQSCKMAXx2	= 11,
 	.tRASmax	= 70,
-	.tFAW		= 50
+	.tFAW		= 50,
 };
 
 const struct lpddr2_timings lpddr2_elpida_timings_200_mhz = {
@@ -103,7 +103,7 @@ const struct lpddr2_timings lpddr2_elpida_timings_200_mhz = {
 	.tZQINIT	= 1000,
 	.tDQSCKMAXx2	= 11,
 	.tRASmax	= 70,
-	.tFAW		= 50
+	.tFAW		= 50,
 };
 
 const struct lpddr2_min_tck lpddr2_elpida_min_tck = {
@@ -131,7 +131,8 @@ struct lpddr2_device_info lpddr2_elpida_2G_S4_dev = {
 	.min_tck	= &lpddr2_elpida_min_tck,
 	.type		= LPDDR2_TYPE_S4,
 	.density	= LPDDR2_DENSITY_2Gb,
-	.io_width	= LPDDR2_IO_WIDTH_32
+	.io_width	= LPDDR2_IO_WIDTH_32,
+	.emif_ddr_selfrefresh_cycles = 262144,
 };
 
 struct lpddr2_device_info lpddr2_elpida_4G_S4_dev = {
