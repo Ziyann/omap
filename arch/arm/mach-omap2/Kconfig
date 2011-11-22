@@ -390,6 +390,10 @@ config OMAP4_PPA_CPU1_ONLINE_BUG
 	  If, on the other hand, you do not understand the change, leave the
 	  default as enabled.
 
+config OMAP_REBOOT_REASON
+	depends on ARCH_OMAP4
+	bool
+
 endmenu
 
 endif
