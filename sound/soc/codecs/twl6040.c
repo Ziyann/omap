@@ -31,6 +31,7 @@
 #include <linux/wakelock.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040-codec.h>
+#include <linux/regulator/consumer.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -88,6 +89,7 @@ struct twl6040_data {
 	int headset_mode;
 	unsigned int clk_in;
 	unsigned int sysclk;
+	struct regulator *vddhf_reg;
 	u16 hs_left_step;
 	u16 hs_right_step;
 	u16 hf_left_step;
@@ -99,6 +101,7 @@ struct twl6040_data {
 	struct workqueue_struct *workqueue;
 	struct delayed_work delayed_work;
 	struct mutex mutex;
+	int hfdrv;
 	struct twl6040_output headset;
 	struct twl6040_output earphone;
 	struct twl6040_output handsfree;
@@ -1789,6 +1792,24 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 
 	mutex_init(&priv->mutex);
 
+	priv->vddhf_reg = regulator_get(codec->dev, "vddhf");
+	if (IS_ERR(priv->vddhf_reg)) {
+		ret = PTR_ERR(priv->vddhf_reg);
+		dev_warn(codec->dev, "couldn't get VDDHF regulator %d\n",
+			 ret);
+		priv->vddhf_reg = NULL;
+	}
+
+	if (priv->vddhf_reg) {
+		ret = regulator_set_voltage(priv->vddhf_reg,
+					    pdata->vddhf_uV, pdata->vddhf_uV);
+		if (ret) {
+			dev_warn(codec->dev, "failed to set VDDHF voltage %d\n",
+				 ret);
+			goto reg_err;
+		}
+	}
+
 	init_completion(&priv->headset.ramp_done);
 	init_completion(&priv->handsfree.ramp_done);
 	init_completion(&priv->earphone.ramp_done);
@@ -1853,6 +1874,8 @@ irq_err:
 	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->ep_workqueue);
 epwork_err:
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
 	destroy_workqueue(priv->hs_workqueue);
 hswork_err:
 	destroy_workqueue(priv->hf_workqueue);
@@ -1870,6 +1893,8 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_HF, codec);
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
 	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->workqueue);
 	destroy_workqueue(priv->hf_workqueue);
@@ -1895,6 +1920,13 @@ static struct snd_soc_codec_driver soc_codec_dev_twl6040 = {
 
 static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 {
+	struct twl4030_codec_audio_data *pdata = pdev->dev.platform_data;
+
+	if (!pdata) {
+		dev_err(&pdev->dev, "platform_data is missing\n");
+		return -EINVAL;
+	}
+
 	return snd_soc_register_codec(&pdev->dev,
 			&soc_codec_dev_twl6040, twl6040_dai, ARRAY_SIZE(twl6040_dai));
 }
