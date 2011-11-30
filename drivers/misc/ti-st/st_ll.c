@@ -76,7 +76,10 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 /* functions invoked by ST Core */
 
 /* called when ST Core wants to
- * enable ST LL */
+ * enable ST LL
+ * Function which resets the ST-LL state, being called with spin lock held and
+ * hence expected to reset the ll_state and do nothing more than that
+ */
 void st_ll_enable(struct st_data_s *ll)
 {
 	ll->ll_state = ST_LL_AWAKE;
