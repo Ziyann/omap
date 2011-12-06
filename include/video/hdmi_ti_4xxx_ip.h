@@ -286,7 +286,22 @@ struct hdmi_core_infoframe_audio {
 	u8 db5_lsv;	/* Level shift values for downmix */
 };
 
+enum hdmi_3d_format {
+	HDMI_FRAME_PACKING = 0,
+	HDMI_FIELD_ALTERNATIVE = 1,
+	HDMI_LINE_ALTERNATIVE = 2,
+	HDMI_SIDE_BY_SIDE_FULL = 3,
+	HDMI_L_DEPTH = 4,
+	HDMI_L_DEPTH_GFX_GFX_DEPTH = 5,
+	HDMI_TOPBOTTOM = 6,
+	HDMI_SIDE_BY_SIDE_HALF = 8
+};
 
+struct hdmi_core_vendor_specific_infoframe {
+	bool enable;
+	u8 s3d_structure;
+	u8 s3d_ext_data;
+};
 
 /* INFOFRAME_AVI_ and INFOFRAME_AUDIO_ definitions */
 enum hdmi_core_infoframe {
