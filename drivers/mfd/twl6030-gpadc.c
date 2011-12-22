@@ -1244,7 +1244,7 @@ static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
 
 			d2 += temp;
 			break;
-		defaut:
+		default:
 			/* No data for other channels */
 			continue;
 		}
