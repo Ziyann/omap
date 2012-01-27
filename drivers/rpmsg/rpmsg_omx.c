@@ -177,9 +177,9 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 					ret = _rpmsg_pa_to_da(omx,
 						(phys_addr_t)paddr2, va2);
 					goto exit;
-				}
-			} else
-				goto exit;
+				} else
+					goto exit;
+			}
 		}
 
 #endif
