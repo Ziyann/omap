@@ -28,6 +28,7 @@
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040-codec.h>
 
@@ -80,6 +81,7 @@ struct twl6040_jack_data {
 
 /* codec private data */
 struct twl6040_data {
+	struct wake_lock wake_lock;
 	int codec_powered;
 	int pll;
 	int power_mode_forced;
@@ -949,9 +951,11 @@ static irqreturn_t twl6040_audio_handler(int irq, void *data)
 
 	intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 
-	if ((intid & TWL6040_PLUGINT) || (intid & TWL6040_UNPLUGINT))
+	if ((intid & TWL6040_PLUGINT) || (intid & TWL6040_UNPLUGINT)) {
+		wake_lock_timeout(&priv->wake_lock, 2 * HZ);
 		queue_delayed_work(priv->workqueue, &priv->delayed_work,
 				   msecs_to_jiffies(200));
+	}
 
 	return IRQ_HANDLED;
 }
@@ -1774,6 +1778,8 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	INIT_DELAYED_WORK(&priv->hf_delayed_work, twl6040_pga_hf_work);
 	INIT_DELAYED_WORK(&priv->ep_delayed_work, twl6040_pga_ep_work);
 
+	wake_lock_init(&priv->wake_lock, WAKE_LOCK_SUSPEND, "twl6040");
+
 	ret = twl6040_request_irq(codec->control_data, TWL6040_IRQ_PLUG,
 				twl6040_audio_handler, IRQF_NO_SUSPEND,
 				"twl6040_irq_plug", codec);
@@ -1799,6 +1805,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 bias_err:
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
 irq_err:
+	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->ep_workqueue);
 epwork_err:
 	destroy_workqueue(priv->hs_workqueue);
@@ -1817,6 +1824,7 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
+	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->workqueue);
 	destroy_workqueue(priv->hf_workqueue);
 	destroy_workqueue(priv->hs_workqueue);
