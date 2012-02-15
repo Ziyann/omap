@@ -647,6 +647,8 @@ enable:
 				CONTROLLER_CTRL1);
 		if (ret)
 			goto err;
+
+		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	}
 	return;
 err:
