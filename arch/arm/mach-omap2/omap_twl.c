@@ -75,6 +75,9 @@
 							 0x01 << 0)
 #define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
 
+/* Pull down control */
+#define TWL6030_REG_CFG_SMPS_PD		0xF6
+
 static bool is_offset_valid;
 static u8 smps_offset;
 /*
@@ -505,6 +508,11 @@ static __initdata struct twl_reg_setup_array omap4460_twl6030_setup[] = {
 		.addr = TWL6030_REG_VCORE2_CFG_TRANS,
 		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
 		.desc = "VCORE2" TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{
+		.addr = TWL6030_REG_CFG_SMPS_PD,
+		.val = 0x77,
+		.desc = "VCORE1 disable PD on shutdown",
 	},
 	{ .desc = NULL} /* TERMINATOR */
 };
