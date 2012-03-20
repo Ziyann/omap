@@ -485,6 +485,21 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+static ssize_t mmc_samsung_smart(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (card->quirks & MMC_QUIRK_SAMSUNG_SMART)
+		return mmc_samsung_smart_handle(card, buf);
+
+	/* There is no information available for this card. */
+	return 0;
+}
+static DEVICE_ATTR(samsung_smart, S_IRUGO, mmc_samsung_smart, NULL);
+#endif /* CONFIG_MMC_SAMSUNG_SMART */
+
 MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
 MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
@@ -516,6 +531,9 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+	&dev_attr_samsung_smart.attr,
+#endif
 	NULL,
 };
 
@@ -550,6 +568,14 @@ static const struct mmc_fixup mmc_fixups[] = {
 	MMC_FIXUP_REV("MAG4FA", 0x15, CID_OEMID_ANY,
 		      cid_rev(0, 0x25, 1997, 1), cid_rev(0, 0x25, 2012, 12),
 		      add_quirk_mmc, MMC_QUIRK_SAMSUNG_WL_PATCH),
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+	MMC_FIXUP("VYL00M", 0x15, CID_OEMID_ANY,
+		      add_quirk_mmc, MMC_QUIRK_SAMSUNG_SMART),
+	MMC_FIXUP("KYL00M", 0x15, CID_OEMID_ANY,
+		      add_quirk_mmc, MMC_QUIRK_SAMSUNG_SMART),
+	MMC_FIXUP("MAG4FA", 0x15, CID_OEMID_ANY,
+		      add_quirk_mmc, MMC_QUIRK_SAMSUNG_SMART),
+#endif
 	END_FIXUP
 };
 
