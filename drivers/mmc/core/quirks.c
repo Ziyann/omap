@@ -168,7 +168,7 @@ static int mmc_movi_erase_cmd(struct mmc_card *card,
 static struct mmc_command wcmd;
 static struct mmc_data wdata;
 
-static void mmc_movi_read_cmd(struct mmc_card *card, u8 *buffer)
+static int mmc_movi_read_cmd(struct mmc_card *card, u8 *buffer)
 {
 	struct mmc_request brq;
 	struct scatterlist sg;
@@ -192,6 +192,11 @@ static void mmc_movi_read_cmd(struct mmc_card *card, u8 *buffer)
 	mmc_set_data_timeout(&wdata, card);
 
 	mmc_wait_for_req(card->host, &brq);
+	if (wcmd.error)
+		return wcmd.error;
+	if (wdata.error)
+		return wdata.error;
+	return 0;
 }
 #endif /* TEST_MMC_FW_PATCHING */
 
@@ -200,7 +205,7 @@ static void mmc_movi_read_cmd(struct mmc_card *card, u8 *buffer)
  */
 static int mmc_set_wearlevel_page(struct mmc_card *card)
 {
-	int err;
+	int err, errx = 0;
 #ifdef TEST_MMC_FW_PATCHING
 	void *buffer;
 	buffer = kmalloc(512, GFP_KERNEL);
@@ -239,12 +244,12 @@ static int mmc_set_wearlevel_page(struct mmc_card *card)
 
 err_set_wl:
 	/* exit vendor command mode */
-	err = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
-	if (err)
+	errx = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
+	if (errx)
 		goto out;
 
-	err = mmc_movi_vendor_cmd(card, 0x00DECCEE);
-	if (err)
+	errx = mmc_movi_vendor_cmd(card, 0x00DECCEE);
+	if (errx || err)
 		goto out;
 
 #ifdef TEST_MMC_FW_PATCHING
@@ -264,7 +269,11 @@ err_set_wl:
 		goto err_check_wl;
 	}
 
-	mmc_movi_read_cmd(card, (u8 *)buffer);
+	err = mmc_movi_read_cmd(card, (u8 *)buffer);
+	if (err) {
+		pr_err("Fail to Read value1\n");
+		goto err_check_wl;
+	}
 	pr_debug("buffer[0] is 0x%x\n", *(u8 *)buffer);
 
 	err = mmc_movi_erase_cmd(card, 0x000379A4, 0x00000004);
@@ -273,17 +282,21 @@ err_set_wl:
 		goto err_check_wl;
 	}
 
-	mmc_movi_read_cmd(card, (u8 *)buffer);
+	err = mmc_movi_read_cmd(card, (u8 *)buffer);
+	if (err) {
+		pr_err("Fail to Read value2\n");
+		goto err_check_wl;
+	}
 	pr_debug("buffer[0] is 0x%x\n", *(u8 *)buffer);
 
 err_check_wl:
 	/* exit vendor cmd mode */
-	err = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
-	if (err)
+	errx = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
+	if (errx)
 		goto out;
 
-	err = mmc_movi_vendor_cmd(card, 0x00DECCEE);
-	if (err)
+	errx = mmc_movi_vendor_cmd(card, 0x00DECCEE);
+	if (errx || err)
 		goto out;
 
 #endif /* TEST_MMC_FW_PATCHING */
@@ -292,7 +305,9 @@ err_check_wl:
 #ifdef TEST_MMC_FW_PATCHING
 	kfree(buffer);
 #endif /* TEST_MMC_FW_PATCHING */
-	return err;
+	if (err)
+		return err;
+	return errx;
 }
 
 void mmc_fixup_samsung_fw(struct mmc_card *card)
