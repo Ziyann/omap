@@ -1040,11 +1040,12 @@ omap_hsmmc_get_dma_dir(struct omap_hsmmc_host *host, struct mmc_data *data)
 static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_request *mrq)
 {
 	int dma_ch;
+	unsigned long flags;
 
-	spin_lock(&host->irq_lock);
+	spin_lock_irqsave(&host->irq_lock, flags);
 	host->req_in_progress = 0;
 	dma_ch = host->dma_ch;
-	spin_unlock(&host->irq_lock);
+	spin_unlock_irqrestore(&host->irq_lock, flags);
 
 	omap_hsmmc_disable_irq(host);
 	/* Do not complete the request if DMA is still in progress */
@@ -1165,13 +1166,14 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
 {
 	int dma_ch;
+	unsigned long flags;
 
 	host->data->error = errno;
 
-	spin_lock(&host->irq_lock);
+	spin_lock_irqsave(&host->irq_lock, flags);
 	dma_ch = host->dma_ch;
 	host->dma_ch = -1;
-	spin_unlock(&host->irq_lock);
+	spin_unlock_irqrestore(&host->irq_lock, flags);
 
 	if ((host->dma_type == SDMA_XFER) && (dma_ch != -1)) {
 		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg,
@@ -1577,6 +1579,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 	struct omap_hsmmc_host *host = cb_data;
 	struct mmc_data *data;
 	int dma_ch, req_in_progress;
+	unsigned long flags;
 
 	if (!(ch_status & OMAP_DMA_BLOCK_IRQ)) {
 		dev_warn(mmc_dev(host->mmc), "unexpected dma status %x\n",
@@ -1584,9 +1587,9 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 		return;
 	}
 
-	spin_lock(&host->irq_lock);
+	spin_lock_irqsave(&host->irq_lock, flags);
 	if (host->dma_ch < 0) {
-		spin_unlock(&host->irq_lock);
+		spin_unlock_irqrestore(&host->irq_lock, flags);
 		return;
 	}
 
@@ -1596,7 +1599,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 		/* Fire up the next transfer. */
 		omap_hsmmc_config_dma_params(host, data,
 					   data->sg + host->dma_sg_idx);
-		spin_unlock(&host->irq_lock);
+		spin_unlock_irqrestore(&host->irq_lock, flags);
 		return;
 	}
 
@@ -1607,7 +1610,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 	req_in_progress = host->req_in_progress;
 	dma_ch = host->dma_ch;
 	host->dma_ch = -1;
-	spin_unlock(&host->irq_lock);
+	spin_unlock_irqrestore(&host->irq_lock, flags);
 
 	omap_free_dma(dma_ch);
 
