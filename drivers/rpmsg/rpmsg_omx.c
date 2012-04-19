@@ -809,7 +809,7 @@ static struct rpmsg_device_id rpmsg_omx_id_table[] = {
 	{ .name	= "rpmsg-omx" },
 	{ },
 };
-MODULE_DEVICE_TABLE(platform, rpmsg_omx_id_table);
+MODULE_DEVICE_TABLE(rpmsg, rpmsg_omx_id_table);
 
 static struct rpmsg_driver rpmsg_omx_driver = {
 	.drv.name	= KBUILD_MODNAME,
