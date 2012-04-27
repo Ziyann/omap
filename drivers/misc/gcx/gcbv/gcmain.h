@@ -40,10 +40,10 @@
  */
 
 #define gc_map_wrapper(gcmap) \
-	gc_map(gcmap)
+	gc_map(gcmap, false)
 
 #define gc_unmap_wrapper(gcmap) \
-	gc_unmap(gcmap)
+	gc_unmap(gcmap, false)
 
 #define gc_commit_wrapper(gccommit) \
 	gc_commit(gccommit, false)
