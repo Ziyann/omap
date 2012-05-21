@@ -1341,6 +1341,8 @@ static void __init tuna_map_io(void)
 
 static void __init tuna_reserve(void)
 {
+	omap_init_ram_size();
+	
     omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
             OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
