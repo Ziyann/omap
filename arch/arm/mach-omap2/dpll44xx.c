@@ -19,6 +19,7 @@
 #ifdef CONFIG_OMAP4_DPLL_CASCADING
 #include <linux/console.h>
 #include <linux/slab.h>
+#include <linux/cpufreq.h>
 #include "dvfs.h"
 #include "smartreflex.h"
 #endif
@@ -1532,8 +1533,8 @@ int omap4_dpll_cascading_blocker_hold(struct device *dev)
 
 		/* exit point of DPLL cascading */
 		ret = omap4_dpll_low_power_cascade_exit();
+		cpufreq_interactive_set_timer_rate(200 * USEC_PER_MSEC, 1);
 	}
-
 out:
 	mutex_unlock(&omap_dvfs_lock);
 	console_unlock();
@@ -1588,8 +1589,12 @@ int omap4_dpll_cascading_blocker_release(struct device *dev)
 		&& !omap4_is_in_dpll_cascading()
 		&& omap4_abe_can_enter_dpll_cascading()) {
 
+		cpufreq_interactive_set_timer_rate(200 * USEC_PER_MSEC, 0);
 		/* enter point of DPLL cascading */
 		ret = omap4_dpll_low_power_cascade_enter();
+		if (ret)
+			cpufreq_interactive_set_timer_rate(
+						200 * USEC_PER_MSEC, 1);
 	}
 out:
 	mutex_unlock(&omap_dvfs_lock);
