@@ -1,0 +1,1795 @@
+/*
+* Copyright (C) 2012 Invensense, Inc.
+*
+* This software is licensed under the terms of the GNU General Public
+* License version 2, as published by the Free Software Foundation, and
+* may be copied, distributed, and modified under those terms.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+*/
+
+/**
+ *  @addtogroup  DRIVERS
+ *  @brief       Hardware drivers.
+ *
+ *  @{
+ *      @file    inv_mpu_core.c
+ *      @brief   A sysfs device driver for Invensense devices
+ *      @details This driver currently works for the MPU3050/MPU6050/MPU9150
+ */
+
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/i2c.h>
+#include <linux/err.h>
+#include <linux/delay.h>
+#include <linux/sysfs.h>
+#include <linux/jiffies.h>
+#include <linux/irq.h>
+#include <linux/interrupt.h>
+#include <linux/kfifo.h>
+#include <linux/poll.h>
+#include <linux/miscdevice.h>
+#include <linux/spinlock.h>
+#include "inv_mpu_iio.h"
+#include "../../sysfs.h"
+#define WRITE_BE32_KEY_TO_MEM(key_addr)  do \
+	{ \
+		out = cpu_to_be32p(&data); \
+		p = (unsigned char *)&out; \
+		result = mem_w_key(key_addr, 4, p); \
+		if (result) \
+			return result; \
+	} while (0);
+
+static const short AKM8975_ST_Lower[3] = {-100, -100, -1000};
+static const short AKM8975_ST_Upper[3] = {100, 100, -300};
+
+static const short AKM8972_ST_Lower[3] = {-50, -50, -500};
+static const short AKM8972_ST_Upper[3] = {50, 50, -100};
+
+static const short AKM8963_ST_Lower[3] = {-200, -200, -3200};
+static const short AKM8963_ST_Upper[3] = {200, 200, -800};
+
+static const struct inv_hw_s hw_info[INV_NUM_PARTS] = {
+	{119, "ITG3500"},
+	{ 63, "MPU3050"},
+	{117, "MPU6050"},
+	{118, "MPU9150"}
+};
+
+static void inv_setup_reg(struct inv_reg_map_s *reg)
+{
+	reg->sample_rate_div	= REG_SAMPLE_RATE_DIV;
+	reg->lpf		= REG_CONFIG;
+	reg->bank_sel		= REG_BANK_SEL;
+	reg->user_ctrl		= REG_USER_CTRL;
+	reg->fifo_en		= REG_FIFO_EN;
+	reg->gyro_config	= REG_GYRO_CONFIG;
+	reg->accl_config	= REG_ACCEL_CONFIG;
+	reg->fifo_count_h	= REG_FIFO_COUNT_H;
+	reg->fifo_r_w		= REG_FIFO_R_W;
+	reg->raw_gyro		= REG_RAW_GYRO;
+	reg->raw_accl		= REG_RAW_ACCEL;
+	reg->temperature	= REG_TEMPERATURE;
+	reg->int_enable		= REG_INT_ENABLE;
+	reg->int_status		= REG_INT_STATUS;
+	reg->pwr_mgmt_1		= REG_PWR_MGMT_1;
+	reg->pwr_mgmt_2		= REG_PWR_MGMT_2;
+	reg->mem_start_addr	= REG_MEM_START_ADDR;
+	reg->mem_r_w		= REG_MEM_RW;
+	reg->prgm_strt_addrh	= REG_PRGM_STRT_ADDRH;
+};
+
+/**
+ *  inv_i2c_read() - Read one or more bytes from the device registers.
+ *  @st:	Device driver instance.
+ *  @reg:	First device register to be read from.
+ *  @length:	Number of bytes to read.
+ *  @data:	Data read from device.
+ *  NOTE: The slave register will not increment when reading from the FIFO.
+ */
+int inv_i2c_read_base(struct inv_mpu_iio_s *st, unsigned short i2c_addr,
+	unsigned char reg, unsigned short length, unsigned char *data)
+{
+	struct i2c_msg msgs[2];
+	int res;
+
+	if (!data)
+		return -EINVAL;
+
+	msgs[0].addr = i2c_addr;
+	msgs[0].flags = 0;	/* write */
+	msgs[0].buf = &reg;
+	msgs[0].len = 1;
+
+	msgs[1].addr = i2c_addr;
+	msgs[1].flags = I2C_M_RD;
+	msgs[1].buf = data;
+	msgs[1].len = length;
+
+	res = i2c_transfer(st->sl_handle, msgs, 2);
+	if (res < 2) {
+		if (res >= 0)
+			res = -EIO;
+		return res;
+	} else {
+		return 0;
+	}
+}
+
+/**
+ *  inv_i2c_single_write() - Write a byte to a device register.
+ *  @st:	Device driver instance.
+ *  @reg:	Device register to be written to.
+ *  @data:	Byte to write to device.
+ */
+int inv_i2c_single_write_base(struct inv_mpu_iio_s *st,
+	unsigned short i2c_addr, unsigned char reg, unsigned char data)
+{
+	unsigned char tmp[2];
+	struct i2c_msg msg;
+	int res;
+
+	tmp[0] = reg;
+	tmp[1] = data;
+
+	msg.addr = i2c_addr;
+	msg.flags = 0;	/* write */
+	msg.buf = tmp;
+	msg.len = 2;
+
+	/*printk(KERN_ERR "WS%02X%02X%02X\n", i2c_addr, reg, data);*/
+	res = i2c_transfer(st->sl_handle, &msg, 1);
+	if (res < 1) {
+		if (res == 0)
+			res = -EIO;
+		return res;
+	} else {
+		return 0;
+	}
+}
+
+static int set_power_itg(struct inv_mpu_iio_s *st, int power_on)
+{
+	struct inv_reg_map_s *reg;
+	unsigned char data;
+	int result;
+
+	reg = &st->reg;
+	if (power_on)
+		data = 0;
+	else
+		data = BIT_SLEEP;
+	if (st->chip_config.lpa_mode)
+		data |= BIT_CYCLE;
+	if (st->chip_config.gyro_enable) {
+		result = inv_i2c_single_write(st,
+			reg->pwr_mgmt_1, data | INV_CLK_PLL);
+		if (result)
+			return result;
+		st->chip_config.clk_src = INV_CLK_PLL;
+	} else {
+		result = inv_i2c_single_write(st,
+			reg->pwr_mgmt_1, data | INV_CLK_INTERNAL);
+		if (result)
+			return result;
+		st->chip_config.clk_src = INV_CLK_INTERNAL;
+	}
+
+	if (power_on) {
+		msleep(POWER_UP_TIME);
+		data = 0;
+		if (!st->chip_config.accl_enable)
+			data |= BIT_PWR_ACCL_STBY;
+		if (!st->chip_config.gyro_enable)
+			data |= BIT_PWR_GYRO_STBY;
+		data |= (st->chip_config.lpa_freq << LPA_FREQ_SHIFT);
+
+		result = inv_i2c_single_write(st, reg->pwr_mgmt_2, data);
+		if (result) {
+			inv_i2c_single_write(st, reg->pwr_mgmt_1, BIT_SLEEP);
+			return result;
+		}
+		msleep(POWER_UP_TIME);
+	}
+	st->chip_config.is_asleep = !power_on;
+
+	return 0;
+}
+
+/**
+ *  inv_init_config() - Initialize hardware, disable FIFO.
+ *  @indio_dev:	Device driver instance.
+ *  Initial configuration:
+ *  FSR: +/- 2000DPS
+ *  DLPF: 42Hz
+ *  FIFO rate: 50Hz
+ *  Clock source: Gyro PLL
+ */
+static int inv_init_config(struct iio_dev *indio_dev)
+{
+	struct inv_reg_map_s *reg;
+	int result;
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	reg = &st->reg;
+	result = set_inv_enable(indio_dev, 0);
+	if (result)
+		return result;
+
+	result = inv_i2c_single_write(st, reg->gyro_config,
+		INV_FSR_2000DPS << GYRO_CONFIG_FSR_SHIFT);
+	if (result)
+		return result;
+	st->chip_config.fsr = INV_FSR_2000DPS;
+
+	result = inv_i2c_single_write(st, reg->lpf, INV_FILTER_42HZ);
+	if (result)
+		return result;
+	st->chip_config.lpf = INV_FILTER_42HZ;
+
+	result = inv_i2c_single_write(st, reg->sample_rate_div,
+					ONE_K_HZ/INIT_FIFO_RATE - 1);
+	if (result)
+		return result;
+	st->chip_config.fifo_rate = INIT_FIFO_RATE;
+	st->irq_dur_us            = INIT_DUR_TIME;
+	st->chip_config.prog_start_addr = DMP_START_ADDR;
+	st->chip_config.gyro_enable = 1;
+	st->chip_config.gyro_fifo_enable = 1;
+	if (INV_ITG3500 != st->chip_type) {
+		st->chip_config.accl_enable = 1;
+		st->chip_config.accl_fifo_enable = 1;
+		st->chip_config.accl_fs = INV_FS_02G;
+		result = inv_i2c_single_write(st, reg->accl_config,
+			(INV_FS_02G << ACCL_CONFIG_FSR_SHIFT));
+		if (result)
+			return result;
+		st->tap.time = INIT_TAP_TIME;
+		st->tap.thresh = INIT_TAP_THRESHOLD;
+		st->tap.min_count = INIT_TAP_MIN_COUNT;
+	}
+
+	return 0;
+}
+
+/**
+ *  inv_compass_scale_show() - show compass scale.
+ */
+static int inv_compass_scale_show(struct inv_mpu_iio_s *st, int *scale)
+{
+	if (COMPASS_ID_AK8975 == st->plat_data.sec_slave_id)
+		*scale = DATA_AKM8975_SCALE;
+	else if (COMPASS_ID_AK8972 == st->plat_data.sec_slave_id)
+		*scale = DATA_AKM8972_SCALE;
+	else if (COMPASS_ID_AK8963 == st->plat_data.sec_slave_id)
+		if (st->compass_scale)
+			*scale = DATA_AKM8963_SCALE1;
+		else
+			*scale = DATA_AKM8963_SCALE0;
+	else
+		return -EINVAL;
+	*scale *= (1L << 15);
+
+	return IIO_VAL_INT;
+}
+
+/**
+ *  mpu_read_raw() - read raw method.
+ */
+static int mpu_read_raw(struct iio_dev *indio_dev,
+			      struct iio_chan_spec const *chan,
+			      int *val,
+			      int *val2,
+			      long mask) {
+	struct inv_mpu_iio_s  *st = iio_priv(indio_dev);
+	int result;
+	if (st->chip_config.is_asleep)
+		return -EINVAL;
+	switch (mask) {
+	case 0:
+		if (chan->type == IIO_ANGL_VEL) {
+			*val = st->raw_gyro[chan->channel2 - IIO_MOD_X];
+			return IIO_VAL_INT;
+		}
+		if (chan->type == IIO_ACCEL) {
+			*val = st->raw_accel[chan->channel2 - IIO_MOD_X];
+			return IIO_VAL_INT;
+		}
+		if (chan->type == IIO_MAGN) {
+			*val = st->raw_compass[chan->channel2 - IIO_MOD_X];
+			return IIO_VAL_INT;
+		}
+		return -EINVAL;
+	case IIO_CHAN_INFO_SCALE:
+		if (chan->type == IIO_ANGL_VEL) {
+			*val = (1 << st->chip_config.fsr)*GYRO_DPS_SCALE;
+			return IIO_VAL_INT;
+		}
+		if (chan->type == IIO_ACCEL) {
+			*val = (2 << st->chip_config.accl_fs);
+			return IIO_VAL_INT;
+		}
+		if (chan->type == IIO_MAGN)
+			return inv_compass_scale_show(st, val);
+		return -EINVAL;
+	case IIO_CHAN_INFO_CALIBBIAS:
+		if (st->chip_config.self_test_run_once == 0) {
+			result = inv_do_test(st, 0,  st->gyro_bias,
+				st->accel_bias);
+			if (result)
+				return result;
+			st->chip_config.self_test_run_once = 1;
+		}
+
+		if (chan->type == IIO_ANGL_VEL) {
+			*val = st->gyro_bias[chan->channel2 - IIO_MOD_X];
+			return IIO_VAL_INT;
+		}
+		if (chan->type == IIO_ACCEL) {
+			*val = st->accel_bias[chan->channel2 - IIO_MOD_X];
+			return IIO_VAL_INT;
+		}
+		return -EINVAL;
+	default:
+		return -EINVAL;
+	}
+}
+
+/**
+ *  inv_write_fsr() - Configure the gyro's scale range.
+ */
+static int inv_write_fsr(struct inv_mpu_iio_s *st, int fsr)
+{
+	struct inv_reg_map_s *reg;
+	int result;
+	reg = &st->reg;
+	if ((fsr < 0) || (fsr > MAX_GYRO_FS_PARAM))
+		return -EINVAL;
+	if (fsr == st->chip_config.fsr)
+		return 0;
+
+	if (INV_MPU3050 == st->chip_type) {
+		result = inv_i2c_single_write(st, reg->lpf,
+			(fsr << GYRO_CONFIG_FSR_SHIFT) | st->chip_config.lpf);
+	} else {
+		result = inv_i2c_single_write(st, reg->gyro_config,
+			fsr << GYRO_CONFIG_FSR_SHIFT);
+	}
+	if (result)
+		return result;
+	st->chip_config.fsr = fsr;
+
+	return 0;
+}
+
+/**
+ *  inv_write_accel_fs() - Configure the accelerometer's scale range.
+ */
+static int inv_write_accel_fs(struct inv_mpu_iio_s *st, int fs)
+{
+	int result;
+	struct inv_reg_map_s *reg;
+	reg = &st->reg;
+
+	if (fs < 0 || fs > MAX_ACCL_FS_PARAM)
+		return -EINVAL;
+	if (fs == st->chip_config.accl_fs)
+		return 0;
+	if (INV_MPU3050 == st->chip_type) {
+		result = st->mpu_slave->set_fs(st, fs);
+		if (result)
+			return result;
+	} else {
+		result = inv_i2c_single_write(st, reg->accl_config,
+				(fs << ACCL_CONFIG_FSR_SHIFT));
+		if (result)
+			return result;
+	}
+	/* reset fifo because the data could be mixed with old bad data */
+	st->chip_config.accl_fs = fs;
+
+	return 0;
+}
+
+/**
+ *  inv_write_compass_scale() - Configure the compass's scale range.
+ */
+static int inv_write_compass_scale(struct inv_mpu_iio_s  *st, int data)
+{
+	char d, en;
+	int result;
+	if (COMPASS_ID_AK8963 != st->plat_data.sec_slave_id)
+		return 0;
+	en = !!data;
+	if (st->compass_scale == en)
+		return 0;
+	d = (1 | (st->compass_scale << AKM8963_SCALE_SHIFT));
+	result = inv_i2c_single_write(st, REG_I2C_SLV1_DO, d);
+	if (result)
+		return result;
+	st->compass_scale = en;
+
+	return 0;
+
+}
+
+/**
+ *  mpu_write_raw() - write raw method.
+ */
+static int mpu_write_raw(struct iio_dev *indio_dev,
+			       struct iio_chan_spec const *chan,
+			       int val,
+			       int val2,
+			       long mask) {
+	struct inv_mpu_iio_s  *st = iio_priv(indio_dev);
+	int result;
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	switch (mask) {
+	case IIO_CHAN_INFO_SCALE:
+		result = -EINVAL;
+		if (chan->type == IIO_ANGL_VEL)
+			result = inv_write_fsr(st, val);
+		if (chan->type == IIO_ACCEL)
+			result = inv_write_accel_fs(st, val);
+		if (chan->type == IIO_MAGN)
+			result = inv_write_compass_scale(st, val);
+		return result;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ *  inv_set_lpf() - set low pass filer based on fifo rate.
+ */
+static int inv_set_lpf(struct inv_mpu_iio_s *st, int rate)
+{
+	const short hz[] = {188, 98, 42, 20, 10, 5};
+	const int   d[] = {INV_FILTER_188HZ, INV_FILTER_98HZ,
+			INV_FILTER_42HZ, INV_FILTER_20HZ,
+			INV_FILTER_10HZ, INV_FILTER_5HZ};
+	int i, h, data, result;
+	struct inv_reg_map_s *reg;
+	reg = &st->reg;
+	h = (rate >> 1);
+	i = 0;
+	while ((h < hz[i]) && (i < ARRAY_SIZE(d) - 1))
+		i++;
+	data = d[i];
+	if (INV_MPU3050 == st->chip_type) {
+		if (st->mpu_slave != NULL) {
+			result = st->mpu_slave->set_lpf(st, rate);
+			if (result)
+				return result;
+		}
+		result = inv_i2c_single_write(st, reg->lpf, data |
+			(st->chip_config.fsr << GYRO_CONFIG_FSR_SHIFT));
+	} else {
+		result = inv_i2c_single_write(st, reg->lpf, data);
+	}
+	if (result)
+		return result;
+	st->chip_config.lpf = data;
+
+	return 0;
+}
+
+/**
+ *  inv_fifo_rate_store() - Set fifo rate.
+ */
+static ssize_t inv_fifo_rate_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long fifo_rate;
+	unsigned char data;
+	int result;
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	struct inv_reg_map_s *reg;
+	reg = &st->reg;
+
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	if (kstrtoul(buf, 10, &fifo_rate))
+		return -EINVAL;
+	if ((fifo_rate < MIN_FIFO_RATE) || (fifo_rate > MAX_FIFO_RATE))
+		return -EINVAL;
+	if (fifo_rate == st->chip_config.fifo_rate)
+		return count;
+	if (st->chip_config.has_compass) {
+		data = COMPASS_RATE_SCALE*fifo_rate/ONE_K_HZ;
+		if (data > 0)
+			data -= 1;
+		st->compass_divider = data;
+		st->compass_counter = 0;
+		/* I2C_MST_DLY is set according to sample rate,
+		   AKM cannot be read or set at sample rate higher than 100Hz*/
+		result = inv_i2c_single_write(st, REG_I2C_SLV4_CTRL, data);
+		if (result)
+			return result;
+	}
+	data = ONE_K_HZ / fifo_rate - 1;
+	result = inv_i2c_single_write(st, reg->sample_rate_div, data);
+	if (result)
+		return result;
+	st->chip_config.fifo_rate = fifo_rate;
+	result = inv_set_lpf(st, fifo_rate);
+	if (result)
+		return result;
+	st->irq_dur_us = (data + 1) * ONE_K_HZ;
+	st->last_isr_time = iio_get_time_ns();
+
+	return count;
+}
+
+/**
+ *  inv_fifo_rate_show() - Get the current sampling rate.
+ */
+static ssize_t inv_fifo_rate_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+
+	return sprintf(buf, "%d\n", st->chip_config.fifo_rate);
+}
+
+/**
+ *  inv_power_state_store() - Turn device on/off.
+ */
+static ssize_t inv_power_state_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int result;
+	unsigned long power_state;
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	if (kstrtoul(buf, 10, &power_state))
+		return -EINVAL;
+	if ((!power_state) == st->chip_config.is_asleep)
+		return count;
+	result = st->set_power_state(st, power_state);
+
+	return count;
+}
+
+/**
+ * inv_firmware_loaded_store() -  calling this function will change
+ *                        firmware load
+ */
+static ssize_t inv_firmware_loaded_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	unsigned long data, result;
+	result = kstrtoul(buf, 10, &data);
+	if (result)
+		return result;
+	if (data)
+		return -EINVAL;
+	st->chip_config.firmware_loaded = 0;
+	st->chip_config.dmp_on = 0;
+	st->chip_config.quaternion_on = 0;
+
+	return count;
+}
+
+/**
+ *  inv_lpa_mode_store() - store current low power settings
+ */
+static ssize_t inv_lpa_mode_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	unsigned long result, lpa_mode;
+	unsigned char d;
+	struct inv_reg_map_s *reg;
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	result = kstrtoul(buf, 10, &lpa_mode);
+	if (result)
+		return result;
+
+	reg = &st->reg;
+	result = inv_i2c_read(st, reg->pwr_mgmt_1, 1, &d);
+	if (result)
+		return result;
+	d &= ~BIT_CYCLE;
+	if (lpa_mode)
+		d |= BIT_CYCLE;
+	result = inv_i2c_single_write(st, reg->pwr_mgmt_1, d);
+	if (result)
+		return result;
+	st->chip_config.lpa_mode = lpa_mode;
+
+	return count;
+}
+
+/**
+ *  inv_lpa_freq_store() - store current low power frequency setting.
+ */
+static ssize_t inv_lpa_freq_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	unsigned long result, lpa_freq;
+	unsigned char d;
+	struct inv_reg_map_s *reg;
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	result = kstrtoul(buf, 10, &lpa_freq);
+	if (result)
+		return result;
+	if (lpa_freq > MAX_LPA_FREQ_PARAM)
+		return -EINVAL;
+	reg = &st->reg;
+	result = inv_i2c_read(st, reg->pwr_mgmt_2, 1, &d);
+	if (result)
+		return result;
+	d &= ~BIT_LPA_FREQ;
+	d |= (unsigned char)(lpa_freq << LPA_FREQ_SHIFT);
+	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, d);
+	if (result)
+		return result;
+	st->chip_config.lpa_freq = lpa_freq;
+
+	return count;
+}
+
+/**
+ *  inv_reg_dump_show() - Register dump for testing.
+ */
+static ssize_t inv_reg_dump_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int ii;
+	char data;
+	ssize_t bytes_printed = 0;
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+
+	for (ii = 0; ii < st->hw->num_reg; ii++) {
+		inv_i2c_read(st, ii, 1, &data);
+		bytes_printed += sprintf(buf+bytes_printed, "%#2x: %#2x\n",
+			ii, data);
+	}
+
+	return bytes_printed;
+}
+
+/**
+ * inv_quaternion_on_store() -  calling this function will store
+ *                                 current quaternion on
+ */
+static ssize_t inv_quaternion_on_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int result, data, en;
+	struct inv_mpu_iio_s *st;
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct iio_buffer *ring = indio_dev->buffer;
+	st = iio_priv(indio_dev);
+	if ((st->chip_config.is_asleep) || (!st->chip_config.firmware_loaded))
+			return -EPERM;
+	result = kstrtoul(buf, 10, (long unsigned int *)&data);
+	if (result)
+		return result;
+	en = !!data;
+	result = inv_send_quaternion(st, en);
+	if (result)
+		return result;
+	st->chip_config.quaternion_on = en;
+	if (!en) {
+		clear_bit(INV_MPU_SCAN_QUAT_R, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_QUAT_X, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_QUAT_Y, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_QUAT_Z, ring->scan_mask);
+	}
+
+	return count;
+}
+
+/**
+ * inv_attr_store() -  calling this function will store current
+ *                        dmp parameter settings
+ */
+static ssize_t inv_attr_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	int result, data, out;
+	char d[4];
+	unsigned char *p;
+	if ((st->chip_config.is_asleep) || (!st->chip_config.firmware_loaded))
+			return -EPERM;
+	result = kstrtol(buf, 10, (long unsigned int *)&data);
+	if (result)
+		return result;
+	switch (this_attr->address) {
+	case ATTR_DMP_FLICK_LOWER:
+		WRITE_BE32_KEY_TO_MEM(KEY_FLICK_LOWER)
+		st->flick.lower = data;
+		break;
+	case ATTR_DMP_FLICK_UPPER:
+		WRITE_BE32_KEY_TO_MEM(KEY_FLICK_UPPER)
+		st->flick.upper = data;
+		break;
+	case ATTR_DMP_FLICK_COUNTER:
+		WRITE_BE32_KEY_TO_MEM(KEY_FLICK_COUNTER)
+		st->flick.counter = data;
+		break;
+	case ATTR_DMP_FLICK_INT_ON:
+		if (data)
+			/* Use interrupt*/
+			d[0] = DIND40+4;
+		else
+			d[0] = DINAA0+8;
+		result = mem_w_key(KEY_CGNOTICE_INTR, 1, d);
+		if (result)
+			return result;
+		st->chip_config.flick_int_on = data;
+		break;
+	case ATTR_DMP_FLICK_AXIS:
+		if (data == 0)
+			d[0] = DINBC2;
+		else if (data == 2)
+			d[2] = DINBC6;
+		else
+			d[0] = DINBC4;
+		result = mem_w_key(KEY_CFG_FLICK_IN, 1, d);
+		if (result)
+			return result;
+		st->flick.axis = data;
+		break;
+	case ATTR_DMP_FLICK_MSG_ON:
+		if (data)
+			data = DATA_MSG_ON;
+		WRITE_BE32_KEY_TO_MEM(KEY_FLICK_MSG)
+		st->flick.msg_on = data;
+		break;
+	case ATTR_DMP_PEDOMETER_STEPS:
+		WRITE_BE32_KEY_TO_MEM(KEY_D_PEDSTD_STEPCTR)
+		break;
+	case ATTR_DMP_PEDOMETER_TIME:
+		WRITE_BE32_KEY_TO_MEM(KEY_D_PEDSTD_TIMECTR)
+		break;
+	case ATTR_DMP_TAP_THRESHOLD: {
+		const char ax[] = {INV_TAP_AXIS_X, INV_TAP_AXIS_Y,
+							INV_TAP_AXIS_Z};
+		int i;
+		for (i = 0; i < ARRAY_SIZE(ax); i++) {
+			result = inv_set_tap_threshold_dmp(st, ax[i], data);
+			if (result)
+				return result;
+		}
+		if (result)
+			return result;
+		st->tap.thresh = data;
+		break;
+	}
+	case ATTR_DMP_TAP_MIN_COUNT:
+		result = inv_set_min_taps_dmp(st, data);
+		if (result)
+			return result;
+		st->tap.min_count = data;
+		break;
+	case ATTR_DMP_TAP_ON:
+		result = inv_enable_tap_dmp(st, !!data);
+		if (result)
+			return result;
+		st->chip_config.tap_on = !!data;
+		break;
+	case ATTR_DMP_TAP_TIME:
+		result = inv_set_tap_time_dmp(st, data);
+		if (result)
+			return result;
+		st->tap.time = data;
+		break;
+	case ATTR_DMP_ON:
+		st->chip_config.dmp_on = !!data;
+		break;
+	case ATTR_DMP_INT_ON:
+		st->chip_config.dmp_int_on = !!data;
+		break;
+	case ATTR_DMP_EVENT_INT_ON:
+		result = inv_set_interrupt_on_gesture_event(st, !!data);
+		if (result)
+			return result;
+		st->chip_config.dmp_event_int_on = !!data;
+		break;
+	case ATTR_DMP_OUTPUT_RATE:
+		if (!data)
+			return -EINVAL;
+		result = inv_set_fifo_rate(st, data);
+		if (result)
+			return result;
+		st->chip_config.dmp_output_rate = data;
+		break;
+	case ATTR_DMP_ORIENTATION_ON:
+		result = inv_enable_orientation_dmp(st, !!data);
+		if (result)
+			return result;
+		st->chip_config.orientation_on = !!data;
+		break;
+	case ATTR_DMP_DISPLAY_ORIENTATION_ON:
+		result = inv_set_display_orient_interrupt_dmp(st, !!data);
+		if (result)
+			return result;
+		st->chip_config.display_orient_on = !!data;
+		break;
+	default:
+		return -EPERM;
+	}
+
+	return count;
+}
+
+/**
+ * inv_attr_show() -  calling this function will show current
+ *                        dmp parameters.
+ */
+static ssize_t inv_attr_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	char d[4];
+	int result, data;
+	signed char *m;
+	unsigned char *key;
+	int i;
+
+	switch (this_attr->address) {
+	case ATTR_DMP_FLICK_LOWER:
+		return sprintf(buf, "%d\n", st->flick.lower);
+	case ATTR_DMP_FLICK_UPPER:
+		return sprintf(buf, "%d\n", st->flick.upper);
+	case ATTR_DMP_FLICK_COUNTER:
+		return sprintf(buf, "%d\n", st->flick.counter);
+	case ATTR_DMP_FLICK_INT_ON:
+		return sprintf(buf, "%d\n", st->chip_config.flick_int_on);
+	case ATTR_DMP_FLICK_AXIS:
+		return sprintf(buf, "%d\n", st->flick.axis);
+	case ATTR_DMP_FLICK_MSG_ON:
+		return sprintf(buf, "%d\n", st->flick.msg_on);
+	case ATTR_DMP_PEDOMETER_STEPS:
+		result = mpu_memory_read(st->sl_handle, st->i2c_addr,
+			inv_dmp_get_address(KEY_D_PEDSTD_STEPCTR), 4, d);
+		if (result)
+			return result;
+		data = be32_to_cpup((int *)d);
+		return sprintf(buf, "%d\n", data);
+	case ATTR_DMP_PEDOMETER_TIME:
+		result = mpu_memory_read(st->sl_handle, st->i2c_addr,
+			inv_dmp_get_address(KEY_D_PEDSTD_TIMECTR), 4, d);
+		if (result)
+			return result;
+		data = be32_to_cpup((int *)d);
+		return sprintf(buf, "%d\n", data*20);
+	case ATTR_DMP_TAP_THRESHOLD:
+		return sprintf(buf, "%d\n", st->tap.thresh);
+	case ATTR_DMP_TAP_MIN_COUNT:
+		return sprintf(buf, "%d\n", st->tap.min_count);
+	case ATTR_DMP_TAP_ON:
+		return sprintf(buf, "%d\n", st->chip_config.tap_on);
+	case ATTR_DMP_TAP_TIME:
+		return sprintf(buf, "%d\n", st->tap.time);
+	case ATTR_DMP_ON:
+		return sprintf(buf, "%d\n", st->chip_config.dmp_on);
+	case ATTR_DMP_INT_ON:
+		return sprintf(buf, "%d\n", st->chip_config.dmp_int_on);
+	case ATTR_DMP_EVENT_INT_ON:
+		return sprintf(buf, "%d\n", st->chip_config.dmp_event_int_on);
+	case ATTR_DMP_OUTPUT_RATE:
+		return sprintf(buf, "%d\n", st->chip_config.dmp_output_rate);
+	case ATTR_DMP_ORIENTATION_ON:
+		return sprintf(buf, "%d\n", st->chip_config.orientation_on);
+	case ATTR_DMP_QUATERNION_ON:
+		return sprintf(buf, "%d\n", st->chip_config.quaternion_on);
+	case ATTR_DMP_DISPLAY_ORIENTATION_ON:
+		return sprintf(buf, "%d\n",
+			st->chip_config.display_orient_on);
+	case ATTR_LPA_MODE:
+		return sprintf(buf, "%d\n", st->chip_config.lpa_mode);
+	case ATTR_LPA_FREQ:{
+		const char *inv_freq[] = {"1.25", "5", "20", "40"};
+		return sprintf(buf, "%s\n",
+				inv_freq[st->chip_config.lpa_freq]);
+	}
+	case ATTR_CLK_SRC:
+		if (INV_CLK_INTERNAL == st->chip_config.clk_src)
+			return sprintf(buf, "INTERNAL\n");
+		else if (INV_CLK_PLL == st->chip_config.clk_src)
+			return sprintf(buf, "Gyro PLL\n");
+		else
+			return -EPERM;
+	case ATTR_SELF_TEST:
+		if (INV_MPU3050 == st->chip_type)
+			result = 0;
+		else
+			result = inv_hw_self_test(st);
+		return sprintf(buf, "%d\n", result);
+	case ATTR_KEY:
+		key = st->plat_data.key;
+		result = 0;
+		data = 0;
+		for (i = 0; i < 16; i++) {
+			data = sprintf(buf+result, "%02x", key[i]);
+			result += data;
+		}
+		result += sprintf(buf + result, "\n");
+		return result;
+
+	case ATTR_GYRO_MATRIX:
+		m = st->plat_data.orientation;
+		return sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+			m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+	case ATTR_ACCL_MATRIX:
+		if (st->plat_data.sec_slave_type == SECONDARY_SLAVE_TYPE_ACCEL)
+			m = st->plat_data.secondary_orientation;
+		else
+			m = st->plat_data.orientation;
+		return sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+			m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+	case ATTR_COMPASS_MATRIX:
+		if (st->plat_data.sec_slave_type ==
+				SECONDARY_SLAVE_TYPE_COMPASS)
+			m = st->plat_data.secondary_orientation;
+		else
+			return -1;
+		return sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+			m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+	case ATTR_GYRO_ENABLE:
+		return sprintf(buf, "%d\n", st->chip_config.gyro_enable);
+	case ATTR_ACCL_ENABLE:
+		return sprintf(buf, "%d\n", st->chip_config.accl_enable);
+	case ATTR_COMPASS_ENABLE:
+		return sprintf(buf, "%d\n", st->chip_config.compass_enable);
+	case ATTR_POWER_STATE:
+		return sprintf(buf, "%d\n", !st->chip_config.is_asleep);
+	case ATTR_FIRMWARE_LOADED:
+		return sprintf(buf, "%d\n", st->chip_config.firmware_loaded);
+	default:
+		return -EPERM;
+	}
+}
+
+/**
+ * inv_dmp_flick_show() -  calling this function will show flick event.
+ *                         This event must use poll.
+ */
+static ssize_t inv_dmp_flick_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "1\n");
+}
+
+/**
+ * inv_dmp_orient_show() -  calling this function will show orientation
+ *                         This event must use poll.
+ */
+static ssize_t inv_dmp_orient_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	return sprintf(buf, "%d\n", st->orient_data);
+}
+
+/**
+ * inv_dmp_display_orient_show() -  calling this function will
+ *			show orientation This event must use poll.
+ */
+static ssize_t inv_dmp_display_orient_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	return sprintf(buf, "%d\n", st->display_orient_data);
+}
+
+/**
+ * inv_dmp_tap_show() -  calling this function will show tap
+ *                         This event must use poll.
+ */
+static ssize_t inv_dmp_tap_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	return sprintf(buf, "%d\n", st->tap_data);
+}
+
+/**
+ *  inv_temperature_show() - Read temperature data directly from registers.
+ */
+static ssize_t inv_temperature_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
+	struct inv_reg_map_s *reg;
+	int result;
+	short temp;
+	long scale_t;
+	unsigned char data[2];
+	reg = &st->reg;
+
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	result = inv_i2c_read(st, reg->temperature, 2, data);
+	if (result) {
+		printk(KERN_ERR "Could not read temperature register.\n");
+		return result;
+	}
+	temp = (signed short)(be16_to_cpup((short *)&data[0]));
+
+	if (INV_MPU3050 == st->chip_type)
+		scale_t = MPU3050_TEMP_OFFSET +
+			inv_q30_mult((long)temp << MPU_TEMP_SHIFT,
+				MPU3050_TEMP_SCALE);
+	else
+		scale_t = MPU6050_TEMP_OFFSET +
+			inv_q30_mult((long)temp << MPU_TEMP_SHIFT,
+				MPU6050_TEMP_SCALE);
+	return sprintf(buf, "%ld %lld\n", scale_t, iio_get_time_ns());
+}
+
+static int inv_switch_gyro_engine(struct inv_mpu_iio_s *st, int en)
+{
+	struct inv_reg_map_s *reg;
+	unsigned char data;
+	int result;
+	reg = &st->reg;
+	result = inv_i2c_read(st, reg->pwr_mgmt_2, 1, &data);
+	if (result)
+		return result;
+	if (en)
+		data &= (~BIT_PWR_GYRO_STBY);
+	else
+		data |= BIT_PWR_GYRO_STBY;
+	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, data);
+	if (result)
+		return result;
+	msleep(SENSOR_UP_TIME);
+
+	return 0;
+}
+
+static int inv_switch_accl_engine(struct inv_mpu_iio_s *st, int en)
+{
+	struct inv_reg_map_s *reg;
+	unsigned char data;
+	int result;
+	reg = &st->reg;
+	result = inv_i2c_read(st, reg->pwr_mgmt_2, 1, &data);
+	if (result)
+		return result;
+	if (en)
+		data &= (~BIT_PWR_ACCL_STBY);
+	else
+		data |= BIT_PWR_ACCL_STBY;
+	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, data);
+	if (result)
+		return result;
+	msleep(SENSOR_UP_TIME);
+
+	return 0;
+}
+
+/**
+ *  inv_gyro_enable_store() - Enable/disable gyro.
+ */
+static ssize_t inv_gyro_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long data,  en;
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+	struct iio_buffer *ring = indio_dev->buffer;
+	int result;
+
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	if (st->chip_config.enable)
+		return -EPERM;
+
+	result = kstrtoul(buf, 10, &data);
+	if (result)
+		return -EINVAL;
+	en = !!data;
+	if (en == st->chip_config.gyro_enable)
+		return count;
+	result = st->switch_gyro_engine(st, en);
+	if (result)
+		return result;
+	if (en)
+		st->chip_config.clk_src = INV_CLK_PLL;
+	else
+		st->chip_config.clk_src = INV_CLK_INTERNAL;
+
+	if (!en) {
+		st->chip_config.gyro_fifo_enable = 0;
+		clear_bit(INV_MPU_SCAN_GYRO_X, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_GYRO_Y, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_GYRO_Z, ring->scan_mask);
+	}
+	st->chip_config.gyro_enable = en;
+	return count;
+}
+
+/**
+ *  inv_accl_enable_store() - Enable/disable accl.
+ */
+static ssize_t inv_accl_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long en, data;
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+	struct iio_buffer *ring = indio_dev->buffer;
+	int result;
+
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	if (st->chip_config.enable)
+		return -EPERM;
+	result = kstrtoul(buf, 10, &data);
+	if (result)
+		return -EINVAL;
+	en = !!data;
+	if (en == st->chip_config.accl_enable)
+		return count;
+	result = st->switch_accl_engine(st, en);
+	if (result)
+		return result;
+	st->chip_config.accl_enable = en;
+	if (!en) {
+		st->chip_config.accl_fifo_enable = 0;
+		clear_bit(INV_MPU_SCAN_ACCL_X, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_ACCL_Y, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_ACCL_Z, ring->scan_mask);
+	}
+	return count;
+}
+
+/**
+ * inv_compass_en_store() -  calling this function will store compass
+ *                         enable
+ */
+static ssize_t inv_compass_en_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long data, result, en;
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+	struct iio_buffer *ring = indio_dev->buffer;
+	if (st->chip_config.is_asleep)
+		return -EPERM;
+	if (st->chip_config.enable)
+		return -EPERM;
+	result = kstrtoul(buf, 10, &data);
+	if (result)
+		return result;
+	en = !!data;
+	if (en == st->chip_config.compass_enable)
+		return count;
+	st->chip_config.compass_enable = en;
+	if (!en) {
+		st->chip_config.compass_fifo_enable = 0;
+		clear_bit(INV_MPU_SCAN_MAGN_X, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_MAGN_Y, ring->scan_mask);
+		clear_bit(INV_MPU_SCAN_MAGN_Z, ring->scan_mask);
+	}
+
+	return count;
+}
+#define INV_MPU_CHAN(_type, _channel2, _index)                        \
+	{                                                             \
+		.type = _type,                                        \
+		.modified = 1,                                        \
+		.channel2 = _channel2,                                \
+		.info_mask =  (IIO_CHAN_INFO_CALIBBIAS_SEPARATE_BIT | \
+				IIO_CHAN_INFO_SCALE_SHARED_BIT),      \
+		.scan_index = _index,                                 \
+		.scan_type  = IIO_ST('s', 16, 16, 0)                  \
+	}
+
+#define INV_MPU_QUATERNION_CHAN(_channel2, _index)                    \
+	{                                                             \
+		.type = IIO_QUATERNION,                               \
+		.modified = 1,                                        \
+		.channel2 = _channel2,                                \
+		.scan_index = _index,                                 \
+		.scan_type  = IIO_ST('s', 32, 32, 0)                  \
+	}
+
+#define INV_MPU_MAGN_CHAN(_channel2, _index)                          \
+	{                                                             \
+		.type = IIO_MAGN,                                     \
+		.modified = 1,                                        \
+		.channel2 = _channel2,                                \
+		.info_mask =  IIO_CHAN_INFO_SCALE_SHARED_BIT,         \
+		.scan_index = _index,                                 \
+		.scan_type  = IIO_ST('s', 16, 16, 0)                  \
+	}
+
+static const struct iio_chan_spec inv_mpu_channels[] = {
+	IIO_CHAN_SOFT_TIMESTAMP(INV_MPU_SCAN_TIMESTAMP),
+
+	INV_MPU_CHAN(IIO_ANGL_VEL, IIO_MOD_X, INV_MPU_SCAN_GYRO_X),
+	INV_MPU_CHAN(IIO_ANGL_VEL, IIO_MOD_Y, INV_MPU_SCAN_GYRO_Y),
+	INV_MPU_CHAN(IIO_ANGL_VEL, IIO_MOD_Z, INV_MPU_SCAN_GYRO_Z),
+
+	INV_MPU_CHAN(IIO_ACCEL, IIO_MOD_X, INV_MPU_SCAN_ACCL_X),
+	INV_MPU_CHAN(IIO_ACCEL, IIO_MOD_Y, INV_MPU_SCAN_ACCL_Y),
+	INV_MPU_CHAN(IIO_ACCEL, IIO_MOD_Z, INV_MPU_SCAN_ACCL_Z),
+
+	INV_MPU_QUATERNION_CHAN(IIO_MOD_R, INV_MPU_SCAN_QUAT_R),
+	INV_MPU_QUATERNION_CHAN(IIO_MOD_X, INV_MPU_SCAN_QUAT_X),
+	INV_MPU_QUATERNION_CHAN(IIO_MOD_Y, INV_MPU_SCAN_QUAT_Y),
+	INV_MPU_QUATERNION_CHAN(IIO_MOD_Z, INV_MPU_SCAN_QUAT_Z),
+
+	INV_MPU_MAGN_CHAN(IIO_MOD_X, INV_MPU_SCAN_MAGN_X),
+	INV_MPU_MAGN_CHAN(IIO_MOD_Y, INV_MPU_SCAN_MAGN_Y),
+	INV_MPU_MAGN_CHAN(IIO_MOD_Z, INV_MPU_SCAN_MAGN_Z),
+};
+
+/*constant IIO attribute */
+static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("10 20 50 100 200 500");
+static IIO_DEV_ATTR_SAMP_FREQ(S_IRUGO | S_IWUSR, inv_fifo_rate_show,
+	inv_fifo_rate_store);
+static DEVICE_ATTR(temperature, S_IRUGO, inv_temperature_show, NULL);
+static IIO_DEVICE_ATTR(clock_source, S_IRUGO, inv_attr_show, NULL,
+		ATTR_CLK_SRC);
+static IIO_DEVICE_ATTR(power_state, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_power_state_store, ATTR_POWER_STATE);
+static IIO_DEVICE_ATTR(firmware_loaded, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_firmware_loaded_store, ATTR_FIRMWARE_LOADED);
+static IIO_DEVICE_ATTR(lpa_mode, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_lpa_mode_store, ATTR_LPA_MODE);
+static IIO_DEVICE_ATTR(lpa_freq, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_lpa_freq_store, ATTR_LPA_FREQ);
+static DEVICE_ATTR(reg_dump, S_IRUGO, inv_reg_dump_show, NULL);
+static IIO_DEVICE_ATTR(self_test, S_IRUGO, inv_attr_show, NULL,
+		ATTR_SELF_TEST);
+static IIO_DEVICE_ATTR(key, S_IRUGO, inv_attr_show, NULL, ATTR_KEY);
+static IIO_DEVICE_ATTR(gyro_matrix, S_IRUGO, inv_attr_show, NULL,
+		ATTR_GYRO_MATRIX);
+static IIO_DEVICE_ATTR(accl_matrix, S_IRUGO, inv_attr_show, NULL,
+		ATTR_ACCL_MATRIX);
+static IIO_DEVICE_ATTR(compass_matrix, S_IRUGO, inv_attr_show, NULL,
+		ATTR_COMPASS_MATRIX);
+static IIO_DEVICE_ATTR(flick_lower, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_LOWER);
+static IIO_DEVICE_ATTR(flick_upper, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_UPPER);
+static IIO_DEVICE_ATTR(flick_counter, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_COUNTER);
+static IIO_DEVICE_ATTR(flick_message_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_MSG_ON);
+static IIO_DEVICE_ATTR(flick_int_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_INT_ON);
+static IIO_DEVICE_ATTR(flick_axis, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_FLICK_AXIS);
+static IIO_DEVICE_ATTR(dmp_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_ON);
+static IIO_DEVICE_ATTR(dmp_int_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_INT_ON);
+static IIO_DEVICE_ATTR(dmp_event_int_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_EVENT_INT_ON);
+static IIO_DEVICE_ATTR(dmp_output_rate, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_OUTPUT_RATE);
+static IIO_DEVICE_ATTR(orientation_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_ORIENTATION_ON);
+static IIO_DEVICE_ATTR(quaternion_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_quaternion_on_store, ATTR_DMP_QUATERNION_ON);
+static IIO_DEVICE_ATTR(display_orientation_on, S_IRUGO | S_IWUSR,
+	inv_attr_show, inv_attr_store, ATTR_DMP_DISPLAY_ORIENTATION_ON);
+static IIO_DEVICE_ATTR(tap_on, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_TAP_ON);
+static IIO_DEVICE_ATTR(tap_time, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_TAP_TIME);
+static IIO_DEVICE_ATTR(tap_min_count, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_TAP_MIN_COUNT);
+static IIO_DEVICE_ATTR(tap_threshold, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_TAP_THRESHOLD);
+static IIO_DEVICE_ATTR(pedometer_time, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_PEDOMETER_TIME);
+static IIO_DEVICE_ATTR(pedometer_steps, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_attr_store, ATTR_DMP_PEDOMETER_STEPS);
+static DEVICE_ATTR(event_flick, S_IRUGO, inv_dmp_flick_show, NULL);
+static DEVICE_ATTR(event_orientation, S_IRUGO, inv_dmp_orient_show, NULL);
+static DEVICE_ATTR(event_tap, S_IRUGO, inv_dmp_tap_show, NULL);
+static DEVICE_ATTR(event_display_orientation, S_IRUGO,
+			inv_dmp_display_orient_show, NULL);
+static IIO_DEVICE_ATTR(gyro_enable, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_gyro_enable_store, ATTR_GYRO_ENABLE);
+static IIO_DEVICE_ATTR(accl_enable, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_accl_enable_store, ATTR_ACCL_ENABLE);
+static IIO_DEVICE_ATTR(compass_enable, S_IRUGO | S_IWUSR, inv_attr_show,
+	inv_compass_en_store, ATTR_COMPASS_ENABLE);
+
+static const struct attribute *inv_gyro_attributes[] = {
+	&iio_dev_attr_gyro_enable.dev_attr.attr,
+	&dev_attr_temperature.attr,
+	&iio_dev_attr_clock_source.dev_attr.attr,
+	&iio_dev_attr_power_state.dev_attr.attr,
+	&dev_attr_reg_dump.attr,
+	&iio_dev_attr_self_test.dev_attr.attr,
+	&iio_dev_attr_key.dev_attr.attr,
+	&iio_dev_attr_gyro_matrix.dev_attr.attr,
+	&iio_dev_attr_sampling_frequency.dev_attr.attr,
+	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
+};
+
+static const struct attribute *inv_mpu6050_attributes[] = {
+	&iio_dev_attr_accl_enable.dev_attr.attr,
+	&iio_dev_attr_accl_matrix.dev_attr.attr,
+	&iio_dev_attr_firmware_loaded.dev_attr.attr,
+	&iio_dev_attr_lpa_mode.dev_attr.attr,
+	&iio_dev_attr_lpa_freq.dev_attr.attr,
+	&iio_dev_attr_flick_lower.dev_attr.attr,
+	&iio_dev_attr_flick_upper.dev_attr.attr,
+	&iio_dev_attr_flick_counter.dev_attr.attr,
+	&iio_dev_attr_flick_message_on.dev_attr.attr,
+	&iio_dev_attr_flick_int_on.dev_attr.attr,
+	&iio_dev_attr_flick_axis.dev_attr.attr,
+	&iio_dev_attr_dmp_on.dev_attr.attr,
+	&iio_dev_attr_dmp_int_on.dev_attr.attr,
+	&iio_dev_attr_dmp_event_int_on.dev_attr.attr,
+	&iio_dev_attr_dmp_output_rate.dev_attr.attr,
+	&iio_dev_attr_orientation_on.dev_attr.attr,
+	&iio_dev_attr_quaternion_on.dev_attr.attr,
+	&iio_dev_attr_display_orientation_on.dev_attr.attr,
+	&iio_dev_attr_tap_on.dev_attr.attr,
+	&iio_dev_attr_tap_time.dev_attr.attr,
+	&iio_dev_attr_tap_min_count.dev_attr.attr,
+	&iio_dev_attr_tap_threshold.dev_attr.attr,
+	&iio_dev_attr_pedometer_time.dev_attr.attr,
+	&iio_dev_attr_pedometer_steps.dev_attr.attr,
+	&dev_attr_event_flick.attr,
+	&dev_attr_event_orientation.attr,
+	&dev_attr_event_display_orientation.attr,
+	&dev_attr_event_tap.attr,
+};
+
+static const struct attribute *inv_compass_attributes[] = {
+	&iio_dev_attr_compass_matrix.dev_attr.attr,
+	&iio_dev_attr_compass_enable.dev_attr.attr,
+};
+
+static const struct attribute *inv_mpu3050_attributes[] = {
+	&iio_dev_attr_accl_matrix.dev_attr.attr,
+	&iio_dev_attr_accl_enable.dev_attr.attr,
+};
+
+static struct attribute *inv_attributes[ARRAY_SIZE(inv_gyro_attributes) +
+				ARRAY_SIZE(inv_mpu6050_attributes) +
+				ARRAY_SIZE(inv_compass_attributes) + 1];
+
+static const struct attribute_group inv_attribute_group = {
+	.name = "mpu",
+	.attrs = inv_attributes
+};
+
+static const struct iio_info mpu_info = {
+	.driver_module = THIS_MODULE,
+	.read_raw = &mpu_read_raw,
+	.write_raw = &mpu_write_raw,
+	.attrs = &inv_attribute_group,
+};
+
+/**
+ *  inv_setup_compass() - Configure compass.
+ */
+static int inv_setup_compass(struct inv_mpu_iio_s *st)
+{
+	int result;
+	unsigned char data[4];
+
+	result = inv_i2c_read(st, REG_YGOFFS_TC, 1, data);
+	if (result)
+		return result;
+	data[0] &= ~BIT_I2C_MST_VDDIO;
+	if (st->plat_data.level_shifter)
+		data[0] |= BIT_I2C_MST_VDDIO;
+	/*set up VDDIO register */
+	result = inv_i2c_single_write(st, REG_YGOFFS_TC, data[0]);
+	if (result)
+		return result;
+	/* set to bypass mode */
+	result = inv_i2c_single_write(st, REG_INT_PIN_CFG,
+				st->plat_data.int_config | BIT_BYPASS_EN);
+	if (result)
+		return result;
+	/*read secondary i2c ID register */
+	result = inv_secondary_read(REG_AKM_ID, 1, data);
+	if (result)
+		return result;
+	if (data[0] != DATA_AKM_ID)
+		return -ENXIO;
+	/*set AKM to Fuse ROM access mode */
+	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PW_FR);
+	if (result)
+		return result;
+	result = inv_secondary_read(REG_AKM_SENSITIVITY, THREE_AXIS,
+					st->chip_info.compass_sens);
+	if (result)
+		return result;
+	/*revert to power down mode */
+	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PW_DN);
+	if (result)
+		return result;
+	pr_info("senx=%d, seny=%d,senz=%d\n",
+		st->chip_info.compass_sens[0],
+		st->chip_info.compass_sens[1],
+		st->chip_info.compass_sens[2]);
+	/*restore to non-bypass mode */
+	result = inv_i2c_single_write(st, REG_INT_PIN_CFG,
+			st->plat_data.int_config);
+	if (result)
+		return result;
+
+	/*setup master mode and master clock and ES bit*/
+	result = inv_i2c_single_write(st, REG_I2C_MST_CTRL, BIT_WAIT_FOR_ES);
+	if (result)
+		return result;
+	/* slave 0 is used to read data from compass */
+	/*read mode */
+	result = inv_i2c_single_write(st, REG_I2C_SLV0_ADDR, BIT_I2C_READ|
+		st->plat_data.secondary_i2c_addr);
+	if (result)
+		return result;
+	/* AKM status register address is 2 */
+	result = inv_i2c_single_write(st, REG_I2C_SLV0_REG, REG_AKM_STATUS);
+	if (result)
+		return result;
+	/* slave 0 is enabled at the beginning, read 8 bytes from here */
+	result = inv_i2c_single_write(st, REG_I2C_SLV0_CTRL, BIT_SLV_EN |
+				NUM_BYTES_COMPASS_SLAVE);
+	if (result)
+		return result;
+	/*slave 1 is used for AKM mode change only*/
+	result = inv_i2c_single_write(st, REG_I2C_SLV1_ADDR,
+		st->plat_data.secondary_i2c_addr);
+	if (result)
+		return result;
+	/* AKM mode register address is 0x0A */
+	result = inv_i2c_single_write(st, REG_I2C_SLV1_REG, REG_AKM_MODE);
+	if (result)
+		return result;
+	/* slave 1 is enabled, byte length is 1 */
+	result = inv_i2c_single_write(st, REG_I2C_SLV1_CTRL, BIT_SLV_EN | 1);
+	if (result)
+		return result;
+	/* output data for slave 1 is fixed, single measure mode*/
+	st->compass_scale = 1;
+	if (COMPASS_ID_AK8975 == st->plat_data.sec_slave_id) {
+		st->compass_st_upper = AKM8975_ST_Upper;
+		st->compass_st_lower = AKM8975_ST_Lower;
+		data[0] = 1;
+	} else if (COMPASS_ID_AK8972 == st->plat_data.sec_slave_id) {
+		st->compass_st_upper = AKM8972_ST_Upper;
+		st->compass_st_lower = AKM8972_ST_Lower;
+		data[0] = 1;
+	} else if (COMPASS_ID_AK8963 == st->plat_data.sec_slave_id) {
+		st->compass_st_upper = AKM8963_ST_Upper;
+		st->compass_st_lower = AKM8963_ST_Lower;
+		data[0] = 1 | (st->compass_scale << AKM8963_SCALE_SHIFT);
+	}
+	result = inv_i2c_single_write(st, REG_I2C_SLV1_DO, data[0]);
+	if (result)
+		return result;
+	/* slave 0 and 1 timer action is enabled every sample*/
+	result = inv_i2c_single_write(st, REG_I2C_MST_DELAY_CTRL,
+				BIT_SLV0_DLY_EN | BIT_SLV1_DLY_EN);
+	return result;
+}
+
+static void inv_setup_func_ptr(struct inv_mpu_iio_s *st)
+{
+	if (st->chip_type == INV_MPU3050) {
+		st->set_power_state    = set_power_mpu3050;
+		st->switch_gyro_engine = inv_switch_3050_gyro_engine;
+		st->switch_accl_engine = inv_switch_3050_accl_engine;
+		st->init_config        = inv_init_config_mpu3050;
+		st->setup_reg          = inv_setup_reg_mpu3050;
+	} else {
+		st->set_power_state    = set_power_itg;
+		st->switch_gyro_engine = inv_switch_gyro_engine;
+		st->switch_accl_engine = inv_switch_accl_engine;
+		st->init_config        = inv_init_config;
+		st->setup_reg          = inv_setup_reg;
+	}
+}
+
+/**
+ *  inv_check_chip_type() - check and setup chip type.
+ */
+static int inv_check_chip_type(struct inv_mpu_iio_s *st,
+		const struct i2c_device_id *id)
+{
+	struct inv_reg_map_s *reg;
+	int result;
+	int t_ind;
+	if (!strcmp(id->name, "itg3500"))
+		st->chip_type = INV_ITG3500;
+	else if (!strcmp(id->name, "mpu3050"))
+		st->chip_type = INV_MPU3050;
+	else if (!strcmp(id->name, "mpu6050"))
+		st->chip_type = INV_MPU6050;
+	else if (!strcmp(id->name, "mpu9150"))
+		st->chip_type = INV_MPU9150;
+	else
+		return -EPERM;
+	inv_setup_func_ptr(st);
+	st->hw  = (struct inv_hw_s *)(hw_info  + st->chip_type);
+	st->mpu_slave = NULL;
+	st->num_channels = INV_CHANNEL_NUM_GYRO;
+	if (INV_MPU9150 == st->chip_type) {
+		st->plat_data.sec_slave_type = SECONDARY_SLAVE_TYPE_COMPASS;
+		st->plat_data.sec_slave_id = COMPASS_ID_AK8975;
+		st->chip_config.has_compass = 1;
+		st->num_channels = INV_CHANNEL_NUM_GYRO_ACCL_QUANTERNION_MAGN;
+	}
+	if (SECONDARY_SLAVE_TYPE_ACCEL == st->plat_data.sec_slave_type) {
+		if (ACCEL_ID_BMA250 == st->plat_data.sec_slave_id)
+			inv_register_mpu3050_slave(st);
+		st->num_channels = INV_CHANNEL_NUM_GYRO_ACCL;
+	}
+	if (SECONDARY_SLAVE_TYPE_COMPASS == st->plat_data.sec_slave_type)
+		st->chip_config.has_compass = 1;
+	else
+		st->chip_config.has_compass = 0;
+	if (INV_MPU6050 == st->chip_type) {
+		if (st->chip_config.has_compass)
+			st->num_channels =
+				INV_CHANNEL_NUM_GYRO_ACCL_QUANTERNION_MAGN;
+		else
+			st->num_channels =
+				INV_CHANNEL_NUM_GYRO_ACCL_QUANTERNION;
+	}
+	reg = &st->reg;
+	st->setup_reg(reg);
+	st->chip_config.gyro_enable = 1;
+	result = st->set_power_state(st, true);
+	if (result)
+		return result;
+
+	if (INV_ITG3500 != st->chip_type && INV_MPU3050 != st->chip_type) {
+		result = inv_get_silicon_rev_mpu6050(st);
+		if (result) {
+			st->set_power_state(st, false);
+			return result;
+		}
+	}
+	if (st->chip_config.has_compass) {
+		result = inv_setup_compass(st);
+		if (result) {
+			st->set_power_state(st, false);
+			return result;
+		}
+	}
+
+	t_ind = 0;
+	memcpy(&inv_attributes[t_ind], inv_gyro_attributes,
+			sizeof(inv_gyro_attributes));
+	t_ind = ARRAY_SIZE(inv_gyro_attributes);
+
+	if (INV_MPU3050 == st->chip_type && st->mpu_slave != NULL) {
+		memcpy(&inv_attributes[t_ind], inv_mpu3050_attributes,
+				sizeof(inv_mpu3050_attributes));
+		t_ind += ARRAY_SIZE(inv_mpu3050_attributes);
+		inv_attributes[t_ind] = NULL;
+		return 0;
+	}
+
+	if ((INV_MPU6050 == st->chip_type) || (INV_MPU9150 == st->chip_type)) {
+		memcpy(&inv_attributes[t_ind], inv_mpu6050_attributes,
+				sizeof(inv_mpu6050_attributes));
+		t_ind += ARRAY_SIZE(inv_mpu6050_attributes);
+	}
+
+	if (st->chip_config.has_compass) {
+		memcpy(&inv_attributes[t_ind], inv_compass_attributes,
+				sizeof(inv_compass_attributes));
+		t_ind += ARRAY_SIZE(inv_compass_attributes);
+	}
+	inv_attributes[t_ind] = NULL;
+
+	return 0;
+}
+
+/**
+ *  inv_create_dmp_sysfs() - create binary sysfs dmp entry.
+ */
+static const struct bin_attribute dmp_firmware = {
+	.attr = {
+		.name = "dmp_firmware",
+		.mode = S_IRUGO | S_IWUSR
+	},
+	.size = 4096,
+	.read = inv_dmp_firmware_read,
+	.write = inv_dmp_firmware_write,
+};
+
+static int inv_create_dmp_sysfs(struct iio_dev *ind)
+{
+	int result;
+	result = sysfs_create_bin_file(&ind->dev.kobj, &dmp_firmware);
+	return result;
+}
+
+/**
+ *  inv_mpu_probe() - probe function.
+ */
+static int inv_mpu_probe(struct i2c_client *client,
+	const struct i2c_device_id *id)
+{
+	struct inv_mpu_iio_s *st;
+	struct iio_dev *indio_dev;
+	int result;
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		result = -ENODEV;
+		goto out_no_free;
+	}
+	indio_dev = iio_allocate_device(sizeof(*st));
+	if (indio_dev == NULL) {
+		result =  -ENOMEM;
+		goto out_no_free;
+	}
+	st = iio_priv(indio_dev);
+	st->client = client;
+	st->sl_handle = client->adapter;
+	st->i2c_addr = client->addr;
+	st->plat_data =
+		*(struct mpu_platform_data *)dev_get_platdata(&client->dev);
+	/* power is turned on inside check chip type*/
+	result = inv_check_chip_type(st, id);
+	if (result)
+		goto out_free;
+
+	result = st->init_config(indio_dev);
+	if (result) {
+		dev_err(&client->adapter->dev,
+			"Could not initialize device.\n");
+		goto out_free;
+	}
+	result = st->set_power_state(st, false);
+	if (result) {
+		dev_err(&client->adapter->dev,
+			"%s could not be turned off.\n", st->hw->name);
+		goto out_free;
+	}
+
+	/* Make state variables available to all _show and _store functions. */
+	i2c_set_clientdata(client, indio_dev);
+	indio_dev->dev.parent = &client->dev;
+	indio_dev->name = id->name;
+	indio_dev->channels = inv_mpu_channels;
+	indio_dev->num_channels = st->num_channels;
+
+	indio_dev->info = &mpu_info;
+	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->currentmode = INDIO_DIRECT_MODE;
+
+	result = inv_mpu_configure_ring(indio_dev);
+	if (result)
+		goto out_free;
+	result = iio_buffer_register(indio_dev, indio_dev->channels,
+					indio_dev->num_channels);
+	if (result)
+		goto out_unreg_ring;
+	st->irq = client->irq;
+	result = inv_mpu_probe_trigger(indio_dev);
+	if (result)
+		goto out_remove_ring;
+
+	result = iio_device_register(indio_dev);
+	if (result)
+		goto out_remove_trigger;
+	if (INV_MPU6050 == st->chip_type || INV_MPU9150 == st->chip_type) {
+		result = inv_create_dmp_sysfs(indio_dev);
+		if (result)
+			goto out_unreg_iio;
+	}
+
+	INIT_KFIFO(st->timestamps);
+	spin_lock_init(&st->time_stamp_lock);
+	pr_info("%s: Probe name %s\n", __func__, id->name);
+	dev_info(&client->adapter->dev, "%s is ready to go!\n", st->hw->name);
+	return 0;
+out_unreg_iio:
+	iio_device_unregister(indio_dev);
+out_remove_trigger:
+	if (indio_dev->modes & INDIO_BUFFER_TRIGGERED)
+		inv_mpu_remove_trigger(indio_dev);
+out_remove_ring:
+	iio_buffer_unregister(indio_dev);
+out_unreg_ring:
+	inv_mpu_unconfigure_ring(indio_dev);
+out_free:
+	iio_free_device(indio_dev);
+out_no_free:
+	dev_err(&client->adapter->dev, "%s failed %d\n", __func__, result);
+
+	return -EIO;
+}
+
+/**
+ *  inv_mpu_remove() - remove function.
+ */
+static int inv_mpu_remove(struct i2c_client *client)
+{
+	struct iio_dev *indio_dev = i2c_get_clientdata(client);
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+	kfifo_free(&st->timestamps);
+	iio_device_unregister(indio_dev);
+	inv_mpu_remove_trigger(indio_dev);
+	iio_buffer_unregister(indio_dev);
+	inv_mpu_unconfigure_ring(indio_dev);
+	iio_free_device(indio_dev);
+
+	dev_info(&client->adapter->dev, "inv-mpu-iio module removed.\n");
+
+	return 0;
+}
+
+static const unsigned short normal_i2c[] = { I2C_CLIENT_END };
+/* device id table is used to identify what device can be
+ * supported by this driver
+ */
+static const struct i2c_device_id inv_mpu_id[] = {
+	{"itg3500", INV_ITG3500},
+	{"mpu3050", INV_MPU3050},
+	{"mpu6050", INV_MPU6050},
+	{"mpu9150", INV_MPU9150},
+	{}
+};
+
+MODULE_DEVICE_TABLE(i2c, inv_mpu_id);
+
+static struct i2c_driver inv_mpu_driver = {
+	.class = I2C_CLASS_HWMON,
+	.probe		=	inv_mpu_probe,
+	.remove		=	inv_mpu_remove,
+	.id_table	=	inv_mpu_id,
+	.driver = {
+		.owner	=	THIS_MODULE,
+		.name	=	"inv-mpu-iio",
+	},
+	.address_list = normal_i2c,
+};
+
+static int __init inv_mpu_init(void)
+{
+	int result = i2c_add_driver(&inv_mpu_driver);
+	if (result) {
+		pr_err("%s failed\n", __func__);
+		return result;
+	}
+	return 0;
+}
+
+static void __exit inv_mpu_exit(void)
+{
+	i2c_del_driver(&inv_mpu_driver);
+}
+
+module_init(inv_mpu_init);
+module_exit(inv_mpu_exit);
+
+MODULE_AUTHOR("Invensense Corporation");
+MODULE_DESCRIPTION("Invensense device driver");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("inv-mpu-iio");
+/**
+ *  @}
+ */
+

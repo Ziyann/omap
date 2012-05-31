@@ -68,6 +68,8 @@ static const char * const iio_chan_type_name_spec[] = {
 	[IIO_ANGL] = "angl",
 	[IIO_TIMESTAMP] = "timestamp",
 	[IIO_CAPACITANCE] = "capacitance",
+	[IIO_PRESSURE] = "pressure",
+	[IIO_QUATERNION] = "quaternion",
 };
 
 static const char * const iio_modifier_names[] = {
@@ -76,6 +78,7 @@ static const char * const iio_modifier_names[] = {
 	[IIO_MOD_Z] = "z",
 	[IIO_MOD_LIGHT_BOTH] = "both",
 	[IIO_MOD_LIGHT_IR] = "ir",
+	[IIO_MOD_R]  = "r",
 };
 
 /* relies on pairs of these shared then separate */
@@ -690,8 +693,8 @@ static int iio_device_register_sysfs(struct iio_dev *indio_dev)
 		attrcount++;
 
 	indio_dev->chan_attr_group.attrs = kcalloc(attrcount + 1,
-						   sizeof(indio_dev->chan_attr_group.attrs[0]),
-						   GFP_KERNEL);
+				sizeof(indio_dev->chan_attr_group.attrs[0]),
+				GFP_KERNEL);
 	if (indio_dev->chan_attr_group.attrs == NULL) {
 		ret = -ENOMEM;
 		goto error_clear_attrs;

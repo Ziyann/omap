@@ -56,6 +56,8 @@ unsigned int iio_buffer_poll(struct file *filp,
 {
 	struct iio_dev *indio_dev = filp->private_data;
 	struct iio_buffer *rb = indio_dev->buffer;
+	if (rb->stufftoread)
+		return POLLIN | POLLRDNORM;
 
 	poll_wait(filp, &rb->pollq, wait);
 	if (rb->stufftoread)
@@ -295,7 +297,8 @@ int iio_buffer_register(struct iio_dev *indio_dev,
 					channels[i].scan_index;
 		}
 		if (indio_dev->masklength && buffer->scan_mask == NULL) {
-			buffer->scan_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
+			buffer->scan_mask =
+				kcalloc(BITS_TO_LONGS(indio_dev->masklength),
 						    sizeof(*buffer->scan_mask),
 						    GFP_KERNEL);
 			if (buffer->scan_mask == NULL) {
@@ -308,8 +311,8 @@ int iio_buffer_register(struct iio_dev *indio_dev,
 	buffer->scan_el_group.name = iio_scan_elements_group_name;
 
 	buffer->scan_el_group.attrs = kcalloc(attrcount + 1,
-					      sizeof(buffer->scan_el_group.attrs[0]),
-					      GFP_KERNEL);
+				      sizeof(buffer->scan_el_group.attrs[0]),
+				      GFP_KERNEL);
 	if (buffer->scan_el_group.attrs == NULL) {
 		ret = -ENOMEM;
 		goto error_free_scan_mask;
@@ -367,7 +370,7 @@ ssize_t iio_buffer_write_length(struct device *dev,
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct iio_buffer *buffer = indio_dev->buffer;
 
-	ret = strict_strtoul(buf, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
