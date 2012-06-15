@@ -38,13 +38,6 @@
 #define OMAP4_ION_HEAP_NONSECURE_TILER_SIZE	\
 			(omap_ion_heap_nonsec_tiler_mem_size())
 
-#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
-#define PHYS_ADDR_TESLA_SIZE	(SZ_1M * 4)
-#define PHYS_ADDR_TESLA_MEM	(PHYS_ADDR_DUCATI_MEM - \
-					OMAP4_ION_HEAP_TILER_SIZE - \
-					PHYS_ADDR_TESLA_SIZE)
-#endif
-
 
 struct omap_ion_platform_data {
 	struct ion_platform_data *ion;
