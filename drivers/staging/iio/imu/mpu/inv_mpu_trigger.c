@@ -67,24 +67,20 @@ int inv_mpu_probe_trigger(struct iio_dev *indio_dev)
 	st->trig = iio_allocate_trigger("%s-dev%d",
 					indio_dev->name,
 					indio_dev->id);
-	if (st->trig == NULL) {
-		ret = -ENOMEM;
-		goto error_ret;
-	}
+	if (st->trig == NULL)
+		return -ENOMEM;
 	st->trig->dev.parent = &st->client->dev;
 	st->trig->private_data = indio_dev;
 	st->trig->ops = &inv_mpu_trigger_ops;
 	ret = iio_trigger_register(st->trig);
 
-	/* select default trigger */
+	if (ret) {
+		iio_free_trigger(st->trig);
+		return -EPERM;
+	}
 	indio_dev->trig = st->trig;
-	if (ret)
-		goto error_ret;
 
 	return 0;
-
-error_ret:
-	return ret;
 }
 
 void inv_mpu_remove_trigger(struct iio_dev *indio_dev)

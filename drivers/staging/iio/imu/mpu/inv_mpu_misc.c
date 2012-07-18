@@ -22,6 +22,8 @@
  *      @details This file is part of invensense mpu driver code
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -66,7 +68,7 @@
 /* full scale setting dps */
 #define DEF_SELFTEST_GYRO_FULL_SCALE         (0 << 3)
 #define DEF_SELFTEST_ACCL_FULL_SCALE         (2 << 3)
-#define DEF_SELFTEST_GYRO_SENS            (32768/250)
+#define DEF_SELFTEST_GYRO_SENS            (32768 / 250)
 /* wait time before collecting data */
 #define DEF_GYRO_WAIT_TIME          50
 #define DEF_ST_STABLE_TIME          200
@@ -80,7 +82,8 @@
 #define DEF_ST_COMPASS_RESULT_SHIFT 2
 #define DEF_ST_ACCEL_RESULT_SHIFT   1
 
-#define DEF_ST_COMPASS_WAIT         (10*1000)
+#define DEF_ST_COMPASS_WAIT_MIN     (10 * 1000)
+#define DEF_ST_COMPASS_WAIT_MAX     (15 * 1000)
 #define DEF_ST_COMPASS_TRY_TIMES    10
 #define DEF_ST_COMPASS_8963_SHIFT   2
 
@@ -339,7 +342,7 @@ int mpu_memory_read(struct i2c_adapter *i2c_adap,
  *  @brief  Inverse lookup of the index of an MPL product key .
  *  @param  key
  *              the MPL product indentifier also referred to as 'key'.
- *  @return the index position of the key in the array, -1 if not found.
+ *  @return the index position of the key in the array.
  */
 static short index_of_key(unsigned short key)
 {
@@ -347,7 +350,7 @@ static short index_of_key(unsigned short key)
 	for (i = 0; i < NUM_OF_PROD_REVS; i++)
 		if (prod_rev_map[i].mpl_product_key == key)
 			return (short)i;
-	return -1;
+	return -EINVAL;
 }
 
 int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st)
@@ -370,6 +373,7 @@ int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st)
 	if (result)
 		return result;
 	prod_ver &= 0xf;
+	/*memory read need more time after power up */
 	msleep(POWER_UP_TIME);
 	result = mpu_memory_read(st->sl_handle, st->i2c_addr, mem_addr,
 			1, &prod_rev);
@@ -393,19 +397,19 @@ int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st)
 	if (sw_rev == 0) {
 		key = MPL_PROD_KEY(prod_ver, prod_rev);
 		if (key == 0)
-			return -1;
+			return -EINVAL;
 		index = index_of_key(key);
-		if (index == -1 || index >= NUM_OF_PROD_REVS)
-			return -1;
+		if (index < 0 || index >= NUM_OF_PROD_REVS)
+			return -EINVAL;
 		/* check MPL is compiled for this device */
 		if (prod_rev_map[index].silicon_rev != MPU_SILICON_REV_B1)
-			return -1;
+			return -EINVAL;
 		p_rev = (struct prod_rev_map_t *)&prod_rev_map[index];
 	/* if valid, use the software product key */
 	} else if (sw_rev < ARRAY_SIZE(sw_rev_map)) {
 		p_rev = (struct prod_rev_map_t *)&sw_rev_map[sw_rev];
 	} else {
-		return -1;
+		return -EINVAL;
 	}
 	chip_info->product_id = prod_ver;
 	chip_info->product_revision = prod_rev;
@@ -426,10 +430,9 @@ int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st)
  *  @brief  read the accelerometer hardware self-test bias shift calculated
  *          during final production test and stored in chip non-volatile memory.
  *  @param  st
- *              serial interface handle to allow serial communication with the
- *              device, both gyro and accelerometer.
+ *              main data structure.
  *  @param  ct_shift_prod
- *              A pointer to an array of 3 float elements to hold the values
+ *              A pointer to an array of 3 elements to hold the values
  *              for production hardware self-test bias shifts returned to the
  *              user.
  *  @return 0 on success, or a non-zero error code otherwise.
@@ -440,13 +443,15 @@ static int read_accel_hw_self_test_prod_shift(struct inv_mpu_iio_s *st,
 	unsigned char regs[4];
 	unsigned char shift_code[3];
 	int result, i;
-	st_prod[0] = st_prod[1] = st_prod[2] = 0;
+	st_prod[0] = 0;
+	st_prod[1] = 0;
+	st_prod[2] = 0;
 	result = inv_i2c_read(st, REG_ST_GCT_X, ARRAY_SIZE(regs), regs);
 	if (result)
 		return result;
 	if ((0 == regs[0])  && (0 == regs[1]) &&
-		(0 == regs[2]) && (0 == regs[3]))
-		return -1;
+	    (0 == regs[2]) && (0 == regs[3]))
+		return -EINVAL;
 	shift_code[X] = ((regs[0] & 0xE0) >> 3) | ((regs[3] & 0x30) >> 4);
 	shift_code[Y] = ((regs[1] & 0xE0) >> 3) | ((regs[3] & 0x0C) >> 2);
 	shift_code[Z] = ((regs[2] & 0xE0) >> 3) |  (regs[3] & 0x03);
@@ -455,9 +460,17 @@ static int read_accel_hw_self_test_prod_shift(struct inv_mpu_iio_s *st,
 			st_prod[i] = test_setup.accl_sens[i]*
 				accl_st_tb[shift_code[i] - 1];
 	}
+
 	return 0;
 }
-
+/**
+* @brief check accel self test.
+*        this function returns zero as success. A non-zero
+*        return value indicates failure in self test.
+*  @param *st main data structure.
+*  @param *reg_avg average value of normal test.
+*  @param *st_avg  average value of self test
+*/
 static int inv_check_accl_self_test(struct inv_mpu_iio_s *st,
 	int *reg_avg, int *st_avg){
 	int gravity, reg_z_avg, g_z_sign, fs, j, ret_val;
@@ -465,7 +478,7 @@ static int inv_check_accl_self_test(struct inv_mpu_iio_s *st,
 	int st_shift_prod[THREE_AXIS], st_shift_cust[THREE_AXIS];
 	int st_shift_ratio[THREE_AXIS];
 	if (st->chip_info.software_revision < DEF_OLDEST_SUPP_SW_REV &&
-		st->chip_info.product_revision < DEF_OLDEST_SUPP_PROD_REV)
+	    st->chip_info.product_revision < DEF_OLDEST_SUPP_PROD_REV)
 		return 0;
 	fs = DEF_ST_ACCL_FULL_SCALE;    /* assume +/- 2 mg as typical */
 	g_z_sign = 1;
@@ -478,8 +491,8 @@ static int inv_check_accl_self_test(struct inv_mpu_iio_s *st,
 						DEF_ST_PRECISION / fs);
 
 	if (MPL_PROD_KEY(st->chip_info.product_id,
-		st->chip_info.product_revision) ==
-		MPU_PRODUCT_KEY_B1_E1_5) {
+			 st->chip_info.product_revision) ==
+	    MPU_PRODUCT_KEY_B1_E1_5) {
 		/* half sensitivity Z accelerometer parts */
 		test_setup.accl_sens[Z] /= 2;
 	} else {
@@ -510,8 +523,17 @@ static int inv_check_accl_self_test(struct inv_mpu_iio_s *st,
 				ret_val |= 1 << j;
 		}
 	}
+
 	return ret_val;
 }
+/**
+* @brief check gyro self test.
+*        this function returns zero as success. A non-zero
+*        return value indicates failure in self test.
+*  @param *st main data structure.
+*  @param *reg_avg average value of normal test.
+*  @param *st_avg  average value of self test
+*/
 
 static int inv_check_3500_gyro_self_test(struct inv_mpu_iio_s *st,
 	int *reg_avg, int *st_avg){
@@ -526,30 +548,41 @@ static int inv_check_3500_gyro_self_test(struct inv_mpu_iio_s *st,
 	result = inv_i2c_read(st, REG_3500_OTP, THREE_AXIS, st_code);
 	if (result)
 		return result;
-	gst_otp[0] = gst_otp[1] = gst_otp[2] = 0;
+	gst_otp[0] = 0;
+	gst_otp[1] = 0;
+	gst_otp[2] = 0;
 	for (i = 0; i < 3; i++) {
 		if (st_code[i] != 0)
 			gst_otp[i] = gyro_3500_st_tb[st_code[i] - 1];
 	}
 	for (i = 0; i < 3; i++) {
 		if (gst_otp[i] == 0) {
-			if (abs(gst[i])*4 < 60*2*DEF_ST_PRECISION*
+			if (abs(gst[i]) * 4 < 60 * 2 * DEF_ST_PRECISION *
 					DEF_GYRO_SCALE)
-				ret_val |= (1<<i);
+				ret_val |= (1 << i);
 		} else {
 			if (abs(gst[i]/gst_otp[i] - DEF_ST_PRECISION) >
 					DEF_GYRO_CT_SHIFT_DELTA)
-				ret_val |= (1<<i);
+				ret_val |= (1 << i);
 		}
 	}
 	for (i = 0; i < 3; i++) {
-		if (abs(reg_avg[i])*4 > 20*2*DEF_ST_PRECISION*DEF_GYRO_SCALE)
-			ret_val |= (1<<i);
+		if (abs(reg_avg[i]) * 4 > 20 * 2 *
+		    DEF_ST_PRECISION*DEF_GYRO_SCALE)
+			ret_val |= (1 << i);
 	}
 
 	return ret_val;
 }
 
+/**
+* @brief check 6050 gyro self test.
+*        this function returns zero as success. A non-zero
+*        return value indicates failure in self test.
+*  @param st main data structure.
+*  @param *reg_avg average value of normal test.
+*  @param *st_avg  average value of self test
+*/
 static int inv_check_6050_gyro_self_test(struct inv_mpu_iio_s *st,
 	int *reg_avg, int *st_avg){
 	int result;
@@ -557,11 +590,13 @@ static int inv_check_6050_gyro_self_test(struct inv_mpu_iio_s *st,
 	int ct_shift_prod[3], st_shift_cust[3], st_shift_ratio[3], i;
 	unsigned char regs[3];
 	if (st->chip_info.software_revision < DEF_OLDEST_SUPP_SW_REV &&
-		st->chip_info.product_revision < DEF_OLDEST_SUPP_PROD_REV)
+	    st->chip_info.product_revision < DEF_OLDEST_SUPP_PROD_REV)
 		return 0;
 
 	ret_val = 0;
 	result = inv_i2c_read(st, REG_ST_GCT_X, 3, regs);
+	if (result)
+		return result;
 	regs[X] &= 0x1f;
 	regs[Y] &= 0x1f;
 	regs[Z] &= 0x1f;
@@ -575,25 +610,27 @@ static int inv_check_6050_gyro_self_test(struct inv_mpu_iio_s *st,
 	for (i = 0; i < 3; i++) {
 		st_shift_cust[i] = abs(reg_avg[i] - st_avg[i]);
 		if (ct_shift_prod[i]) {
-			st_shift_ratio[i] = st_shift_cust[i]/
+			st_shift_ratio[i] = st_shift_cust[i] /
 				ct_shift_prod[i] - DEF_ST_PRECISION;
 			if (st_shift_ratio[i] > DEF_GYRO_CT_SHIFT_DELTA)
 				ret_val |= 1 << i;
 			if (st_shift_ratio[i] < -DEF_GYRO_CT_SHIFT_DELTA)
 				ret_val |= 1 << i;
 		} else {
-			if (st_shift_cust[i] < DEF_ST_PRECISION*
-				DEF_GYRO_CT_SHIFT_MIN*test_setup.gyro_sens)
+			if (st_shift_cust[i] < DEF_ST_PRECISION *
+				DEF_GYRO_CT_SHIFT_MIN * test_setup.gyro_sens)
 				ret_val |= 1 << i;
-			if (st_shift_cust[i] > DEF_ST_PRECISION*
-				DEF_GYRO_CT_SHIFT_MAX*test_setup.gyro_sens)
+			if (st_shift_cust[i] > DEF_ST_PRECISION *
+				DEF_GYRO_CT_SHIFT_MAX * test_setup.gyro_sens)
 				ret_val |= 1 << i;
 		}
 	}
 	for (i = 0; i < 3; i++) {
-		if (abs(reg_avg[i])*4 > 20*2*DEF_ST_PRECISION*DEF_GYRO_SCALE)
-			ret_val |= (1<<i);
+		if (abs(reg_avg[i]) * 4 > 20 * 2 *
+		    DEF_ST_PRECISION * DEF_GYRO_SCALE)
+			ret_val |= (1 << i);
 	}
+
 	return ret_val;
 }
 
@@ -663,13 +700,15 @@ int inv_do_test(struct inv_mpu_iio_s *st, int self_test_flag,
 	result = inv_i2c_single_write(st, reg->fifo_en, 0);
 	if (result)
 		return result;
-	result = inv_i2c_read(st, reg->fifo_count_h, 2, data);
+	result = inv_i2c_read(st, reg->fifo_count_h, FIFO_COUNT_BYTE, data);
 	if (result)
 		return result;
-	fifo_count = (data[0] << 8) + data[1];
-	packet_count = fifo_count/packet_size;
-	gyro_result[0] = gyro_result[1] = gyro_result[2] = 0;
-	accl_result[0] = accl_result[1] = accl_result[2] = 0;
+	fifo_count = be16_to_cpup((__be16 *)(&data[0]));
+	packet_count = fifo_count / packet_size;
+	for (i = 0; i < 3; i++) {
+		gyro_result[i] = 0;
+		accl_result[i] = 0;
+	}
 	if (abs(packet_count - DEF_GYRO_PACKET_THRESH) > DEF_GYRO_THRESH)
 		return -EAGAIN;
 
@@ -684,24 +723,24 @@ int inv_do_test(struct inv_mpu_iio_s *st, int self_test_flag,
 			for (j = 0; j < THREE_AXIS; j++)
 				accl_result[j] +=
 					(short)be16_to_cpup((__be16
-					*)(&data[ind + 2*j]));
-				ind += 6;
+					*)(&data[ind + 2 * j]));
+				ind += BYTES_PER_SENSOR;
 		}
 		for (j = 0; j < THREE_AXIS; j++)
 			gyro_result[j] +=
-			(short)be16_to_cpup((__be16 *)(&data[ind + 2*j]));
+			(short)be16_to_cpup((__be16 *)(&data[ind + 2 * j]));
 	}
 
-	gyro_result[0] = gyro_result[0]*DEF_ST_PRECISION/packet_count;
-	gyro_result[1] = gyro_result[1]*DEF_ST_PRECISION/packet_count;
-	gyro_result[2] = gyro_result[2]*DEF_ST_PRECISION/packet_count;
+	gyro_result[0] = gyro_result[0] * DEF_ST_PRECISION / packet_count;
+	gyro_result[1] = gyro_result[1] * DEF_ST_PRECISION / packet_count;
+	gyro_result[2] = gyro_result[2] * DEF_ST_PRECISION / packet_count;
 	if (has_accl) {
 		accl_result[0] =
-			accl_result[0]*DEF_ST_PRECISION/packet_count;
+			accl_result[0] * DEF_ST_PRECISION / packet_count;
 		accl_result[1] =
-			accl_result[1]*DEF_ST_PRECISION/packet_count;
+			accl_result[1] * DEF_ST_PRECISION / packet_count;
 		accl_result[2] =
-			accl_result[2]*DEF_ST_PRECISION/packet_count;
+			accl_result[2] * DEF_ST_PRECISION / packet_count;
 	}
 
 	return 0;
@@ -720,13 +759,14 @@ static void   inv_recover_setting(struct inv_mpu_iio_s *st)
 	reg = &st->reg;
 	set_inv_enable(indio, st->chip_config.enable);
 	inv_i2c_single_write(st, reg->gyro_config,
-			st->chip_config.fsr<<GYRO_CONFIG_FSR_SHIFT);
+			     st->chip_config.fsr << GYRO_CONFIG_FSR_SHIFT);
 	inv_i2c_single_write(st, reg->lpf, st->chip_config.lpf);
 	data = ONE_K_HZ/st->chip_config.fifo_rate - 1;
 	inv_i2c_single_write(st, reg->sample_rate_div, data);
 	if (INV_ITG3500 != st->chip_type) {
 		inv_i2c_single_write(st, reg->accl_config,
-			(st->chip_config.accl_fs << ACCL_CONFIG_FSR_SHIFT));
+				     (st->chip_config.accl_fs <<
+				     ACCL_CONFIG_FSR_SHIFT));
 	}
 	st->set_power_state(st, !st->chip_config.is_asleep);
 }
@@ -749,7 +789,7 @@ static int inv_check_compass_self_test(struct inv_mpu_iio_s *st)
 		return result;
 	}
 	/*set to power down mode */
-	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PW_DN);
+	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PD);
 	if (result)
 		goto AKM_fail;
 
@@ -758,12 +798,12 @@ static int inv_check_compass_self_test(struct inv_mpu_iio_s *st)
 	if (result)
 		goto AKM_fail;
 	/*set self test mode */
-	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PW_ST);
+	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_ST);
 	if (result)
 		goto AKM_fail;
 	counter = DEF_ST_COMPASS_TRY_TIMES;
 	while (counter > 0) {
-		usleep_range(DEF_ST_COMPASS_WAIT, DEF_ST_COMPASS_WAIT);
+		usleep_range(DEF_ST_COMPASS_WAIT_MIN, DEF_ST_COMPASS_WAIT_MAX);
 		result = inv_secondary_read(REG_AKM_STATUS, 1, data);
 		if (result)
 			goto AKM_fail;
@@ -773,7 +813,7 @@ static int inv_check_compass_self_test(struct inv_mpu_iio_s *st)
 			counter = 0;
 	}
 	if ((data[0] & DATA_AKM_DRDY) == 0) {
-		result = -1;
+		result = -EINVAL;
 		goto AKM_fail;
 	}
 	result = inv_secondary_read(REG_AKM_MEASURE_DATA,
@@ -797,7 +837,7 @@ static int inv_check_compass_self_test(struct inv_mpu_iio_s *st)
 			z <<= DEF_ST_COMPASS_8963_SHIFT;
 		}
 	}
-	result = 1;
+	result = -EINVAL;
 	if (x > st->compass_st_upper[X] || x < st->compass_st_lower[X])
 		goto AKM_fail;
 	if (y > st->compass_st_upper[Y] || y < st->compass_st_lower[Y])
@@ -809,7 +849,7 @@ AKM_fail:
 	/*write 0 to ASTC register */
 	result |= inv_secondary_write(REG_AKM_ST_CTRL, 0);
 	/*set to power down mode */
-	result |= inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PW_DN);
+	result |= inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PD);
 	/*restore to non-bypass mode */
 	result |= inv_i2c_single_write(st, REG_INT_PIN_CFG,
 			st->plat_data.int_config);
@@ -826,7 +866,8 @@ static int inv_power_up_self_test(struct inv_mpu_iio_s *st)
 	result = inv_i2c_single_write(st, st->reg.pwr_mgmt_2, 0);
 	if (result)
 		return result;
-	msleep(POWER_UP_TIME);
+	msleep(SENSOR_UP_TIME);
+
 	return 0;
 }
 
@@ -840,12 +881,17 @@ int inv_hw_self_test(struct inv_mpu_iio_s *st)
 	int accl_bias_st[THREE_AXIS], accl_bias_regular[THREE_AXIS];
 	int test_times;
 	char compass_result, accel_result, gyro_result;
-	if (st->chip_config.is_asleep || st->chip_config.lpa_mode) {
+	if (st->chip_config.is_asleep      ||
+	    st->chip_config.lpa_mode       ||
+	    (!st->chip_config.gyro_enable) ||
+	    (!st->chip_config.accl_enable)) {
 		result = inv_power_up_self_test(st);
 		if (result)
 			return result;
 	}
-	compass_result = accel_result = gyro_result = 0;
+	compass_result = 0;
+	accel_result   = 0;
+	gyro_result    = 0;
 	test_times = DEF_ST_TRY_TIMES;
 	while (test_times > 0) {
 		result = inv_do_test(st, 0,  gyro_bias_regular,
@@ -882,8 +928,21 @@ int inv_hw_self_test(struct inv_mpu_iio_s *st)
 	}
 test_fail:
 	inv_recover_setting(st);
-	return (compass_result<<DEF_ST_COMPASS_RESULT_SHIFT) |
-		(accel_result<<DEF_ST_ACCEL_RESULT_SHIFT) | gyro_result;
+
+	return (compass_result << DEF_ST_COMPASS_RESULT_SHIFT) |
+		(accel_result << DEF_ST_ACCEL_RESULT_SHIFT) | gyro_result;
+}
+
+/**
+ *  inv_hw_self_test_6500() - main function to do hardware self test for 6500
+ */
+int inv_hw_self_test_6500(struct inv_mpu_iio_s *st)
+{
+	int compass_result;
+	compass_result = !inv_check_compass_self_test(st);
+	return (compass_result << DEF_ST_COMPASS_RESULT_SHIFT) |
+		(SELF_TEST_SUCCESS << DEF_ST_ACCEL_RESULT_SHIFT) |
+		SELF_TEST_SUCCESS;
 }
 
 static int inv_load_firmware(struct inv_mpu_iio_s *st,
@@ -962,12 +1021,12 @@ static int inv_set_fifo_div(struct inv_mpu_iio_s *st,
 	return result;
 }
 
-int inv_send_quaternion(struct inv_mpu_iio_s *st, int on)
+int inv_send_quaternion(struct inv_mpu_iio_s *st, bool on)
 {
 	const unsigned char regs_on[] = {DINBC0, DINBC2,
-				DINBC4, DINBC6};
+					 DINBC4, DINBC6};
 	const unsigned char regs_off[] = {DINA80, DINA80,
-				DINA80, DINA80};
+					  DINA80, DINA80};
 	const unsigned char *regs;
 	unsigned char result;
 	if (on)
@@ -979,7 +1038,7 @@ int inv_send_quaternion(struct inv_mpu_iio_s *st, int on)
 }
 
 int inv_set_display_orient_interrupt_dmp(struct inv_mpu_iio_s *st,
-						int on)
+						bool on)
 {
 	/*Turn on the display orientation interrupt in the DMP*/
 	int result;
@@ -991,16 +1050,16 @@ int inv_set_display_orient_interrupt_dmp(struct inv_mpu_iio_s *st,
 	return result;
 }
 
-int inv_set_fifo_rate(struct inv_mpu_iio_s *st, unsigned long fifo_rate)
+int inv_set_fifo_rate(struct inv_mpu_iio_s *st, unsigned short fifo_rate)
 {
 	unsigned char divider;
 	int result;
 
-	divider = (unsigned char)(ONE_K_HZ/fifo_rate) - 1;
+	divider = (unsigned char)(ONE_K_HZ / fifo_rate) - 1;
 	if (divider > DMP_MAX_DIVIDER) {
 		st->sample_divider = DMP_MAX_DIVIDER;
 		st->fifo_divider =
-			(unsigned char)(DMP_DEFAULT_FIFO_RATE/fifo_rate)-1;
+			(unsigned char)(DMP_DEFAULT_FIFO_RATE / fifo_rate) - 1;
 	} else {
 		st->sample_divider = divider;
 		st->fifo_divider = 0;
@@ -1057,9 +1116,9 @@ int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
 	int scaledThreshold;
 	unsigned int dmpThreshold;
 	unsigned char sample_div;
-#define	 accel_sens (0x20000000/0x00010000)
+	const unsigned int  accel_sens = (0x20000000 / 0x00010000);
 
-	if ((axis & ~(INV_TAP_AXIS_ALL)) || (threshold > (1<<15)))
+	if ((axis & ~(INV_TAP_AXIS_ALL)) || (threshold > (1 << 15)))
 		return -EINVAL;
 	sample_div = st->sample_divider;
 
@@ -1080,10 +1139,10 @@ int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
 
 	/* Scale to DMP 16 bit value */
 	if (accel_sens != 0)
-		dmpThreshold = (unsigned int)(scaledThreshold*accel_sens);
+		dmpThreshold = (unsigned int)(scaledThreshold * accel_sens);
 	else
 		return -EINVAL;
-	dmpThreshold = dmpThreshold/DMP_PRECISION;
+	dmpThreshold = dmpThreshold / DMP_PRECISION;
 
 	data[0] = dmpThreshold >> 8;
 	data[1] = dmpThreshold & 0xFF;
@@ -1096,8 +1155,8 @@ int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
 
 		/*Also set additional threshold for correcting the direction
 		of taps that were very near the threshold. */
-		data[0] = (dmpThreshold*3/4) >> 8;
-		data[1] = (dmpThreshold*3/4) & 0xFF;
+		data[0] = (dmpThreshold * 3 / 4) >> 8;
+		data[1] = (dmpThreshold * 3 / 4) & 0xFF;
 		result = mem_w_key(KEY_D_1_36, ARRAY_SIZE(data), data);
 		if (result)
 			return result;
@@ -1106,8 +1165,8 @@ int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
 		result = mem_w_key(KEY_DMP_TAP_THR_Y, 2, data);
 		if (result)
 			return result;
-		data[0] = (dmpThreshold*3/4) >> 8;
-		data[1] = (dmpThreshold*3/4) & 0xFF;
+		data[0] = (dmpThreshold * 3 / 4) >> 8;
+		data[1] = (dmpThreshold * 3 / 4) & 0xFF;
 
 		result = mem_w_key(KEY_D_1_40, ARRAY_SIZE(data), data);
 		if (result)
@@ -1117,8 +1176,8 @@ int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
 		result = mem_w_key(KEY_DMP_TAP_THR_Z, ARRAY_SIZE(data), data);
 		if (result)
 			return result;
-		data[0] = (dmpThreshold*3/4) >> 8;
-		data[1] = (dmpThreshold*3/4) & 0xFF;
+		data[0] = (dmpThreshold * 3 / 4) >> 8;
+		data[1] = (dmpThreshold * 3 / 4) & 0xFF;
 
 		result = mem_w_key(KEY_D_1_44, ARRAY_SIZE(data), data);
 		if (result)
@@ -1146,7 +1205,7 @@ static int inv_set_tap_axes_dmp(struct inv_mpu_iio_s *st,
 }
 
 int inv_set_min_taps_dmp(struct inv_mpu_iio_s *st,
-				unsigned int min_taps) {
+				unsigned short min_taps) {
 	/*Indicates the minimum number of consecutive taps required
 		before the DMP will generate an interrupt */
 	unsigned char regs[1];
@@ -1160,7 +1219,7 @@ int inv_set_min_taps_dmp(struct inv_mpu_iio_s *st,
 	return result;
 }
 
-int  inv_set_tap_time_dmp(struct inv_mpu_iio_s *st, unsigned int time)
+int  inv_set_tap_time_dmp(struct inv_mpu_iio_s *st, unsigned short time)
 {
 	/* Determines how long after a tap the DMP requires before
 	  another tap can be registered*/
@@ -1179,6 +1238,7 @@ int  inv_set_tap_time_dmp(struct inv_mpu_iio_s *st, unsigned int time)
 	data[1] = dmpTime & 0xFF;
 
 	result = mem_w_key(KEY_DMP_TAPW_MIN, ARRAY_SIZE(data), data);
+
 	return result;
 }
 
@@ -1200,17 +1260,18 @@ static int inv_set_multiple_tap_time_dmp(struct inv_mpu_iio_s *st,
 	dmpTime = ((time) / sampleDivider);
 	data[0] = dmpTime >> 8;
 	data[1] = dmpTime & 0xFF;
-
 	result = mem_w_key(KEY_D_1_218, ARRAY_SIZE(data), data);
+
 	return result;
 }
 
-long inv_q30_mult(long a, long b)
+int inv_q30_mult(int a, int b)
 {
 	long long temp;
-	long result;
+	int result;
 	temp = (long long)a * b;
-	result = (long)(temp >> DMP_MULTI_SHIFT);
+	result = (int)(temp >> DMP_MULTI_SHIFT);
+
 	return result;
 }
 
@@ -1232,7 +1293,7 @@ static unsigned short inv_row_2_scale(const signed char *row)
 		b = 6;
 	else
 		b = 7;
-	/* error */
+
 	return b;
 }
 
@@ -1311,6 +1372,7 @@ static int inv_gyro_dmp_cal(struct inv_mpu_iio_s *st)
 		regs[2] = DINA76;
 
 	result = mem_w_key(KEY_FCFG_3, ARRAY_SIZE(regs), regs);
+
 	return result;
 }
 
@@ -1340,10 +1402,10 @@ static int inv_accel_dmp_cal(struct inv_mpu_iio_s *st)
 	if (inv_accel_orient & 0x100)
 		regs[2] |= 1;
 	result = mem_w_key(KEY_FCFG_7, ARRAY_SIZE(regs), regs);
+
 	return result;
 }
 
-#define gyro_sens                       (0x03e80000)
 static int inv_set_gyro_sf_dmp(struct inv_mpu_iio_s *st)
 {
 	/*The gyro threshold, in dps, above which taps will be rejected*/
@@ -1351,15 +1413,17 @@ static int inv_set_gyro_sf_dmp(struct inv_mpu_iio_s *st)
 	/* DMP Algorithm */
 	unsigned char sampleDivider;
 	unsigned char *regs;
-	int gyro_sf;
+	unsigned int gyro_sf;
+	const unsigned int gyro_sens = 0x03e80000;
 
 	sampleDivider = st->sample_divider;
 	gyro_sf = inv_q30_mult(gyro_sens,
-			(int)(DMP_TAP_SCALE * (sampleDivider+1)));
+			(int)(DMP_TAP_SCALE * (sampleDivider + 1)));
 
 	out = cpu_to_be32p(&gyro_sf);
 	regs = (unsigned char *)&out;
 	result = mem_w_key(KEY_D_0_104, sizeof(out), regs);
+
 	return result;
 }
 
@@ -1372,14 +1436,15 @@ static int inv_set_shake_reject_thresh_dmp(struct inv_mpu_iio_s *st,
 	unsigned char sampleDivider;
 	int thresh_scaled;
 	unsigned char *regs;
-	long gyro_sf;
+	unsigned int gyro_sf;
+	const unsigned int gyro_sens = 0x03e80000;
 	sampleDivider = st->sample_divider;
 	gyro_sf = inv_q30_mult(gyro_sens, (int)(DMP_TAP_SCALE *
-			(sampleDivider+1)));
+			(sampleDivider + 1)));
 	/* We're in units of DPS, convert it back to chip units*/
 	/*split the operation to aviod overflow of integer*/
-	thresh_scaled = gyro_sens/(1L<<16);
-	thresh_scaled = thresh_scaled/thresh;
+	thresh_scaled = gyro_sens / (1L << 16);
+	thresh_scaled = thresh_scaled / thresh;
 	thresh_scaled = gyro_sf / thresh_scaled;
 	out = cpu_to_be32p(&thresh_scaled);
 	regs = (unsigned char *)&out;
@@ -1434,35 +1499,32 @@ static int inv_set_shake_reject_timeout_dmp(struct inv_mpu_iio_s *st,
 	return result;
 }
 
-int inv_set_interrupt_on_gesture_event(struct inv_mpu_iio_s *st, char on)
+int inv_set_interrupt_on_gesture_event(struct inv_mpu_iio_s *st, bool on)
 {
 	unsigned char result;
 	const unsigned char regs_on[] = {DINADA, DINADA, DINAB1, DINAB9,
-					DINAF3, DINA8B, DINAA3, DINA91,
-					DINAB6, DINADA, DINAB4, DINADA};
+					 DINAF3, DINA8B, DINAA3, DINA91,
+					 DINAB6, DINADA, DINAB4, DINADA};
 	const unsigned char regs_off[] = {0xd8, 0xd8, 0xb1, 0xb9, 0xf3, 0x8b,
-					0xa3, 0x91, 0xb6, 0x09, 0xb4, 0xd9};
+					  0xa3, 0x91, 0xb6, 0x09, 0xb4, 0xd9};
 	/*For some reason DINAC4 is defined as 0xb8,
 	but DINBC4 is not defined.*/
 	const unsigned char regs_end[] = {DINAFE, DINAF2, DINAAB, 0xc4,
 					DINAAA, DINAF1, DINADF, DINADF};
-	if (on) {
+	if (on)
 		/*Sets the DMP to send an interrupt and put a FIFO packet
 		in the FIFO if and only if a tap/orientation event
 		just occurred*/
 		result = mem_w_key(KEY_CFG_FIFO_ON_EVENT, ARRAY_SIZE(regs_on),
 					regs_on);
-		if (result)
-			return result;
-	} else {
+	else
 		/*Sets the DMP to send an interrupt and put a FIFO packet
 		in the FIFO at the rate specified by the FIFO div.
 		see inv_set_fifo_div in hw_setup.c to set the FIFO div.*/
 		result = mem_w_key(KEY_CFG_FIFO_ON_EVENT, ARRAY_SIZE(regs_off),
 					regs_off);
-		if (result)
-			return result;
-	}
+	if (result)
+		return result;
 
 	result = mem_w_key(KEY_CFG_6, ARRAY_SIZE(regs_end), regs_end);
 	return result;
@@ -1471,7 +1533,7 @@ int inv_set_interrupt_on_gesture_event(struct inv_mpu_iio_s *st, char on)
 /**
  * inv_enable_tap_dmp() -  calling this function will enable/disable tap function.
  */
-int inv_enable_tap_dmp(struct inv_mpu_iio_s *st, unsigned char on)
+int inv_enable_tap_dmp(struct inv_mpu_iio_s *st, bool on)
 {
 	int result;
 	result = inv_set_tap_interrupt_dmp(st, on);
@@ -1479,15 +1541,15 @@ int inv_enable_tap_dmp(struct inv_mpu_iio_s *st, unsigned char on)
 		return result;
 	if (on) {
 		result = inv_set_tap_threshold_dmp(st, INV_TAP_AXIS_X,
-							st->tap.thresh);
+						   st->tap.thresh);
 		if (result)
 			return result;
 		result = inv_set_tap_threshold_dmp(st, INV_TAP_AXIS_Y,
-							st->tap.thresh);
+						   st->tap.thresh);
 		if (result)
 			return result;
 		result = inv_set_tap_threshold_dmp(st, INV_TAP_AXIS_Z,
-							st->tap.thresh);
+						   st->tap.thresh);
 		if (result)
 			return result;
 	}
@@ -1520,7 +1582,7 @@ int inv_enable_tap_dmp(struct inv_mpu_iio_s *st, unsigned char on)
 		return result;
 
 	result = inv_set_shake_reject_timeout_dmp(st,
-					DMP_SHAKE_REJECT_TIMEOUT);
+						  DMP_SHAKE_REJECT_TIMEOUT);
 	return result;
 }
 
@@ -1551,9 +1613,11 @@ static int inv_set_orientation_thresh_dmp(struct inv_mpu_iio_s *st,
 	unsigned int out;
 	unsigned int d;
 	const unsigned int threshold[] = {138952416, 268435455, 379625062,
-					464943848, 518577479, 536870912};
-	/*threshold = (long)((1<<29) * sin((angle * M_PI) / 180.));*/
-	d = angle/DMP_ANGLE_SCALE;
+					  464943848, 518577479, 536870912};
+	/* The real calculation is
+	 * threshold = (long)((1 << 29) * sin((angle * M_PI) / 180.));
+	 * Here we have to use table lookup*/
+	d = angle / DMP_ANGLE_SCALE;
 	d -= 1;
 	if (d >= ARRAY_SIZE(threshold))
 		return -EPERM;
@@ -1589,7 +1653,7 @@ static int inv_set_orientation_time_dmp(struct inv_mpu_iio_s *st,
  * inv_enable_orientation_dmp() -  calling this function will
  *                  enable/disable orientation function.
  */
-int inv_enable_orientation_dmp(struct inv_mpu_iio_s *st, int on)
+int inv_enable_orientation_dmp(struct inv_mpu_iio_s *st, bool on)
 {
 	int result;
 	result = inv_set_orientation_interrupt_dmp(st, on);
@@ -1612,10 +1676,10 @@ static int inv_send_sensor_data(struct inv_mpu_iio_s *st,
 				unsigned short elements)
 {
 	int result;
-	unsigned char regs[] = { DINAA0 + 3, DINAA0 + 3, DINAA0 + 3,
+	unsigned char regs[] = {DINAA0 + 3, DINAA0 + 3, DINAA0 + 3,
 				DINAA0 + 3, DINAA0 + 3, DINAA0 + 3,
-				DINAA0 + 3, DINAA0 + 3, DINAA0 + 3, DINAA0 + 3
-	};
+				DINAA0 + 3, DINAA0 + 3, DINAA0 + 3,
+				DINAA0 + 3};
 
 	if (elements & INV_ELEMENT_1)
 		regs[0] = DINACA;
@@ -1625,8 +1689,8 @@ static int inv_send_sensor_data(struct inv_mpu_iio_s *st,
 		regs[5] = DINACC;
 	if (elements & INV_ELEMENT_4)
 		regs[6] = DINBC6;
-	if ((elements & INV_ELEMENT_5) || (elements & INV_ELEMENT_6)
-		|| (elements & INV_ELEMENT_7)) {
+	if ((elements & INV_ELEMENT_5) || (elements & INV_ELEMENT_6) ||
+	    (elements & INV_ELEMENT_7)) {
 		regs[1] = DINBC0;
 		regs[2] = DINAC8;
 		regs[3] = DINBC2;
@@ -1661,14 +1725,13 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 	indio_dev = dev_get_drvdata(container_of(kobj, struct device, kobj));
 	st = iio_priv(indio_dev);
 
-	if (st->chip_config.is_asleep)
-		return -EPERM;
-	if (1 == st->chip_config.firmware_loaded)
+	if (st->chip_config.is_asleep || st->chip_config.firmware_loaded)
 		return -EINVAL;
+
 	reg = &st->reg;
 	if (DMP_IMAGE_SIZE != size) {
 		pr_err("wrong DMP image size\n");
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	firmware = kmalloc(size, GFP_KERNEL);
@@ -1676,8 +1739,9 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 		return -ENOMEM;
 
 	memcpy(firmware, buf, size);
-	result = crc32(0, firmware, size);
+	result = crc32(CRC_FIRMWARE_SEED, firmware, size);
 	if (DMP_IMAGE_CRC_VALUE != result) {
+		result = -EINVAL;
 		pr_err("firmware CRC error\n");
 		goto firmware_write_fail;
 	}
@@ -1717,12 +1781,11 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 	result = inv_accel_dmp_cal(st);
 	if (result)
 		goto firmware_write_fail;
-	if (result)
-		goto firmware_write_fail;
 	st->chip_config.firmware_loaded = 1;
 	result = size;
 firmware_write_fail:
 	kfree(firmware);
+
 	return result;
 }
 
@@ -1747,13 +1810,14 @@ ssize_t inv_dmp_firmware_read(struct file *filp,
 		else
 			write_size = size;
 
-		memaddr = ((bank << 8) | 0x00);
+		memaddr = (bank << 8);
 		result = mpu_memory_read(st->sl_handle,
 			st->i2c_addr, memaddr, write_size, &buf[data]);
 		if (result)
 			return result;
 	}
-	return count;
+
+	return 0;
 }
 /**
  *  @}

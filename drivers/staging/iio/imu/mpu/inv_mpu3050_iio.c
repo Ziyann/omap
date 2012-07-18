@@ -38,15 +38,17 @@
 #include <linux/spinlock.h>
 
 #include "inv_mpu_iio.h"
-#define MPU3050_NACK_TIME (2*1000)
-#define MPU3050_ONE_MPU_TIME (20)
-#define MPU3050_BOGUS_ADDR (0x7F)
+#define MPU3050_NACK_MIN_TIME (2 * 1000)
+#define MPU3050_NACK_MAX_TIME (3 * 1000)
+
+#define MPU3050_ONE_MPU_TIME 20
+#define MPU3050_BOGUS_ADDR  0x7F
 int __attribute__((weak)) inv_register_mpu3050_slave(struct inv_mpu_iio_s *st)
 {
 	return 0;
 }
 
-int set_3050_bypass(struct inv_mpu_iio_s *st, int enable)
+int set_3050_bypass(struct inv_mpu_iio_s *st, bool enable)
 {
 	struct inv_reg_map_s *reg;
 	int result;
@@ -84,7 +86,7 @@ int set_3050_bypass(struct inv_mpu_iio_s *st, int enable)
 		* 2) wait enough time for a nack to occur, then go into
 		*    bypass mode:
 		*/
-		usleep_range(MPU3050_NACK_TIME, MPU3050_NACK_TIME);
+		usleep_range(MPU3050_NACK_MIN_TIME, MPU3050_NACK_MAX_TIME);
 		result = inv_i2c_single_write(st, reg->user_ctrl, b);
 		if (result)
 			return result;
@@ -101,7 +103,7 @@ int set_3050_bypass(struct inv_mpu_iio_s *st, int enable)
 		result = inv_i2c_single_write(st, reg->user_ctrl, b);
 		if (result)
 			return result;
-		usleep_range(MPU3050_NACK_TIME, MPU3050_NACK_TIME);
+		usleep_range(MPU3050_NACK_MIN_TIME, MPU3050_NACK_MAX_TIME);
 	}
 	return 0;
 }
@@ -122,7 +124,7 @@ void inv_setup_reg_mpu3050(struct inv_reg_map_s *reg)
 	reg->int_status      = REG_3050_INT_STATUS;
 }
 
-int inv_switch_3050_gyro_engine(struct inv_mpu_iio_s *st, int en)
+int inv_switch_3050_gyro_engine(struct inv_mpu_iio_s *st, bool en)
 {
 	struct inv_reg_map_s *reg;
 	unsigned char data, p;
@@ -140,6 +142,7 @@ int inv_switch_3050_gyro_engine(struct inv_mpu_iio_s *st, int en)
 			return result;
 		p = data;
 		result = inv_i2c_single_write(st, reg->pwr_mgmt_1, p);
+		msleep(SENSOR_UP_TIME);
 	} else {
 		p = BITS_3050_GYRO_STANDBY;
 		result = inv_i2c_single_write(st, reg->pwr_mgmt_1, p);
@@ -148,7 +151,7 @@ int inv_switch_3050_gyro_engine(struct inv_mpu_iio_s *st, int en)
 	return result;
 }
 
-int inv_switch_3050_accl_engine(struct inv_mpu_iio_s *st, int en)
+int inv_switch_3050_accl_engine(struct inv_mpu_iio_s *st, bool en)
 {
 	int result;
 	if (NULL == st->mpu_slave)
@@ -206,7 +209,7 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
 	if (result)
 		return result;
 	st->chip_config.fifo_rate = INIT_FIFO_RATE;
-	st->irq_dur_us            = INIT_DUR_TIME;
+	st->irq_dur_ns            = INIT_DUR_TIME;
 	st->chip_config.prog_start_addr = DMP_START_ADDR;
 	st->chip_config.gyro_enable = 1;
 	st->chip_config.gyro_fifo_enable = 1;
@@ -223,6 +226,7 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
 		st->chip_config.accl_enable = 1;
 		st->chip_config.accl_fifo_enable = 1;
 	}
+
 	return 0;
 }
 
@@ -231,16 +235,15 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
  *  @st:	Device driver instance.
  *  @power_on:  on/off
  */
-int set_power_mpu3050(struct inv_mpu_iio_s *st,
-	int power_on)
+int set_power_mpu3050(struct inv_mpu_iio_s *st, bool power_on)
 {
 	struct inv_reg_map_s *reg;
 	unsigned char data, p;
 	int result;
 	reg = &st->reg;
-	if (power_on)
+	if (power_on) {
 		data = 0;
-	else {
+	} else {
 		if (st->mpu_slave) {
 			result = st->mpu_slave->suspend(st);
 			if (result)
@@ -279,9 +282,9 @@ int set_power_mpu3050(struct inv_mpu_iio_s *st,
 			if (result)
 				return result;
 		}
-		st->chip_config.is_asleep = 0;
-	} else
-		st->chip_config.is_asleep = 1;
+	}
+	st->chip_config.is_asleep = !power_on;
+
 	return 0;
 }
 /**

@@ -196,9 +196,12 @@ dmp_on(read/write)
 This entry controls whether to run DMP or not. To enable DMP ,
 firmware_loaded must be 1. write 1 to enable DMP and write 0 to disable dmp.
 
-dmp_in_on(read/write)
+dmp_int_on(read/write)
 This entry controls whether dmp interrupt is on/off. firmware_loaded must
 be 1. sometimes, it is desirable that interrupt is off while DMP is running.
+
+dmp_output_rate
+control dmp output rate when dmp is on.
 
 dmp_event_int_on(read/write)
 This entry controls whether dmp event interrupt is on/off. Setting this on
