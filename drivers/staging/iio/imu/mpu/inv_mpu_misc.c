@@ -353,6 +353,29 @@ static short index_of_key(unsigned short key)
 	return -EINVAL;
 }
 
+int inv_get_silicon_rev_mpu6500(struct inv_mpu_iio_s *st)
+{
+	struct inv_chip_info_s *chip_info = &st->chip_info;
+	int result;
+	unsigned char whoami;
+
+	result = inv_i2c_read(st, REG_WHOAMI, 1, &whoami);
+	if (result)
+		return result;
+	if (whoami != MPU6500_ID)
+		return -EINVAL;
+
+	chip_info->product_id = MPU6500_PRODUCT_REVISION;
+	chip_info->product_revision = MPU6500_PRODUCT_REVISION;
+	chip_info->silicon_revision = MPU6500_PRODUCT_REVISION;
+	chip_info->software_revision = MPU6500_PRODUCT_REVISION;
+	chip_info->gyro_sens_trim = DEFAULT_GYRO_TRIM;
+	chip_info->accl_sens_trim = DEFAULT_ACCL_TRIM;
+	chip_info->multi = 1;
+
+	return result;
+}
+
 int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st)
 {
 	int result;

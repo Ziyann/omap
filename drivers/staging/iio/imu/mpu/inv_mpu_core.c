@@ -166,7 +166,7 @@ int inv_i2c_single_write_base(struct inv_mpu_iio_s *st,
 static int set_power_itg(struct inv_mpu_iio_s *st, bool power_on)
 {
 	struct inv_reg_map_s *reg;
-	unsigned char data;
+	u8 data;
 	int result;
 
 	reg = &st->reg;
@@ -602,14 +602,10 @@ static ssize_t inv_reg_dump_show(struct device *dev,
 }
 
 static inline int write_be32_key_to_mem(struct inv_mpu_iio_s *st,
-					int data, int key)
+					u32 data, int key)
 {
-	int out;
-	unsigned char *p;
-	out = cpu_to_be32p(&data);
-	p = (unsigned char *)&out;
-
-	return mem_w_key(key, 4, p);
+	cpu_to_be32s(&data);
+	return mem_w_key(key, 4, (u8 *)&data);
 }
 
 /**
@@ -1034,9 +1030,11 @@ static int inv_lpa_mode(struct inv_mpu_iio_s *st, int lpa_mode)
 	result = inv_i2c_read(st, reg->pwr_mgmt_1, 1, &d);
 	if (result)
 		return result;
-	d &= ~BIT_CYCLE;
 	if (lpa_mode)
 		d |= BIT_CYCLE;
+	else
+		d &= ~BIT_CYCLE;
+
 	result = inv_i2c_single_write(st, reg->pwr_mgmt_1, d);
 	if (result)
 		return result;
@@ -1085,7 +1083,7 @@ static int inv_lpa_freq(struct inv_mpu_iio_s *st, int lpa_freq)
 	return 0;
 }
 
-static int inv_switch_gyro_engine(struct inv_mpu_iio_s *st, bool en)
+static int inv_switch_engine(struct inv_mpu_iio_s *st, bool en, u32 mask)
 {
 	struct inv_reg_map_s *reg;
 	unsigned char data;
@@ -1095,36 +1093,26 @@ static int inv_switch_gyro_engine(struct inv_mpu_iio_s *st, bool en)
 	if (result)
 		return result;
 	if (en)
-		data &= (~BIT_PWR_GYRO_STBY);
+		data &= (~mask);
 	else
-		data |= BIT_PWR_GYRO_STBY;
+		data |= mask;
 	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, data);
 	if (result)
 		return result;
-	msleep(SENSOR_UP_TIME);
+	if (en)
+		msleep(SENSOR_UP_TIME);
 
 	return 0;
+
+}
+static int inv_switch_gyro_engine(struct inv_mpu_iio_s *st, bool en)
+{
+	return inv_switch_engine(st, en, BIT_PWR_GYRO_STBY);
 }
 
 static int inv_switch_accl_engine(struct inv_mpu_iio_s *st, bool en)
 {
-	struct inv_reg_map_s *reg;
-	unsigned char data;
-	int result;
-	reg = &st->reg;
-	result = inv_i2c_read(st, reg->pwr_mgmt_2, 1, &data);
-	if (result)
-		return result;
-	if (en)
-		data &= (~BIT_PWR_ACCL_STBY);
-	else
-		data |= BIT_PWR_ACCL_STBY;
-	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, data);
-	if (result)
-		return result;
-	msleep(SENSOR_UP_TIME);
-
-	return 0;
+	return inv_switch_engine(st, en, BIT_PWR_ACCL_STBY);
 }
 
 /**
@@ -1539,10 +1527,11 @@ static int inv_setup_compass(struct inv_mpu_iio_s *st)
 	result = inv_secondary_write(REG_AKM_MODE, DATA_AKM_MODE_PD);
 	if (result)
 		return result;
-	pr_info("senx=%d, seny=%d,senz=%d\n",
-		st->chip_info.compass_sens[0],
-		st->chip_info.compass_sens[1],
-		st->chip_info.compass_sens[2]);
+	pr_debug("%s senx=%d, seny=%d, senz=%d\n",
+		 st->hw->name,
+		 st->chip_info.compass_sens[0],
+		 st->chip_info.compass_sens[1],
+		 st->chip_info.compass_sens[2]);
 	/*restore to non-bypass mode */
 	result = inv_i2c_single_write(st, REG_INT_PIN_CFG,
 			st->plat_data.int_config);
@@ -1699,16 +1688,22 @@ static int inv_check_chip_type(struct inv_mpu_iio_s *st,
 		result = st->set_power_state(st, false);
 		return -ENODEV;
 	}
-
-	if (INV_MPU6050 == st->chip_type || INV_MPU9150 == st->chip_type) {
+	switch (st->chip_type) {
+	case INV_MPU6050:
+	case INV_MPU9150:
 		result = inv_get_silicon_rev_mpu6050(st);
-		if (result) {
-			pr_err("read silicon rev error\n");
-			st->set_power_state(st, false);
-			return result;
-		}
-	} else {
-		st->chip_info.multi = 1;
+		break;
+	case INV_MPU6500:
+		result = inv_get_silicon_rev_mpu6500(st);
+		break;
+	default:
+		result = 0;
+		break;
+	}
+	if (result) {
+		pr_err("read silicon rev error\n");
+		st->set_power_state(st, false);
+		return result;
 	}
 	if (st->chip_config.has_compass) {
 		result = inv_setup_compass(st);
@@ -1732,7 +1727,8 @@ static int inv_check_chip_type(struct inv_mpu_iio_s *st,
 		return 0;
 	}
 
-	if ((INV_MPU6050 == st->chip_type) || (INV_MPU9150 == st->chip_type) ||
+	if ((INV_MPU6050 == st->chip_type) ||
+	    (INV_MPU9150 == st->chip_type) ||
 	    (INV_MPU6500 == st->chip_type)) {
 		memcpy(&inv_attributes[t_ind], inv_mpu6050_attributes,
 		       sizeof(inv_mpu6050_attributes));
@@ -1860,7 +1856,6 @@ static int inv_mpu_probe(struct i2c_client *client,
 
 	INIT_KFIFO(st->timestamps);
 	spin_lock_init(&st->time_stamp_lock);
-	pr_info("Probe name %s\n", id->name);
 	dev_info(&client->adapter->dev, "%s is ready to go!\n", st->hw->name);
 
 	return 0;
@@ -1900,6 +1895,30 @@ static int inv_mpu_remove(struct i2c_client *client)
 
 	return 0;
 }
+#ifdef CONFIG_PM
+
+static int inv_mpu_resume(struct device *dev)
+{
+	struct inv_mpu_iio_s *st =
+			iio_priv(i2c_get_clientdata(to_i2c_client(dev)));
+
+	return st->set_power_state(st, true);
+}
+
+static int inv_mpu_suspend(struct device *dev)
+{
+	struct inv_mpu_iio_s *st =
+			iio_priv(i2c_get_clientdata(to_i2c_client(dev)));
+
+	return st->set_power_state(st, false);
+}
+static const struct dev_pm_ops inv_mpu_pmops = {
+	SET_SYSTEM_SLEEP_PM_OPS(inv_mpu_suspend, inv_mpu_resume)
+};
+#define INV_MPU_PMOPS (&inv_mpu_pmops)
+#else
+#define INV_MPU_PMOPS NULL
+#endif /* CONFIG_PM */
 
 static const unsigned short normal_i2c[] = { I2C_CLIENT_END };
 /* device id table is used to identify what device can be
@@ -1924,6 +1943,7 @@ static struct i2c_driver inv_mpu_driver = {
 	.driver = {
 		.owner	=	THIS_MODULE,
 		.name	=	"inv-mpu-iio",
+		.pm     =       INV_MPU_PMOPS,
 	},
 	.address_list = normal_i2c,
 };

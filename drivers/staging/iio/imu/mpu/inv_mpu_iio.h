@@ -486,6 +486,7 @@ struct inv_mpu_slave {
 #define REG_PRGM_STRT_ADDRH     0x70
 #define REG_FIFO_COUNT_H        0x72
 #define REG_FIFO_R_W            0x74
+#define REG_WHOAMI              0x75
 
 #define REG_6500_ACCEL_CONFIG2  0x1D
 #define BIT_ACCEL_FCHOCIE_B              0x08
@@ -517,7 +518,12 @@ struct inv_mpu_slave {
 #define MAX_GYRO_FS_PARAM        3
 #define MAX_ACCL_FS_PARAM        3
 #define MAX_LPA_FREQ_PARAM       3
+
+/*---- MPU6500 ----*/
 #define MAX_6500_LPA_FREQ_PARAM  11
+#define MPU6500_ID               0x70      /* unique WHOAMI */
+#define MPU6500_PRODUCT_REVISION 1
+
 #define THREE_AXIS               3
 #define GYRO_CONFIG_FSR_SHIFT    3
 #define ACCL_CONFIG_FSR_SHIFT    3
@@ -547,6 +553,7 @@ struct inv_mpu_slave {
 #define TIME_STAMP_TOR                        5
 #define MAX_CATCH_UP                          5
 #define DEFAULT_ACCL_TRIM                     16384
+#define DEFAULT_GYRO_TRIM                     131
 #define MAX_FIFO_RATE                         1000
 #define MIN_FIFO_RATE                         4
 #define ONE_K_HZ                              1000
@@ -736,6 +743,7 @@ void inv_mpu_unconfigure_ring(struct iio_dev *indio_dev);
 void inv_mpu_remove_trigger(struct iio_dev *indio_dev);
 int inv_init_config_mpu3050(struct iio_dev *indio_dev);
 int inv_get_silicon_rev_mpu6050(struct inv_mpu_iio_s *st);
+int inv_get_silicon_rev_mpu6500(struct inv_mpu_iio_s *st);
 int set_3050_bypass(struct inv_mpu_iio_s *st, bool enable);
 int inv_register_mpu3050_slave(struct inv_mpu_iio_s *st);
 void inv_setup_reg_mpu3050(struct inv_reg_map_s *reg);
