@@ -626,6 +626,19 @@ static int cpuidle_coupled_cpu_notify(struct notifier_block *nb,
 {
 	int cpu = (unsigned long)hcpu;
 
+
+	switch (action & ~CPU_TASKS_FROZEN) {
+	case CPU_UP_PREPARE:
+	case CPU_DOWN_PREPARE:
+	case CPU_ONLINE:
+	case CPU_DEAD:
+	case CPU_UP_CANCELED:
+	case CPU_DOWN_FAILED:
+		break;
+	default:
+		return NOTIFY_OK;
+	}
+
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_DEAD:
 	case CPU_UP_CANCELED:
