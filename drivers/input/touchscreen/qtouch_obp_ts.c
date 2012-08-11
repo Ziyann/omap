@@ -1064,7 +1064,7 @@ static int qtouch_ts_probe(struct i2c_client *client,
 		__set_bit(INPUT_PROP_DIRECT, ts->input_dev->evbit);
 		/* multi touch */
 		input_mt_init_slots(ts->input_dev,
-			pdata->multi_touch_cfg.num_touch);
+			pdata->multi_touch_cfg.num_touch, 0);
 		input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
 			pdata->abs_min_x, pdata->abs_max_x,
 			pdata->fuzz_x, 0);
