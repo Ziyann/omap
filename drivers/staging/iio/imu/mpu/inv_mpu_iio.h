@@ -56,25 +56,25 @@
  *  @prgm_strt_addrh	firmware program start address register
  */
 struct inv_reg_map_s {
-	unsigned char sample_rate_div;
-	unsigned char lpf;
-	unsigned char bank_sel;
-	unsigned char user_ctrl;
-	unsigned char fifo_en;
-	unsigned char gyro_config;
-	unsigned char accl_config;
-	unsigned char fifo_count_h;
-	unsigned char fifo_r_w;
-	unsigned char raw_gyro;
-	unsigned char raw_accl;
-	unsigned char temperature;
-	unsigned char int_enable;
-	unsigned char int_status;
-	unsigned char pwr_mgmt_1;
-	unsigned char pwr_mgmt_2;
-	unsigned char mem_start_addr;
-	unsigned char mem_r_w;
-	unsigned char prgm_strt_addrh;
+	u8 sample_rate_div;
+	u8 lpf;
+	u8 bank_sel;
+	u8 user_ctrl;
+	u8 fifo_en;
+	u8 gyro_config;
+	u8 accl_config;
+	u8 fifo_count_h;
+	u8 fifo_r_w;
+	u8 raw_gyro;
+	u8 raw_accl;
+	u8 temperature;
+	u8 int_enable;
+	u8 int_status;
+	u8 pwr_mgmt_1;
+	u8 pwr_mgmt_2;
+	u8 mem_start_addr;
+	u8 mem_r_w;
+	u8 prgm_strt_addrh;
 };
 /*device enum */
 enum inv_devices {
@@ -101,7 +101,7 @@ struct test_setup_t {
 	int lpf;
 	int fsr;
 	int accl_fs;
-	unsigned int accl_sens[3];
+	u32 accl_sens[3];
 };
 
 /**
@@ -110,8 +110,8 @@ struct test_setup_t {
  *  @name:      name of the chip
  */
 struct inv_hw_s {
-	unsigned char num_reg;
-	unsigned char *name;
+	u8 num_reg;
+	u8 *name;
 };
 
 /**
@@ -147,35 +147,35 @@ struct inv_hw_s {
  *  @fifo_rate:		FIFO update rate.
  */
 struct inv_chip_config_s {
-	unsigned int fsr:2;
-	unsigned int lpf:3;
-	unsigned int clk_src:1;
-	unsigned int accl_fs:2;
-	unsigned int self_test_run_once:1;
-	unsigned int has_footer:1;
-	unsigned int has_compass:1;
-	unsigned int enable:1;
-	unsigned int accl_enable:1;
-	unsigned int accl_fifo_enable:1;
-	unsigned int gyro_enable:1;
-	unsigned int gyro_fifo_enable:1;
-	unsigned int compass_enable:1;
-	unsigned int compass_fifo_enable:1;
-	unsigned int is_asleep:1;
-	unsigned int dmp_on:1;
-	unsigned int dmp_int_on:1;
-	unsigned int dmp_event_int_on:1;
-	unsigned int orientation_on:1;
-	unsigned int firmware_loaded:1;
-	unsigned int lpa_mode:1;
-	unsigned int tap_on:1;
-	unsigned int flick_int_on:1;
-	unsigned int quaternion_on:1;
-	unsigned int display_orient_on:1;
-	unsigned short lpa_freq;
-	unsigned short  prog_start_addr;
-	unsigned short fifo_rate;
-	unsigned short dmp_output_rate;
+	u32 fsr:2;
+	u32 lpf:3;
+	u32 clk_src:1;
+	u32 accl_fs:2;
+	u32 self_test_run_once:1;
+	u32 has_footer:1;
+	u32 has_compass:1;
+	u32 enable:1;
+	u32 accl_enable:1;
+	u32 accl_fifo_enable:1;
+	u32 gyro_enable:1;
+	u32 gyro_fifo_enable:1;
+	u32 compass_enable:1;
+	u32 compass_fifo_enable:1;
+	u32 is_asleep:1;
+	u32 dmp_on:1;
+	u32 dmp_int_on:1;
+	u32 dmp_event_int_on:1;
+	u32 orientation_on:1;
+	u32 firmware_loaded:1;
+	u32 lpa_mode:1;
+	u32 tap_on:1;
+	u32 flick_int_on:1;
+	u32 quaternion_on:1;
+	u32 display_orient_on:1;
+	u16 lpa_freq;
+	u16  prog_start_addr;
+	u16 fifo_rate;
+	u16 dmp_output_rate;
 };
 
 /**
@@ -190,12 +190,12 @@ struct inv_chip_config_s {
  *  @accl_sens_trim:    accel sensitivity trim factor.
  */
 struct inv_chip_info_s {
-	unsigned char product_id;
-	unsigned char product_revision;
-	unsigned char silicon_revision;
-	unsigned char software_revision;
-	unsigned char multi;
-	unsigned char compass_sens[3];
+	u8 product_id;
+	u8 product_revision;
+	u8 silicon_revision;
+	u8 software_revision;
+	u8 multi;
+	u8 compass_sens[3];
 	unsigned long gyro_sens_trim;
 	unsigned long accl_sens_trim;
 };
@@ -230,9 +230,9 @@ enum inv_channel_num {
  *  @time:	tap time.
  */
 struct inv_tap_s {
-	unsigned short min_count;
-	unsigned short thresh;
-	unsigned short time;
+	u16 min_count;
+	u16 thresh;
+	u16 time;
 };
 struct inv_mpu_slave;
 /**
@@ -263,9 +263,11 @@ struct inv_mpu_slave;
  *  @raw_gyro:          raw gyro data.
  *  @raw_accel:         raw accel data.
  *  @raw_compass:       raw compass.
+ *  @raw_quaternion     raw quaternion data.
  *  @compass_scale:     compass scale.
  *  @i2c_addr:          i2c address.
  *  @compass_divider:   slow down compass rate.
+ *  @compass_dmp_divider: slow down compass rate for dmp.
  *  @compass_counter:   slow down compass rate.
  *  @sample_divider:    sample divider for dmp.
  *  @fifo_divider:      fifo divider for dmp.
@@ -305,19 +307,21 @@ struct inv_mpu_iio_s {
 	short raw_gyro[3];
 	short raw_accel[3];
 	short raw_compass[3];
-	unsigned char compass_scale;
-	unsigned char i2c_addr;
-	unsigned char compass_divider;
-	unsigned char compass_counter;
-	unsigned char sample_divider;
-	unsigned char fifo_divider;
-	unsigned char orient_data;
-	unsigned char display_orient_data;
-	unsigned char tap_data;
+	int raw_quaternion[4];
+	u8 compass_scale;
+	u8 i2c_addr;
+	u8 compass_divider;
+	u8 compass_counter;
+	u8 compass_dmp_divider;
+	u8 sample_divider;
+	u8 fifo_divider;
+	u8 orient_data;
+	u8 display_orient_data;
+	u8 tap_data;
 	enum inv_channel_num num_channels;
 	void *sl_handle;
-	unsigned int irq_dur_ns;
-	long long last_isr_time;
+	u32 irq_dur_ns;
+	u64 last_isr_time;
 #ifdef CONFIG_INV_TESTING
 	unsigned long i2c_readcount;
 	unsigned long i2c_writecount;
@@ -327,10 +331,10 @@ struct inv_mpu_iio_s {
 /* produces an unique identifier for each device based on the
    combination of product version and product revision */
 struct prod_rev_map_t {
-	unsigned short mpl_product_key;
-	unsigned char silicon_rev;
-	unsigned short gyro_trim;
-	unsigned short accel_trim;
+	u16 mpl_product_key;
+	u8 silicon_rev;
+	u16 gyro_trim;
+	u16 accel_trim;
 };
 
 /**
@@ -347,7 +351,7 @@ struct inv_mpu_slave {
 	int (*suspend)(struct inv_mpu_iio_s *);
 	int (*resume)(struct inv_mpu_iio_s *);
 	int (*setup)(struct inv_mpu_iio_s *);
-	int (*combine_data)(unsigned char *in, short *out);
+	int (*combine_data)(u8 *in, short *out);
 	int (*get_mode)(void);
 	int (*set_lpf)(struct inv_mpu_iio_s *, int rate);
 	int (*set_fs)(struct inv_mpu_iio_s *, int fs);
@@ -524,6 +528,9 @@ struct inv_mpu_slave {
 #define MPU6500_ID               0x70      /* unique WHOAMI */
 #define MPU6500_PRODUCT_REVISION 1
 
+/*---- MPU9250 ----*/
+#define MPU9250_ID               0x71      /* unique WHOAMI */
+
 #define THREE_AXIS               3
 #define GYRO_CONFIG_FSR_SHIFT    3
 #define ACCL_CONFIG_FSR_SHIFT    3
@@ -536,6 +543,7 @@ struct inv_mpu_slave {
 
 /* init parameters */
 #define INIT_FIFO_RATE           50
+#define INIT_DMP_OUTPUT_RATE     25
 #define INIT_DUR_TIME           ((1000 / INIT_FIFO_RATE) * 1000 * 1000)
 #define INIT_TAP_THRESHOLD       100
 #define INIT_TAP_TIME            100
@@ -755,30 +763,32 @@ int inv_set_interrupt_on_gesture_event(struct inv_mpu_iio_s *st, bool on);
 int inv_send_quaternion(struct inv_mpu_iio_s *st, bool on);
 int inv_set_display_orient_interrupt_dmp(struct inv_mpu_iio_s *st, bool on);
 int inv_enable_orientation_dmp(struct inv_mpu_iio_s *st, bool on);
-int inv_set_fifo_rate(struct inv_mpu_iio_s *st, unsigned short fifo_rate);
-unsigned short inv_dmp_get_address(unsigned short key);
+int inv_set_fifo_rate(struct inv_mpu_iio_s *st, u16 fifo_rate);
+u16 inv_dmp_get_address(u16 key);
 int inv_q30_mult(int a, int b);
 int inv_set_tap_threshold_dmp(struct inv_mpu_iio_s *st,
-				unsigned int axis, unsigned short threshold);
-int inv_set_min_taps_dmp(struct inv_mpu_iio_s *st, unsigned short min_taps);
-int  inv_set_tap_time_dmp(struct inv_mpu_iio_s *st, unsigned short time);
+				u32 axis, u16 threshold);
+int inv_set_min_taps_dmp(struct inv_mpu_iio_s *st, u16 min_taps);
+int  inv_set_tap_time_dmp(struct inv_mpu_iio_s *st, u16 time);
 int inv_enable_tap_dmp(struct inv_mpu_iio_s *st, bool on);
-int inv_i2c_read_base(struct inv_mpu_iio_s *st, unsigned short i2c_addr,
-	unsigned char reg, unsigned short length, unsigned char *data);
+int inv_i2c_read_base(struct inv_mpu_iio_s *st, u16 i2c_addr,
+	u8 reg, u16 length, u8 *data);
 int inv_i2c_single_write_base(struct inv_mpu_iio_s *st,
-	unsigned short i2c_addr, unsigned char reg, unsigned char data);
+	u16 i2c_addr, u8 reg, u8 data);
 int inv_do_test(struct inv_mpu_iio_s *st, int self_test_flag,
 		int *gyro_result, int *accl_result);
 int mpu_memory_write(struct i2c_adapter *i2c_adap,
-			    unsigned char mpu_addr,
-			    unsigned short mem_addr,
-			    unsigned int len, unsigned char const *data);
+			    u8 mpu_addr,
+			    u16 mem_addr,
+			    u32 len, u8 const *data);
 int mpu_memory_read(struct i2c_adapter *i2c_adap,
-			   unsigned char mpu_addr,
-			   unsigned short mem_addr,
-			   unsigned int len, unsigned char *data);
+			   u8 mpu_addr,
+			   u16 mem_addr,
+			   u32 len, u8 *data);
 int inv_hw_self_test(struct inv_mpu_iio_s *st);
 int inv_hw_self_test_6500(struct inv_mpu_iio_s *st);
+void inv_recover_setting(struct inv_mpu_iio_s *st);
+s64 get_time_ns(void);
 
 #define mem_w(a, b, c) mpu_memory_write(st->sl_handle,\
 			st->i2c_addr, a, b, c)

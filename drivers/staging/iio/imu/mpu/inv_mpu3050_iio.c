@@ -179,6 +179,7 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
 	int result;
 	unsigned char data;
 	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+
 	if (st->chip_config.is_asleep)
 		return -EPERM;
 	/*reading AUX VDDIO register */
@@ -193,7 +194,7 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
 		return result;
 
 	reg = &st->reg;
-	result = set_inv_enable(indio_dev, 0);
+	result = set_inv_enable(indio_dev, false);
 	if (result)
 		return result;
 	/*2000dps full scale range*/
@@ -213,7 +214,8 @@ int inv_init_config_mpu3050(struct iio_dev *indio_dev)
 	st->chip_config.prog_start_addr = DMP_START_ADDR;
 	st->chip_config.gyro_enable = 1;
 	st->chip_config.gyro_fifo_enable = 1;
-	if (SECONDARY_SLAVE_TYPE_ACCEL == st->plat_data.sec_slave_type) {
+	if ((SECONDARY_SLAVE_TYPE_ACCEL == st->plat_data.sec_slave_type) &&
+		st->mpu_slave) {
 		result = st->mpu_slave->setup(st);
 		if (result)
 			return result;

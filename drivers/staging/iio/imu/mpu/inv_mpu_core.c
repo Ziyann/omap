@@ -41,6 +41,13 @@
 #include "inv_mpu_iio.h"
 #include "../../sysfs.h"
 
+s64 get_time_ns(void)
+{
+	struct timespec ts;
+	ktime_get_ts(&ts);
+	return timespec_to_ns(&ts);
+}
+
 static const short AKM8975_ST_Lower[3] = {-100, -100, -1000};
 static const short AKM8975_ST_Upper[3] = {100, 100, -300};
 
@@ -92,7 +99,7 @@ static void inv_setup_reg(struct inv_reg_map_s *reg)
  *       i2c address due to secondary i2c interface.
  */
 int inv_i2c_read_base(struct inv_mpu_iio_s *st, unsigned short i2c_addr,
-	unsigned char reg, unsigned short length, unsigned char *data)
+	u8 reg, unsigned short length, u8 *data)
 {
 	struct i2c_msg msgs[2];
 	int res;
@@ -135,9 +142,9 @@ int inv_i2c_read_base(struct inv_mpu_iio_s *st, unsigned short i2c_addr,
  *       i2c address due to secondary i2c interface.
  */
 int inv_i2c_single_write_base(struct inv_mpu_iio_s *st,
-	unsigned short i2c_addr, unsigned char reg, unsigned char data)
+	unsigned short i2c_addr, u8 reg, u8 data)
 {
-	unsigned char tmp[2];
+	u8 tmp[2];
 	struct i2c_msg msg;
 	int res;
 
@@ -246,7 +253,7 @@ static int inv_init_config(struct iio_dev *indio_dev)
 	st->chip_config.lpf = INV_FILTER_42HZ;
 
 	result = inv_i2c_single_write(st, reg->sample_rate_div,
-					ONE_K_HZ/INIT_FIFO_RATE - 1);
+					ONE_K_HZ / INIT_FIFO_RATE - 1);
 	if (result)
 		return result;
 	st->chip_config.fifo_rate = INIT_FIFO_RATE;
@@ -254,6 +261,7 @@ static int inv_init_config(struct iio_dev *indio_dev)
 	st->chip_config.prog_start_addr = DMP_START_ADDR;
 	st->chip_config.gyro_enable = 1;
 	st->chip_config.gyro_fifo_enable = 1;
+	st->chip_config.dmp_output_rate = INIT_DMP_OUTPUT_RATE;
 	if (INV_ITG3500 != st->chip_type) {
 		st->chip_config.accl_enable = 1;
 		st->chip_config.accl_fifo_enable = 1;
@@ -294,66 +302,88 @@ static int inv_compass_scale_show(struct inv_mpu_iio_s *st, int *scale)
  *  mpu_read_raw() - read raw method.
  */
 static int mpu_read_raw(struct iio_dev *indio_dev,
-			      struct iio_chan_spec const *chan,
-			      int *val,
-			      int *val2,
-			      long mask) {
+			struct iio_chan_spec const *chan,
+			int *val, int *val2, long mask)
+{
 	struct inv_mpu_iio_s  *st = iio_priv(indio_dev);
 	int result;
 	if (st->chip_config.is_asleep)
 		return -EINVAL;
 	switch (mask) {
 	case 0:
-		if (chan->type == IIO_ANGL_VEL) {
+		switch (chan->type) {
+		case IIO_ANGL_VEL:
 			*val = st->raw_gyro[chan->channel2 - IIO_MOD_X];
 			return IIO_VAL_INT;
-		}
-		if (chan->type == IIO_ACCEL) {
+		case IIO_ACCEL:
 			*val = st->raw_accel[chan->channel2 - IIO_MOD_X];
 			return IIO_VAL_INT;
-		}
-		if (chan->type == IIO_MAGN) {
+		case IIO_MAGN:
 			*val = st->raw_compass[chan->channel2 - IIO_MOD_X];
 			return IIO_VAL_INT;
+		case IIO_QUATERNION:
+			if (IIO_MOD_R == chan->channel2)
+				*val = st->raw_quaternion[0];
+			else
+				*val = st->raw_quaternion[chan->channel2 -
+							  IIO_MOD_X + 1];
+			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
 		}
 		return -EINVAL;
 	case IIO_CHAN_INFO_SCALE:
-		if (chan->type == IIO_ANGL_VEL) {
-			const short gyro_scale_6050[] = {250, 500, 1000, 2000};
-			const short gyro_scale_6500[] = {250, 1000, 2000, 4000};
+		switch (chan->type) {
+		case IIO_ANGL_VEL:
+		{
+			const s16 gyro_scale_6050[] = {250, 500, 1000, 2000};
+			const s16 gyro_scale_6500[] = {250, 1000, 2000, 4000};
 			if (INV_MPU6500 == st->chip_type)
 				*val = gyro_scale_6500[st->chip_config.fsr];
 			else
 				*val = gyro_scale_6050[st->chip_config.fsr];
 			return IIO_VAL_INT;
 		}
-		if (chan->type == IIO_ACCEL) {
-			const short accel_scale[] = {2, 4, 8, 16};
+		case IIO_ACCEL:
+		{
+			const s16 accel_scale[] = {2, 4, 8, 16};
 			*val = accel_scale[st->chip_config.accl_fs];
 			return IIO_VAL_INT;
 		}
-		if (chan->type == IIO_MAGN)
+		case IIO_MAGN:
 			return inv_compass_scale_show(st, val);
-		return -EINVAL;
+		default:
+			return -EINVAL;
+		}
 	case IIO_CHAN_INFO_CALIBBIAS:
+		/* return bias=0 for both accel and gyro for MPU6500;
+		   self test not supported yet */
+		if (INV_MPU6500 == st->chip_type) {
+			*val = 0;
+			return IIO_VAL_INT;
+		}
 		if (st->chip_config.self_test_run_once == 0) {
 			result = inv_do_test(st, 0,  st->gyro_bias,
 				st->accel_bias);
+			/* Reset Accel and Gyro full scale range
+			   back to default value */
+			inv_recover_setting(st);
 			if (result)
 				return result;
 			st->chip_config.self_test_run_once = 1;
 		}
 
-		if (chan->type == IIO_ANGL_VEL) {
+		switch (chan->type) {
+		case IIO_ANGL_VEL:
 			*val = st->gyro_bias[chan->channel2 - IIO_MOD_X];
 			return IIO_VAL_INT;
-		}
-		if (chan->type == IIO_ACCEL) {
+		case IIO_ACCEL:
 			*val = st->accel_bias[chan->channel2 - IIO_MOD_X] *
 					st->chip_info.multi;
 			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
 		}
-		return -EINVAL;
 	default:
 		return -EINVAL;
 	}
@@ -447,19 +477,20 @@ static int mpu_write_raw(struct iio_dev *indio_dev,
 			       int val2,
 			       long mask) {
 	struct inv_mpu_iio_s  *st = iio_priv(indio_dev);
-	int result;
 	if (check_enable(st))
 		return -EPERM;
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
-		result = -EINVAL;
-		if (chan->type == IIO_ANGL_VEL)
-			result = inv_write_fsr(st, val);
-		if (chan->type == IIO_ACCEL)
-			result = inv_write_accel_fs(st, val);
-		if (chan->type == IIO_MAGN)
-			result = inv_write_compass_scale(st, val);
-		return result;
+		switch (chan->type) {
+		case IIO_ANGL_VEL:
+			return inv_write_fsr(st, val);
+		case IIO_ACCEL:
+			return inv_write_accel_fs(st, val);
+		case IIO_MAGN:
+			return inv_write_compass_scale(st, val);
+		default:
+			return -EINVAL;
+		}
 	default:
 		return -EINVAL;
 	}
@@ -509,7 +540,7 @@ static ssize_t inv_fifo_rate_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	unsigned long fifo_rate;
-	unsigned char data;
+	u8 data;
 	int result;
 	struct inv_mpu_iio_s *st = iio_priv(dev_get_drvdata(dev));
 	struct inv_reg_map_s *reg;
@@ -524,16 +555,11 @@ static ssize_t inv_fifo_rate_store(struct device *dev,
 	if (fifo_rate == st->chip_config.fifo_rate)
 		return count;
 	if (st->chip_config.has_compass) {
-		data = COMPASS_RATE_SCALE*fifo_rate/ONE_K_HZ;
-		if (data > 0)
-			data -= 1;
-		st->compass_divider = data;
+		st->compass_divider = COMPASS_RATE_SCALE * fifo_rate /
+					ONE_K_HZ;
+		if (st->compass_divider > 0)
+			st->compass_divider -= 1;
 		st->compass_counter = 0;
-		/* I2C_MST_DLY is set according to sample rate,
-		   AKM cannot be read or set at sample rate higher than 100Hz*/
-		result = inv_i2c_single_write(st, REG_I2C_SLV4_CTRL, data);
-		if (result)
-			return result;
 	}
 	data = ONE_K_HZ / fifo_rate - 1;
 	result = inv_i2c_single_write(st, reg->sample_rate_div, data);
@@ -738,6 +764,12 @@ static ssize_t inv_dmp_attr_store(struct device *dev,
 		result = inv_set_fifo_rate(st, data);
 		if (result)
 			return result;
+		if (st->chip_config.has_compass) {
+			st->compass_dmp_divider = COMPASS_RATE_SCALE * data /
+							ONE_K_HZ;
+			if (st->compass_dmp_divider > 0)
+				st->compass_dmp_divider -= 1;
+		}
 		st->chip_config.dmp_output_rate = data;
 		break;
 	case ATTR_DMP_ORIENTATION_ON:
@@ -771,7 +803,7 @@ static ssize_t inv_attr_show(struct device *dev,
 	char d[4];
 	int result, data;
 	signed char *m;
-	unsigned char *key;
+	u8 *key;
 	int i;
 
 	switch (this_attr->address) {
@@ -957,7 +989,7 @@ static ssize_t inv_temperature_show(struct device *dev,
 	int result;
 	short temp;
 	long scale_t;
-	unsigned char data[2];
+	u8 data[2];
 	reg = &st->reg;
 
 	if (st->chip_config.is_asleep)
@@ -977,7 +1009,10 @@ static ssize_t inv_temperature_show(struct device *dev,
 		scale_t = MPU6050_TEMP_OFFSET +
 			inv_q30_mult((int)temp << MPU_TEMP_SHIFT,
 				     MPU6050_TEMP_SCALE);
-	return sprintf(buf, "%ld %lld\n", scale_t, iio_get_time_ns());
+#ifdef CONFIG_INV_TESTING
+	 st->i2c_tempreads++;
+#endif
+	return sprintf(buf, "%ld %lld\n", scale_t, get_time_ns());
 }
 
 /**
@@ -1023,7 +1058,7 @@ static int inv_quaternion_on(struct inv_mpu_iio_s *st,
 static int inv_lpa_mode(struct inv_mpu_iio_s *st, int lpa_mode)
 {
 	unsigned long result;
-	unsigned char d;
+	u8 d;
 	struct inv_reg_map_s *reg;
 
 	reg = &st->reg;
@@ -1055,7 +1090,7 @@ static int inv_lpa_mode(struct inv_mpu_iio_s *st, int lpa_mode)
 static int inv_lpa_freq(struct inv_mpu_iio_s *st, int lpa_freq)
 {
 	unsigned long result;
-	unsigned char d;
+	u8 d;
 	struct inv_reg_map_s *reg;
 
 	if (INV_MPU6500 == st->chip_type) {
@@ -1073,7 +1108,7 @@ static int inv_lpa_freq(struct inv_mpu_iio_s *st, int lpa_freq)
 		if (result)
 			return result;
 		d &= ~BIT_LPA_FREQ;
-		d |= (unsigned char)(lpa_freq << LPA_FREQ_SHIFT);
+		d |= (u8)(lpa_freq << LPA_FREQ_SHIFT);
 		result = inv_i2c_single_write(st, reg->pwr_mgmt_2, d);
 		if (result)
 			return result;
@@ -1086,7 +1121,7 @@ static int inv_lpa_freq(struct inv_mpu_iio_s *st, int lpa_freq)
 static int inv_switch_engine(struct inv_mpu_iio_s *st, bool en, u32 mask)
 {
 	struct inv_reg_map_s *reg;
-	unsigned char data;
+	u8 data;
 	int result;
 	reg = &st->reg;
 	result = inv_i2c_read(st, reg->pwr_mgmt_2, 1, &data);
@@ -1250,7 +1285,7 @@ static ssize_t inv_reg_write_store(struct device *dev,
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
 	unsigned int result;
-	unsigned char wreg, wval;
+	u8 wreg, wval;
 	int temp;
 	char local_buf[10];
 
@@ -1492,7 +1527,7 @@ static const struct iio_info mpu_info = {
 static int inv_setup_compass(struct inv_mpu_iio_s *st)
 {
 	int result;
-	unsigned char data[4];
+	u8 data[4];
 
 	result = inv_i2c_read(st, REG_YGOFFS_TC, 1, data);
 	if (result)
@@ -1651,6 +1686,7 @@ static int inv_check_chip_type(struct inv_mpu_iio_s *st,
 	result = st->set_power_state(st, true);
 	if (result)
 		return result;
+
 	switch (st->chip_type) {
 	case INV_ITG3500:
 		st->num_channels = INV_CHANNEL_NUM_GYRO;
@@ -1688,6 +1724,7 @@ static int inv_check_chip_type(struct inv_mpu_iio_s *st,
 		result = st->set_power_state(st, false);
 		return -ENODEV;
 	}
+
 	switch (st->chip_type) {
 	case INV_MPU6050:
 	case INV_MPU9150:
@@ -1775,6 +1812,7 @@ static int inv_mpu_probe(struct i2c_client *client,
 	struct inv_mpu_iio_s *st;
 	struct iio_dev *indio_dev;
 	int result;
+
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		result = -ENOSYS;
 		pr_err("I2c function error\n");
@@ -1803,7 +1841,6 @@ static int inv_mpu_probe(struct i2c_client *client,
 			"Could not initialize device.\n");
 		goto out_free;
 	}
-
 	result = st->set_power_state(st, false);
 	if (result) {
 		dev_err(&client->adapter->dev,
@@ -1845,6 +1882,7 @@ static int inv_mpu_probe(struct i2c_client *client,
 		pr_err("IIO device register fail\n");
 		goto out_remove_trigger;
 	}
+
 	if (INV_MPU6050 == st->chip_type || INV_MPU9150 == st->chip_type ||
 	    INV_MPU6500 == st->chip_type) {
 		result = inv_create_dmp_sysfs(indio_dev);
