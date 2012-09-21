@@ -378,4 +378,9 @@ config SIGNATURE
 	  Digital signature verification. Currently only RSA is supported.
 	  Implementation is done using GnuPG MPI library
 
+config OID_REGISTRY
+	tristate
+	help
+	  Enable fast lookup object identifier registry.
+
 endmenu
