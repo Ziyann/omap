@@ -131,6 +131,7 @@ struct inv_hw_s {
  *  @compass_enable:	enable compass
  *  @compass_fifo_enable: enable compass data output
  *  @is_asleep:		1 if chip is powered down.
+ *  @was_asleep_on_suspend:	1 if chip was powered at time of sustpend.
  *  @dmp_on:		dmp is on/off.
  *  @dmp_int_on:        dmp interrupt on/off.
  *  @dmp_event_int_on:  dmp event interrupt on/off.
@@ -162,6 +163,7 @@ struct inv_chip_config_s {
 	u32 compass_enable:1;
 	u32 compass_fifo_enable:1;
 	u32 is_asleep:1;
+	u32 was_asleep_on_suspend:1;
 	u32 dmp_on:1;
 	u32 dmp_int_on:1;
 	u32 dmp_event_int_on:1;

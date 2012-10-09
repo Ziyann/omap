@@ -1940,6 +1940,8 @@ static int inv_mpu_resume(struct device *dev)
 	struct inv_mpu_iio_s *st =
 			iio_priv(i2c_get_clientdata(to_i2c_client(dev)));
 
+	if (st->chip_config.was_asleep_on_suspend)
+		return 0;
 	return st->set_power_state(st, true);
 }
 
@@ -1947,7 +1949,7 @@ static int inv_mpu_suspend(struct device *dev)
 {
 	struct inv_mpu_iio_s *st =
 			iio_priv(i2c_get_clientdata(to_i2c_client(dev)));
-
+	st->chip_config.was_asleep_on_suspend = st->chip_config.is_asleep;
 	return st->set_power_state(st, false);
 }
 static const struct dev_pm_ops inv_mpu_pmops = {
