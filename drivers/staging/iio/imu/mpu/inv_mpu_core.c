@@ -1914,6 +1914,28 @@ out_no_free:
 	return -EIO;
 }
 
+static void inv_mpu_shutdown(struct i2c_client *client)
+{
+	struct iio_dev *indio_dev = i2c_get_clientdata(client);
+	struct inv_mpu_iio_s *st = iio_priv(indio_dev);
+	struct inv_reg_map_s *reg;
+	int result;
+
+	reg = &st->reg;
+
+	dev_dbg(&client->adapter->dev, "Shutting down %s...\n", st->hw->name);
+
+	/* reset to make sure previous state are not there */
+	result = inv_i2c_single_write(st, reg->pwr_mgmt_1, BIT_H_RESET);
+	if (result)
+		dev_err(&client->adapter->dev, "Failed to reset %s\n", st->hw->name);
+	msleep(POWER_UP_TIME);
+	/* turn off power to ensure gyro engine is off */
+	result = st->set_power_state(st, false);
+	if (result)
+		dev_err(&client->adapter->dev, "Failed to turn off %s\n", st->hw->name);
+}
+
 /**
  *  inv_mpu_remove() - remove function.
  */
@@ -1979,6 +2001,7 @@ static struct i2c_driver inv_mpu_driver = {
 	.class = I2C_CLASS_HWMON,
 	.probe		=	inv_mpu_probe,
 	.remove		=	inv_mpu_remove,
+	.shutdown	=	inv_mpu_shutdown,
 	.id_table	=	inv_mpu_id,
 	.driver = {
 		.owner	=	THIS_MODULE,
