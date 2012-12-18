@@ -54,7 +54,7 @@
 #define DMP_PRECISION                   1000
 #define DMP_MAX_DIVIDER                 4
 #define DMP_MAX_MIN_TAPS                4
-#define DMP_IMAGE_CRC_VALUE             0x6590dad6
+uint32_t DMP_IMAGE_CRC_VALUES[] = { 0x6590dad6, 0xd37d4599 };
 #define DMP_IMAGE_SIZE                  3065
 
 /*--- Test parameters defaults --- */
@@ -1736,6 +1736,8 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 {
 	u8 *firmware;
 	int result;
+	uint32_t crc;
+	int crc_idx;
 	struct inv_reg_map_s *reg;
 	struct iio_dev *indio_dev;
 	struct inv_mpu_iio_s *st;
@@ -1757,10 +1759,13 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 		return -ENOMEM;
 
 	memcpy(firmware, buf, size);
-	result = crc32(CRC_FIRMWARE_SEED, firmware, size);
-	if (DMP_IMAGE_CRC_VALUE != result) {
+	crc = crc32(CRC_FIRMWARE_SEED, firmware, size);
+	for (crc_idx = 0; crc_idx < ARRAY_SIZE(DMP_IMAGE_CRC_VALUES); crc_idx++)
+		if (DMP_IMAGE_CRC_VALUES[crc_idx] == crc)
+			break;
+	if (crc_idx >= ARRAY_SIZE(DMP_IMAGE_CRC_VALUES)) {
+		pr_err("firmware CRC error. Got 0x%08x\n", crc);
 		result = -EINVAL;
-		pr_err("firmware CRC error\n");
 		goto firmware_write_fail;
 	}
 
@@ -1800,6 +1805,7 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 	if (result)
 		goto firmware_write_fail;
 	st->chip_config.firmware_loaded = 1;
+	pr_info("firmware loaded CRC=0x%08x\n", DMP_IMAGE_CRC_VALUES[crc_idx]);
 	result = size;
 firmware_write_fail:
 	kfree(firmware);
