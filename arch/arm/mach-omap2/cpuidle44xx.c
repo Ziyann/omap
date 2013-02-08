@@ -174,6 +174,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 			gic_dist_disable();
 
 		clkdm_wakeup(cpu_clkdm[1]);
+		omap_set_pwrdm_state(cpu_pd[1], PWRDM_POWER_ON);
 		clkdm_allow_idle(cpu_clkdm[1]);
 
 		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) &&
