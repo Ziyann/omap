@@ -650,6 +650,12 @@ int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
 const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
 
 /*
+ *
+ */
+
+extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
+
+/*
  * Chip variant-specific hwmod init routines - XXX should be converted
  * to use initcalls once the initial boot ordering is straightened out
  */
