@@ -229,25 +229,27 @@ static void __init omap3_check_features(void)
 
 static void __init omap4_check_features(void)
 {
-	u32 si_type;
+	u32 si_type, si_type_forced;
 
 	omap4_features = 0;
 
 	si_type =
 	  (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 3;
+	si_type_forced = si_type;
 
 #ifdef CONFIG_FORCE_SILICON_PERFORMANCE
-	si_type = OMAP4_SILICON_TYPE_PERFORMANCE;
+	si_type_forced = OMAP4_SILICON_TYPE_PERFORMANCE;
 #endif
 
-	switch (si_type) {
+	switch (si_type_forced) {
 	case OMAP4_SILICON_TYPE_PERFORMANCE:
 		/* High performance device */
 		if (cpu_is_omap443x())
 			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
 		else if (cpu_is_omap446x() || cpu_is_omap447x()) {
 			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
-			omap4_features |= OMAP4_HAS_IVA_500MHZ;
+			if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
+				omap4_features |= OMAP4_HAS_IVA_500MHZ;
 		}
 		/* Fall through to Standard device features */
 	case OMAP4_SILICON_TYPE_STANDARD:
