@@ -573,7 +573,8 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
 		pdata->slots[0].gpio_wp = -EINVAL;
 
 	/* Make MMC wake up capable */
-	enable_irq_wake(pdata->slots[0].card_detect_irq);
+	if (gpio_is_valid(pdata->slots[0].switch_pin))
+		enable_irq_wake(pdata->slots[0].card_detect_irq);
 
 	return 0;
 
