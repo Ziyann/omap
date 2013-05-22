@@ -18,6 +18,8 @@
 #include <linux/kernel.h>
 #include <linux/i2c/twl.h>
 
+#include <plat/cpu.h>
+
 #include "voltage.h"
 #include "pm.h"
 #include "twl-common.h"
@@ -510,6 +512,15 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 
 int __init omap_twl_init(const char *pmic_type)
 {
+	if (cpu_is_omap446x() && pmic_type && !strcmp(pmic_type, "twl6032")) {
+		omap_twl_map[2].cpu &= ~PMIC_CPU_OMAP4460;
+		omap_twl_map[3].cpu |= PMIC_CPU_OMAP4460;
+		omap_twl_map[5].cpu &= ~PMIC_CPU_OMAP4460;
+		omap_twl_map[6].cpu |= PMIC_CPU_OMAP4460;
+		omap_twl_map[7].cpu &= ~PMIC_CPU_OMAP4460;
+		omap_twl_map[8].cpu |= PMIC_CPU_OMAP4460;
+	}
+
 	return omap_pmic_register_data(omap_twl_map);
 }
 
