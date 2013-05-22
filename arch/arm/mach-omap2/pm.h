@@ -189,10 +189,10 @@ static inline void omap_enable_smartreflex_on_init(void) {}
 #endif
 
 #ifdef CONFIG_TWL4030_CORE
-extern int omap_twl_init(void);
+extern int omap_twl_init(const char *pmic_type);
 extern int omap3_twl_set_sr_bit(bool enable);
 #else
-static inline int omap_twl_init(void)
+static inline int omap_twl_init(const char *pmic_type)
 {
 	return -EINVAL;
 }

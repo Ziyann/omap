@@ -508,7 +508,7 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 	{ .name = NULL, .pmic_data = NULL},
 };
 
-int __init omap_twl_init(void)
+int __init omap_twl_init(const char *pmic_type)
 {
 	return omap_pmic_register_data(omap_twl_map);
 }

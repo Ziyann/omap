@@ -191,7 +191,7 @@ void __init omap_pmic_late_init(void)
 	if (!pmic_i2c_board_info.irq && !omap4_i2c1_board_info[0].irq &&
 	    !omap5_i2c1_generic_info[0].irq)
 		return;
-	omap_twl_init();
+	omap_twl_init(NULL);
 	omap_tps6236x_init();
 	omap_palmas_init();
 }
