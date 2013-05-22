@@ -468,7 +468,7 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 	},
 	{
 		.name = "mpu",
-		.cpu = PMIC_CPU_OMAP4430,
+		.cpu = PMIC_CPU_OMAP4430 | PMIC_CPU_OMAP4460,
 		.pmic_data = &twl6030_vcore1_pmic,
 		.special_action = twl603x_set_offset,
 	},
