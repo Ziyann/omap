@@ -187,11 +187,21 @@ void __init omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
 
 void __init omap_pmic_late_init(void)
 {
+	const char *pmic_type = NULL;
+
 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
 	if (!pmic_i2c_board_info.irq && !omap4_i2c1_board_info[0].irq &&
 	    !omap5_i2c1_generic_info[0].irq)
 		return;
-	omap_twl_init(NULL);
+
+	if (cpu_is_omap44xx())
+		pmic_type = omap4_i2c1_board_info[0].type;
+	else if (cpu_is_omap54xx())
+		pmic_type = omap5_i2c1_generic_info[0].type;
+	else
+		pmic_type = pmic_i2c_board_info.type;
+
+	omap_twl_init(pmic_type);
 	omap_tps6236x_init();
 	omap_palmas_init();
 }
