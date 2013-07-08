@@ -1530,7 +1530,8 @@ static void __vunmap(const void *addr, int deallocate_pages)
  *	Must not be called in NMI context (strictly speaking, only if we don't
  *	have CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG, but making the calling
  *	conventions for vfree() arch-depenedent would be a really bad idea)
- *	
+ *
+ *	NOTE: assumes that the object at *addr has a size >= sizeof(llist_node)
  */
 void vfree(const void *addr)
 {
@@ -1542,8 +1543,8 @@ void vfree(const void *addr)
 		return;
 	if (unlikely(in_interrupt())) {
 		struct vfree_deferred *p = &__get_cpu_var(vfree_deferred);
-		llist_add((struct llist_node *)addr, &p->list);
-		schedule_work(&p->wq);
+		if (llist_add((struct llist_node *)addr, &p->list))
+			schedule_work(&p->wq);
 	} else
 		__vunmap(addr, 1);
 }
