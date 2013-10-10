@@ -3257,7 +3257,7 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"dpll_iva_m4x2_ck",		&dpll_iva_m4x2_ck),
 	CLKDEV_INIT(NULL,	"dpll_iva_m5x2_ck",		&dpll_iva_m5x2_ck),
 	CLKDEV_INIT(NULL,       "virt_dpll_iva_ck",             &virt_dpll_iva_ck),
-	CLKDEV_INIT(NULL,       "virt_dsp_ck",                  &virt_dpll_dsp_ck),
+	CLKDEV_INIT(NULL,       "virt_dpll_dsp_ck",                  &virt_dpll_dsp_ck),
 	CLKDEV_INIT(NULL,	"dpll_mpu_ck",			&dpll_mpu_ck),
 	CLKDEV_INIT(NULL,	"dpll_mpu_m2_ck",		&dpll_mpu_m2_ck),
 	CLKDEV_INIT(NULL,	"per_hs_clk_div_ck",		&per_hs_clk_div_ck),
