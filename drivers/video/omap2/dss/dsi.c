@@ -4533,7 +4533,7 @@ static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 		irq = dssdev->manager->id == OMAP_DSS_CHANNEL_LCD ?
 			DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2;
 
-		omap_dispc_unregister_isr(dsi_framedone_irq_callback,
+		omap_dispc_unregister_isr_sync(dsi_framedone_irq_callback,
 			(void *) dssdev, irq);
 	}
 }

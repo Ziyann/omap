@@ -145,10 +145,10 @@ static void wb_irq_handler(void *data, u32 mask)
 	complete_all(&wb->wb_completion);
 	complete(&wb->wb_done.completion);
 	if (wb->wb_done.vsync_active)
-		omap_dispc_unregister_isr(wb_irq_handler,
+		omap_dispc_unregister_isr_nosync(wb_irq_handler,
 					wb, DISPC_IRQ_VSYNC);
 	else
-		omap_dispc_unregister_isr(wb_irq_handler,
+		omap_dispc_unregister_isr_nosync(wb_irq_handler,
 					wb, DISPC_IRQ_FRAMEDONEWB);
 }
 

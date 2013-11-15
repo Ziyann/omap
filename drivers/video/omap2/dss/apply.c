@@ -1040,8 +1040,9 @@ static void schedule_completion_irq(void)
 
 	if (mask != dss_data.comp_irq_enabled) {
 		if (dss_data.comp_irq_enabled)
-			omap_dispc_unregister_isr(dss_completion_irq_handler,
-					NULL, dss_data.comp_irq_enabled);
+			omap_dispc_unregister_isr_nosync(
+					dss_completion_irq_handler, NULL,
+					dss_data.comp_irq_enabled);
 		if (mask)
 			omap_dispc_register_isr(dss_completion_irq_handler,
 					NULL, mask);
@@ -1122,7 +1123,7 @@ static void dss_unregister_vsync_isr(void)
 	for (i = 0; i < num_mgrs; ++i)
 		mask |= dispc_mgr_get_framedone_irq(i);
 
-	r = omap_dispc_unregister_isr(dss_apply_irq_handler, NULL, mask);
+	r = omap_dispc_unregister_isr_nosync(dss_apply_irq_handler, NULL, mask);
 	WARN_ON(r);
 
 	dss_data.irq_enabled = false;

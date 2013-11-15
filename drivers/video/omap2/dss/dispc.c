@@ -2698,7 +2698,7 @@ static void dispc_mgr_enable_lcd_out(enum omap_channel channel, bool enable)
 					msecs_to_jiffies(100)))
 			DSSERR("timeout waiting for FRAME DONE\n");
 
-		r = omap_dispc_unregister_isr(dispc_disable_isr,
+		r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
 				&frame_done_completion, irq);
 
 		if (r)
@@ -2767,8 +2767,8 @@ static void dispc_mgr_enable_digit_out(bool enable)
 					enable ? "start" : "stop");
 	}
 
-	r = omap_dispc_unregister_isr(dispc_disable_isr, &frame_done_completion,
-			irq_mask);
+	r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
+			&frame_done_completion, irq_mask);
 	if (r)
 		DSSERR("failed to unregister %x isr\n", irq_mask);
 
@@ -3628,6 +3628,12 @@ int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 	isr_data = NULL;
 	ret = -EBUSY;
 
+	/* WARN and return if DISPC is suspended, as otherwise we
+	*  will crash while trying to write DSS registers. */
+	if (WARN(pm_runtime_suspended(&dispc.pdev->dev),
+		"Trying to register ISR while DISPC is suspended, exiting!\n"))
+		goto err;
+
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
 		isr_data = &dispc.registered_isr[i];
 
@@ -3657,7 +3663,8 @@ err:
 }
 EXPORT_SYMBOL(omap_dispc_register_isr);
 
-int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
+/* WARNING: callback might be executed even after this function returns! */
+int omap_dispc_unregister_isr_nosync(omap_dispc_isr_t isr, void *arg, u32 mask)
 {
 	int i;
 	unsigned long flags;
@@ -3689,7 +3696,40 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 
 	return ret;
 }
-EXPORT_SYMBOL(omap_dispc_unregister_isr);
+EXPORT_SYMBOL(omap_dispc_unregister_isr_nosync);
+
+/*
+ * Ensure that callback <isr> will NOT be executed after this function
+ * returns. Must be called from sleepable context, though!
+ */
+int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask)
+{
+	int ret;
+
+	ret = omap_dispc_unregister_isr_nosync(isr, arg, mask);
+
+	/* Non-atomic context is not really needed. But if we're called
+	 * from atomic context, it is probably from DISPC IRQ, where we
+	 * will deadlock.
+	 */
+	might_sleep();
+
+#if defined(CONFIG_SMP)
+	/* DISPC IRQ executes callbacks with dispc.irq_lock released, so
+	 * there is a chance that a callback be executed even though it
+	 * has been unregistered. Do disable/enable to act as a barrier, and
+	 * ensure that after returning from this function, the DISPC IRQ
+	 * will use an updated callback array, and NOT its cached copy.
+	 *
+	 * This is SMP-only issue because unregister_isr_nosync disables
+	 * IRQs.
+	 */
+	synchronize_irq(dispc.irq);
+#endif
+
+	return ret;
+}
+EXPORT_SYMBOL(omap_dispc_unregister_isr_sync);
 
 #ifdef DEBUG
 static void print_irq_status(u32 status)
@@ -3926,7 +3966,8 @@ int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout)
 
 	timeout = wait_for_completion_timeout(&completion, timeout);
 
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
+		&completion, irqmask);
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
@@ -3957,7 +3998,8 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 	timeout = wait_for_completion_interruptible_timeout(&completion,
 			timeout);
 
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
+		&completion, irqmask);
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
