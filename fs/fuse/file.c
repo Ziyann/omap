@@ -14,6 +14,10 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/compat.h>
+#ifdef CONFIG_CMA
+/* Needed for lru_cache_add_lru() */
+#include <linux/swap.h>
+#endif
 
 static const struct file_operations fuse_direct_io_file_operations;
 
@@ -688,6 +692,10 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 		 * owner of it
 		 */
 		put_page(newpage);
+
+#ifdef CONFIG_CMA
+		lru_cache_add_lru(newpage, LRU_ACTIVE_FILE);
+#endif
 
 		/* finally release the old page and swap pointers */
 		unlock_page(oldpage);
