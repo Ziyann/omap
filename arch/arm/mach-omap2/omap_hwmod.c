@@ -1545,11 +1545,6 @@ static int _ocp_softreset(struct omap_hwmod *oh)
 		goto dis_opt_clks;
 
 	_write_sysconfig(v, oh);
-	ret = _clear_softreset(oh, &v);
-	if (ret)
-		goto dis_opt_clks;
-
-	_write_sysconfig(v, oh);
 
 	if (oh->class->sysc->srst_udelay)
 		udelay(oh->class->sysc->srst_udelay);
@@ -1567,18 +1562,25 @@ static int _ocp_softreset(struct omap_hwmod *oh)
 				  MAX_MODULE_SOFTRESET_WAIT, c);
 	}
 
-	if (c == MAX_MODULE_SOFTRESET_WAIT)
+	if (c == MAX_MODULE_SOFTRESET_WAIT) {
 		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
 			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
-	else
+		ret = -ETIMEDOUT;
+		goto dis_opt_clks;
+	} else {
 		pr_debug("omap_hwmod: %s: softreset in %d usec\n", oh->name, c);
+	}
+
+	ret = _clear_softreset(oh, &v);
+	if (ret)
+		goto dis_opt_clks;
+
+	_write_sysconfig(v, oh);
 
 	/*
 	 * XXX add _HWMOD_STATE_WEDGED for modules that don't come back from
 	 * _wait_target_ready() or _reset()
 	 */
-
-	ret = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
 
 dis_opt_clks:
 	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
