@@ -172,6 +172,10 @@ struct hwmod_ops {
 	int	(*hwmod_get_context_lost)(struct omap_hwmod *oh);
 };
 
+/* Keep track of how many omap4 target failures happen since last clear */
+static int omap_target_disable_failures = 0;
+static DEFINE_MUTEX(omap_target_disable_count_lock);
+
 static struct hwmod_ops *arch_hwmod;
 
 /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
@@ -825,6 +829,38 @@ static void _enable_module(struct omap_hwmod *oh)
 }
 
 /**
+ * omap_increment_target_disable_failure_count - increment the failures count.
+ */
+void omap_increment_target_disable_failure_count(void)
+{
+	mutex_lock(&omap_target_disable_count_lock);
+	omap_target_disable_failures++;
+	mutex_unlock(&omap_target_disable_count_lock);
+}
+
+/**
+ * omap_target_disable_failure_count - retrieve the number of target disable failures.
+ */
+int omap_target_disable_failure_count(void)
+{
+	int result = 0;
+	mutex_lock(&omap_target_disable_count_lock);
+	result = omap_target_disable_failures++;
+	mutex_unlock(&omap_target_disable_count_lock);
+	return result;
+}
+
+/**
+ * omap_clear_target_disable_failure_count - clears the target disable failure count.
+ */
+void omap_clear_target_disable_failure_count(void)
+{
+	mutex_lock(&omap_target_disable_count_lock);
+	omap_target_disable_failures = 0;
+	mutex_unlock(&omap_target_disable_count_lock);
+}
+
+/**
  * _omap4_wait_target_disable - wait for a module to be disabled on OMAP4
  * @oh: struct omap_hwmod *
  *
@@ -879,9 +915,11 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
 				    oh->prcm.omap4.clkctrl_offs);
 
 	v = _omap4_wait_target_disable(oh);
-	if (v)
+	if (v) {
 		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
 			oh->name);
+		omap_increment_target_disable_failure_count();
+	}
 
 	return 0;
 }
