@@ -38,7 +38,6 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
 #include <linux/platform_data/lte_modem_bootloader.h>
-#include <linux/platform_data/ram_console.h>
 #include <plat/mcspi.h>
 #include <linux/i2c-gpio.h>
 #include <linux/earlysuspend.h>
@@ -69,11 +68,9 @@
 #include "control.h"
 #include "mux.h"
 #include "board-tuna.h"
+#include "omap_ram_console.h"
 #include "resetreason.h"
 #include <mach/dmm.h>
-
-#define TUNA_RAMCONSOLE_START	(PLAT_PHYS_OFFSET + SZ_512M)
-#define TUNA_RAMCONSOLE_SIZE	SZ_2M
 
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
@@ -214,26 +211,6 @@ static struct platform_device wl1271_device = {
 	},
 };
 
-static struct resource ramconsole_resources[] = {
-	{
-		.flags  = IORESOURCE_MEM,
-		.start	= TUNA_RAMCONSOLE_START,
-		.end	= TUNA_RAMCONSOLE_START + TUNA_RAMCONSOLE_SIZE - 1,
-	},
-};
-
-static struct ram_console_platform_data ramconsole_pdata;
-
-static struct platform_device ramconsole_device = {
-	.name           = "ram_console",
-	.id             = -1,
-	.num_resources  = ARRAY_SIZE(ramconsole_resources),
-	.resource       = ramconsole_resources,
-	.dev		= {
-		.platform_data = &ramconsole_pdata,
-	},
-};
-
 static struct platform_device bcm4330_bluetooth_device = {
 	.name = "bcm4330_bluetooth",
 	.id = -1,
@@ -336,7 +313,6 @@ static struct platform_device tuna_spdif_dit_device = {
 };
 
 static struct platform_device *tuna_devices[] __initdata = {
-	&ramconsole_device,
 	&wl1271_device,
 	&twl6030_madc_device,
 	&tuna_ion_device,
@@ -1369,7 +1345,6 @@ static void __init tuna_init(void)
 	tuna_audio_init();
 	tuna_i2c_init();
 	tuna_gsd4t_gps_init();
-	ramconsole_pdata.bootinfo = omap4_get_resetreason();
 	platform_add_devices(tuna_devices, ARRAY_SIZE(tuna_devices));
 	board_serial_init();
 	tuna_bt_init();
@@ -1416,8 +1391,9 @@ static void __init tuna_reserve(void)
 	int i;
 	int ret;
 
+    omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+            OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	/* do the static reservations first */
-	memblock_remove(TUNA_RAMCONSOLE_START, TUNA_RAMCONSOLE_SIZE);
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 
