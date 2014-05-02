@@ -28,6 +28,7 @@
 #include <linux/usb/otg.h>
 #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
+#include <linux/mfd/twl6040.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
@@ -683,7 +684,7 @@ static struct regulator_init_data tuna_v2v1 = {
 	},
 };
 
-static struct twl4030_codec_audio_data twl6040_audio = {
+static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step   = 0x0f,
 	.hs_right_step  = 0x0f,
@@ -692,51 +693,8 @@ static struct twl4030_codec_audio_data twl6040_audio = {
 	.ep_step	= 0x0f,
 };
 
-static struct regulator *twl6040_clk32kreg;
-
-static int tuna_twl6040_get_ext_clk32k(void)
-{
-	int ret = 0;
-
-	twl6040_clk32kreg = regulator_get(NULL, "twl6040_clk32k");
-	if (IS_ERR(twl6040_clk32kreg)) {
-		ret = PTR_ERR(twl6040_clk32kreg);
-		pr_err("failed to get CLK32K %d\n", ret);
-	}
-
-	return ret;
-}
-
-static void tuna_twl6040_put_ext_clk32k(void)
-{
-	regulator_put(twl6040_clk32kreg);
-}
-
-static int tuna_twl6040_set_ext_clk32k(bool on)
-{
-	int ret;
-
-	if (IS_ERR_OR_NULL(twl6040_clk32kreg))
-		return -EINVAL;
-
-	if (on)
-		ret = regulator_enable(twl6040_clk32kreg);
-	else
-		ret = regulator_disable(twl6040_clk32kreg);
-
-	if (ret)
-		pr_err("failed to enable TWL6040 CLK32K %d\n", ret);
-
-	return ret;
-}
-
-static struct twl4030_codec_data twl6040_codec = {
-	.audio		= &twl6040_audio,
-	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
-	.irq_base	= TWL6040_CODEC_IRQ_BASE,
-	.get_ext_clk32k	= tuna_twl6040_get_ext_clk32k,
-	.put_ext_clk32k	= tuna_twl6040_put_ext_clk32k,
-	.set_ext_clk32k	= tuna_twl6040_set_ext_clk32k,
+static struct twl6040_platform_data twl6040_data = {
+	.codec		= &twl6040_codec,
 };
 
 static struct twl4030_platform_data tuna_twldata = {
@@ -758,7 +716,7 @@ static struct twl4030_platform_data tuna_twldata = {
 	.clk32kaudio	= &tuna_clk32kaudio,
 
 	/* children */
-	.codec		= &twl6040_codec,
+	.codec		= &twl6040_data,
 	.madc		= &twl6030_madc,
 
 	/* SMPS */
@@ -782,7 +740,7 @@ static void tuna_audio_init(void)
 	else
 		aud_pwron = GPIO_AUD_PWRON;
 	omap_mux_init_gpio(aud_pwron, OMAP_PIN_OUTPUT);
-	twl6040_codec.audpwron_gpio = aud_pwron;
+	twl6040_data.audpwron_gpio = aud_pwron;
 
 	omap_mux_init_signal("gpmc_a24.gpio_48", OMAP_PIN_OUTPUT | OMAP_MUX_MODE3);
 	omap_mux_init_signal("kpd_col3.gpio_171", OMAP_PIN_OUTPUT | OMAP_MUX_MODE3);
