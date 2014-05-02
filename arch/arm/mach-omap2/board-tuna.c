@@ -58,7 +58,6 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/remoteproc.h>
-#include <plat/omap-serial.h>
 
 #include <mach/omap_fiq_debugger.h>
 
@@ -962,44 +961,58 @@ static struct omap_device_pad tuna_uart4_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data tuna_uart1_board_data_sample4 = {
+	.id = 0,
+	.pads = tuna_uart1_pads_sample4,
+	.pads_cnt = ARRAY_SIZE(tuna_uart1_pads_sample4),
+};
+
+static struct omap_board_data tuna_uart1_board_data = {
+	.id = 0,
+	.pads = tuna_uart1_pads,
+	.pads_cnt = ARRAY_SIZE(tuna_uart1_pads),
+};
+
+static struct omap_board_data tuna_uart2_board_data = {
+	.id = 1,
+	.pads = tuna_uart2_pads,
+	.pads_cnt = ARRAY_SIZE(tuna_uart2_pads),
+};
+
+static struct omap_board_data tuna_uart3_board_data = {
+	.id = 2,
+	.pads = tuna_uart3_pads,
+	.pads_cnt = ARRAY_SIZE(tuna_uart3_pads),
+};
+
+static struct omap_board_data tuna_uart4_board_data = {
+	.id = 3,
+	.pads = tuna_uart4_pads,
+	.pads_cnt = ARRAY_SIZE(tuna_uart4_pads),
+};
+
 static struct omap_uart_port_info tuna_uart2_info __initdata = {
-	.use_dma	= 0,
-	.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-	.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-	.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-	.auto_sus_timeout = 0,
-	.wake_peer	= bcm_bt_lpm_exit_lpm_locked,
-	.rts_mux_driver_control = 1,
+	.dma_enabled = false,
+	.dma_rx_buf_size = 4096,
+	.dma_rx_poll_rate = 1,
+	.dma_rx_timeout = 3 * HZ,
+	.autosuspend_timeout = 0,
 };
 
 static inline void __init board_serial_init(void)
 {
-	struct omap_device_pad *uart1_pads;
-	int uart1_pads_sz;
+	struct omap_board_data *uart1_board_data;
 
-	if (omap4_tuna_get_revision() >= TUNA_REV_SAMPLE_4) {
-		uart1_pads = tuna_uart1_pads_sample4;
-		uart1_pads_sz = ARRAY_SIZE(tuna_uart1_pads_sample4);
-	} else {
-		uart1_pads = tuna_uart1_pads;
-		uart1_pads_sz = ARRAY_SIZE(tuna_uart1_pads);
-	}
+	if (omap4_tuna_get_revision() >= TUNA_REV_SAMPLE_4)
+		uart1_board_data = &tuna_uart1_board_data_sample4;
+	else
+		uart1_board_data = &tuna_uart1_board_data;
 
-	omap_serial_init_port_pads(0, uart1_pads, uart1_pads_sz, NULL);
-	omap_serial_init_port_pads(1, tuna_uart2_pads,
-		ARRAY_SIZE(tuna_uart2_pads), &tuna_uart2_info);
-	omap_serial_init_port_pads(3, tuna_uart4_pads,
-				   ARRAY_SIZE(tuna_uart4_pads), NULL);
+	omap_serial_init_port(uart1_board_data, NULL);
+	omap_serial_init_port(&tuna_uart2_board_data, &tuna_uart2_info);
+	omap_serial_init_port(&tuna_uart3_board_data, NULL);
+	omap_serial_init_port(&tuna_uart4_board_data, NULL);
 }
-
-/* fiq_debugger initializes really early but OMAP resource mgmt
- * is not yet ready @ arch_init, so init the serial debugger later */
-static int __init board_serial_debug_init(void)
-{
-	return omap_serial_debug_init(2, false, true,
-			tuna_uart3_pads, ARRAY_SIZE(tuna_uart3_pads));
-}
-device_initcall(board_serial_debug_init);
 
 /* SPI flash memory in camera module */
 #define F_ROM_SPI_BUS_NUM	3
