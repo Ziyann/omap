@@ -394,21 +394,20 @@ static struct omap_musb_board_data musb_board_data = {
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 1,
-		.nonremovable	= true,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-		.ocr_mask       = MMC_VDD_165_195,
 		.gpio_wp	= -EINVAL,
 		.gpio_cd	= -EINVAL,
+		.ocr_mask       = MMC_VDD_165_195,
+		.nonremovable	= true,
 	},
 	{
 		.name		= "omap_wlan",
 		.mmc		= 5,
-		.caps		= MMC_CAP_4_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
 		.gpio_wp	= -EINVAL,
 		.gpio_cd	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195 | MMC_VDD_20_21,
 		.nonremovable	= false,
-		.mmc_data	= &tuna_wifi_data,
 	},
 	{}	/* Terminator */
 };
