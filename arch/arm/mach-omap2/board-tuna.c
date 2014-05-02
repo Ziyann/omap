@@ -42,7 +42,7 @@
 #include <linux/i2c-gpio.h>
 
 #include <mach/hardware.h>
-#include "mach/omap4-common.h"
+//#include "mach/omap4-common.h"
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -58,10 +58,10 @@
 #include <plat/remoteproc.h>
 #include <plat/omap-serial.h>
 
-#include "mach/omap_fiq_debugger.h"
+//#include "mach/omap_fiq_debugger.h"
 
 #include <mach/id.h>
-#include "timer-gp.h"
+//#include "timer-gp.h"
 
 #include "omap4-sar-layout.h"
 #include "hsmmc.h"
@@ -69,8 +69,8 @@
 #include "mux.h"
 #include "board-tuna.h"
 #include "omap_ram_console.h"
-#include "resetreason.h"
-#include "mach/dmm.h"
+//#include "resetreason.h"
+//#include "mach/dmm.h"
 
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
