@@ -56,6 +56,7 @@
 #include <plat/board.h>
 #include <plat/common.h>
 #include <plat/cpu.h>
+#include <plat/drm.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/remoteproc.h>
@@ -73,7 +74,6 @@
 #include "board-tuna.h"
 #include "omap_ram_console.h"
 #include "resetreason.h"
-#include <mach/dmm.h>
 
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
@@ -1320,8 +1320,8 @@ static void __init tuna_init(void)
 				ARRAY_SIZE(tuna_lte_modem));
 	}
 	tuna_from_init();
-	omap_dmm_init();
 	omap4_register_ion();
+	omap_init_dmm_tiler();
 	omap4_tuna_display_init();
 	omap4_tuna_input_init();
 	omap4_tuna_nfc_init();
