@@ -485,14 +485,6 @@ static void tuna_audio_init(void)
 	omap_mux_init_signal("kpd_col3.gpio_171", OMAP_PIN_OUTPUT | OMAP_MUX_MODE3);
 }
 
-static struct i2c_board_info __initdata tuna_i2c1_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("twl6030", 0x48),
-		.flags = I2C_CLIENT_WAKE,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-	},
-};
-
 static struct i2c_board_info __initdata tuna_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("ducati", 0x20),
@@ -507,6 +499,28 @@ static struct i2c_board_info __initdata tuna_i2c4_boardinfo[] = {
 	},
 };
 
+static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
+	                                struct omap_i2c_bus_board_data *pdata)
+{
+	/* spinlock_id should be -1 for a generic lock request */
+	if (spinlock_id < 0)
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
+	else
+		pdata->handle = hwspin_lock_request_specific(spinlock_id,
+												USE_MUTEX_LOCK);
+
+	if (pdata->handle != NULL) {
+		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
+		pdata->hwspin_unlock = hwspin_unlock;
+	} else
+		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
+}
+
+static struct omap_i2c_bus_board_data __initdata omap4_i2c_1_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata omap4_i2c_2_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata omap4_i2c_3_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata omap4_i2c_4_bus_pdata;
+
 static int __init tuna_i2c_init(void)
 {
 	u32 r;
@@ -516,25 +530,33 @@ static int __init tuna_i2c_init(void)
 	omap_mux_init_signal("i2c1_scl.i2c1_scl", OMAP_PIN_INPUT_PULLUP);
 	omap_mux_init_signal("i2c1_sda.i2c1_sda", OMAP_PIN_INPUT_PULLUP);
 
+	omap_i2c_hwspinlock_init(1, 0, &omap4_i2c_1_bus_pdata);
+	omap_i2c_hwspinlock_init(2, 1, &omap4_i2c_2_bus_pdata);
+	omap_i2c_hwspinlock_init(3, 2, &omap4_i2c_3_bus_pdata);
+	omap_i2c_hwspinlock_init(4, 3, &omap4_i2c_4_bus_pdata);
+
+	omap_register_i2c_bus_board_data(1, &omap4_i2c_1_bus_pdata);
+	omap_register_i2c_bus_board_data(2, &omap4_i2c_2_bus_pdata);
+	omap_register_i2c_bus_board_data(3, &omap4_i2c_3_bus_pdata);
+	omap_register_i2c_bus_board_data(4, &omap4_i2c_4_bus_pdata);
+
 	omap4_pmic_get_config(&tuna_twldata, TWL_COMMON_PDATA_USB |
 			TWL_COMMON_PDATA_MADC |
-			TWL_COMMON_PDATA_BCI |
 			TWL_COMMON_PDATA_THERMAL,
-			TWL_COMMON_REGULATOR_VDAC |
-			TWL_COMMON_REGULATOR_VAUX1 |
-			TWL_COMMON_REGULATOR_VAUX2 |
-			TWL_COMMON_REGULATOR_VAUX3 |
 			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
 			TWL_COMMON_REGULATOR_VUSIM |
 			TWL_COMMON_REGULATOR_VANA |
 			TWL_COMMON_REGULATOR_VCXIO |
+			TWL_COMMON_REGULATOR_VDAC |
 			TWL_COMMON_REGULATOR_VUSB |
+			TWL_COMMON_REGULATOR_VAUX2 |
+			TWL_COMMON_REGULATOR_VAUX3 |
 			TWL_COMMON_REGULATOR_CLK32KG |
+			TWL_COMMON_REGULATOR_CLK32KAUDIO |
 			TWL_COMMON_REGULATOR_V1V8 |
 			TWL_COMMON_REGULATOR_V2V1 |
 			TWL_COMMON_REGULATOR_SYSEN |
-			TWL_COMMON_REGULATOR_CLK32KAUDIO |
 			TWL_COMMON_REGULATOR_REGEN1);
 
 
@@ -544,12 +566,8 @@ static int __init tuna_i2c_init(void)
 	 */
 	regulator_has_full_constraints();
 
-	/*
-	 * Phoenix Audio IC needs I2C1 to
-	 * start with 400 KHz or less
-	 */
-	omap_register_i2c_bus(1, 400, tuna_i2c1_boardinfo,
-			      ARRAY_SIZE(tuna_i2c1_boardinfo));
+	omap4_pmic_init("twl6030", &tuna_twldata,
+			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	omap_register_i2c_bus(2, 400, tuna_i2c2_boardinfo,
                               ARRAY_SIZE(tuna_i2c2_boardinfo));
 	omap_register_i2c_bus(3, 400, NULL, 0);
