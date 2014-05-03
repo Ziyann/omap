@@ -772,8 +772,6 @@ static const struct flash_platform_data w25q80_pdata = {
 
 static struct omap2_mcspi_device_config f_rom_mcspi_config = {
 	.turbo_mode	= 0,
-	.single_channel	= 1,	/* 0: slave, 1: master */
-	.swap_datalines	= 1,
 };
 
 static struct spi_board_info tuna_f_rom[] __initdata = {
@@ -792,9 +790,6 @@ static void tuna_from_init(void)
 {
 	int err;
 
-	if (tuna_hw_rev >= 0x07)
-		f_rom_mcspi_config.swap_datalines = 0;
-
 	err = spi_register_board_info(tuna_f_rom, ARRAY_SIZE(tuna_f_rom));
 	if (err)
 		pr_err("failed to register SPI F-ROM\n");
@@ -812,7 +807,6 @@ struct lte_modem_bootloader_platform_data lte_modem_bootloader_pdata = {
 
 static struct omap2_mcspi_device_config lte_mcspi_config = {
 	.turbo_mode	= 0,
-	.single_channel	= 1,	/* 0: slave, 1: master */
 };
 
 static struct spi_board_info tuna_lte_modem[] __initdata = {
