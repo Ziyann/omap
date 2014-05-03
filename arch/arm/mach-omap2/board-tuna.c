@@ -62,7 +62,6 @@
 //#include "mach/omap_fiq_debugger.h"
 
 #include <mach/id.h>
-//#include "timer-gp.h"
 
 #include "omap4-sar-layout.h"
 #include "mux.h"
@@ -1086,5 +1085,5 @@ MACHINE_START(TUNA, "Tuna")
 	.init_early	= tuna_init_early,
 	.init_irq	= gic_init_irq,
 	.init_machine	= tuna_init,
-	.timer		= &omap_timer,
+	.timer		= &omap4_timer,
 MACHINE_END
