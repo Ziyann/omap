@@ -150,7 +150,7 @@ static struct i2c_board_info __initdata tuna_i2c3_boardinfo_final[] = {
 		I2C_BOARD_INFO("mms_ts", 0x48),
 		.flags = I2C_CLIENT_WAKE,
 		.platform_data = &mms_ts_pdata,
-		.irq = OMAP_GPIO_IRQ(GPIO_TOUCH_IRQ),
+		.irq = GPIO_TOUCH_IRQ,
 	},
 };
 
