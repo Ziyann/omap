@@ -758,7 +758,6 @@ static struct i2c_board_info __initdata tuna_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("ducati", 0x20),
 		.irq = OMAP44XX_IRQ_I2C2,
-		.ext_master = true,
 	},
 };
 
