@@ -437,7 +437,7 @@ static const __initdata struct i2c_board_info max17043_i2c[] = {
 	{
 		I2C_BOARD_INFO("max17040", (0x6C >> 1)),
 		.platform_data = &max17043_pdata,
-		.irq = OMAP_GPIO_IRQ(GPIO_FUEL_ALERT),
+		.irq = GPIO_FUEL_ALERT,
 	}
 };
 

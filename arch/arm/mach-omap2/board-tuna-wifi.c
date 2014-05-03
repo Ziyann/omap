@@ -104,9 +104,9 @@ int __init tuna_init_wifi_mem(void)
 static struct resource tuna_wifi_resources[] = {
 	[0] = {
 		.name		= "bcmdhd_wlan_irq",
-		.start		= OMAP_GPIO_IRQ(GPIO_WLAN_IRQ),
-		.end		= OMAP_GPIO_IRQ(GPIO_WLAN_IRQ),
-		.flags          = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+		.start		= GPIO_WLAN_IRQ,
+		.end		= GPIO_WLAN_IRQ,
+		.flags      = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
 	},
 };
 

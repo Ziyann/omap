@@ -549,7 +549,7 @@ static struct fsa9480_platform_data tuna_fsa9480_pdata = {
 static struct i2c_board_info __initdata tuna_connector_i2c4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("fsa9480", 0x4A >> 1),
-		.irq = OMAP_GPIO_IRQ(GPIO_JACK_INT_N),
+		.irq = GPIO_JACK_INT_N,
 		.platform_data = &tuna_fsa9480_pdata,
 	},
 };
@@ -871,7 +871,7 @@ static struct sii9234_platform_data sii9234_pdata = {
 static struct i2c_board_info __initdata tuna_i2c5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("sii9234_mhl_tx", 0x72>>1),
-		.irq = OMAP_GPIO_IRQ(GPIO_MHL_INT),
+		.irq = GPIO_MHL_INT,
 		.platform_data = &sii9234_pdata,
 	},
 	{

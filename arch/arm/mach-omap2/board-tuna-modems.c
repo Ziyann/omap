@@ -220,8 +220,7 @@ static void umts_modem_cfg_gpio(void)
 	}
 
 	if (gpio_phone_active)
-		irq_set_irq_type(
-			OMAP_GPIO_IRQ(OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE),
+		irq_set_irq_type(OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE,
 						     IRQ_TYPE_LEVEL_HIGH);
 
 	pr_debug("umts_modem_cfg_gpio done\n");
@@ -231,8 +230,8 @@ static void umts_modem_cfg_gpio(void)
 static struct resource umts_modem_res[] = {
 	[0] = {
 		.name = "umts_phone_active",
-		.start = OMAP_GPIO_IRQ(OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE),
-		.end = OMAP_GPIO_IRQ(OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE),
+		.start = OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE,
+		.end = OMAP_GPIO_MIPI_HSI_PHONE_ACTIVE,
 		.flags = IORESOURCE_IRQ,
 	},
 };
@@ -384,7 +383,7 @@ static void dpram_cfg_gpio(void)
 
 	gpio_request(OMAP_GPIO_DPRAM_INT_N, "dpram_int");
 	gpio_direction_input(OMAP_GPIO_DPRAM_INT_N);
-	irq_set_irq_type(OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_INT_N),
+	irq_set_irq_type(OMAP_GPIO_DPRAM_INT_N,
 				IRQ_TYPE_LEVEL_LOW);
 
 	/*dpram platform init setting*/
@@ -483,22 +482,21 @@ static void cdma_modem_cfg_gpio(void)
 	}
 
 	if (gpio_phone_active)
-		irq_set_irq_type(
-			OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_PHONE_ACTIVE),
+		irq_set_irq_type(OMAP_GPIO_DPRAM_PHONE_ACTIVE,
 						     IRQ_TYPE_LEVEL_HIGH);
 }
 
 static struct resource cdma_modem_res[] = {
 	[0] = {
 		.name = "cdma_phone_active",
-		.start = OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_PHONE_ACTIVE),
-		.end = OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_PHONE_ACTIVE),
+		.start = OMAP_GPIO_DPRAM_PHONE_ACTIVE,
+		.end = OMAP_GPIO_DPRAM_PHONE_ACTIVE,
 		.flags = IORESOURCE_IRQ,
 	},
 	[1] = {
 		.name = "cdma_dpram_int",
-		.start = OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_INT_N),
-		.end = OMAP_GPIO_IRQ(OMAP_GPIO_DPRAM_INT_N),
+		.start = OMAP_GPIO_DPRAM_INT_N,
+		.end = OMAP_GPIO_DPRAM_INT_N,
 		.flags = IORESOURCE_IRQ,
 	},
 	[2] = {
@@ -695,15 +693,15 @@ static struct resource lte_modem_res[] = {
 	[0] = {
 		.name = "lte_phone_active",
 		/* phone active irq */
-		.start = OMAP_GPIO_IRQ(OMAP_GPIO_LTE_ACTIVE),
-		.end = OMAP_GPIO_IRQ(OMAP_GPIO_LTE_ACTIVE),
+		.start = OMAP_GPIO_LTE_ACTIVE,
+		.end = OMAP_GPIO_LTE_ACTIVE,
 		.flags = IORESOURCE_IRQ,
 	},
 	[1] = {
 		.name = "lte_host_wakeup",
 		/* host wakeup irq */
-		.start = OMAP_GPIO_IRQ(OMAP_GPIO_CMC2AP_INT2),
-		.end = OMAP_GPIO_IRQ(OMAP_GPIO_CMC2AP_INT2),
+		.start = OMAP_GPIO_CMC2AP_INT2,
+		.end = OMAP_GPIO_CMC2AP_INT2,
 		.flags = IORESOURCE_IRQ,
 	},
 };
