@@ -952,7 +952,6 @@ static struct omap_dss_device tuna_oled_device = {
 	.driver_name		= "s6e8aa0",
 	.type			= OMAP_DISPLAY_TYPE_DSI,
 	.phy.dsi		= {
-		.type		= OMAP_DSS_DSI_TYPE_VIDEO_MODE,
 		.clk_lane	= 1,
 		.clk_pol	= 0,
 		.data1_lane	= 2,
@@ -969,6 +968,7 @@ static struct omap_dss_device tuna_oled_device = {
 			.x_res = 720,
 			.y_res = 1280,
 		},
+		.dsi_mode	= OMAP_DSS_DSI_VIDEO_MODE,
 		.width_in_um	= 58000,
 		.height_in_um	= 102000,
 	},
@@ -998,11 +998,6 @@ static struct omap_dss_device tuna_oled_device = {
 	},
 
 	.channel		= OMAP_DSS_CHANNEL_LCD,
-#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
-	.skip_init              = true,
-#else
-	.skip_init              = false,
-#endif
 };
 
 static void tuna_hdmi_mux_init(void)
@@ -1028,6 +1023,12 @@ static void tuna_hdmi_mux_init(void)
 
 }
 
+static struct omap_dss_hdmi_data tuna_hdmi_data = {
+	.hpd_gpio = TUNA_GPIO_HDMI_HPD,
+	.ls_oe_gpio = TUNA_GPIO_HDMI_LS_OE,
+	.ct_cp_hpd_gpio = TUNA_GPIO_HDMI_CT_CP_HDP,
+};
+
 static struct omap_dss_device tuna_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
@@ -1042,8 +1043,8 @@ static struct omap_dss_device tuna_hdmi_device = {
 			.max_pixclk_khz = 75000,
 		},
 	},
-	.hpd_gpio = TUNA_GPIO_HDMI_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
+	.data = &tuna_hdmi_data,
 };
 
 static struct omap_dss_device *tuna_dss_devices[] = {
