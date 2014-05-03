@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/wakelock.h>
+#include <linux/stat.h>
 #include <plat/serial.h>
 
 #include "mux.h"
@@ -103,7 +104,7 @@ static DEVICE_ATTR(nfc_power, S_IWUSR | S_IRUGO, nfc_power_show,
 
 static irqreturn_t nfc_irq_isr(int irq, void *dev)
 {
-	omap_uart_wake(NFC_UART_NUM);
+	//omap_uart_wake(NFC_UART_NUM);
 
 	/*
 	 * take a 500ms wakelock, to give time for higher layers
