@@ -18,7 +18,7 @@
 #include <linux/omapfb.h>
 #include <linux/regulator/consumer.h>
 
-//#include <linux/platform_data/panel-s6e8aa0.h>
+#include <linux/platform_data/panel-s6e8aa0.h>
 
 #include <plat/vram.h>
 
