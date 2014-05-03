@@ -49,6 +49,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <asm/system_misc.h>
 
 #include <plat/board-tuna-bluetooth.h>
 #include <plat/omap-serial.h>
