@@ -206,11 +206,9 @@ static int __init vibrator_init(void)
 	if (vibdata.gptimer == NULL)
 		return -1;
 
-	omap_dm_timer_dump_regs(vibdata.gptimer);
 	ret = vibrator_timer_init();
 	if (ret < 0)
 		goto err_dm_timer_init;
-	omap_dm_timer_dump_regs(vibdata.gptimer);
 
 	wake_lock_init(&vibdata.wklock, WAKE_LOCK_SUSPEND, "vibrator");
 	mutex_init(&vibdata.lock);
