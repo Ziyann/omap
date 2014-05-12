@@ -127,45 +127,7 @@ static struct embedded_sdio_data tuna_wifi_emb_data = {
 };
 #endif
 
-static int tuna_wifi_cd = 0; /* WIFI virtual 'card detect' status */
-static void (*wifi_status_cb)(int card_present, void *dev_id);
-static void *wifi_status_cb_devid;
 static struct regulator *clk32kaudio_reg;
-
-static int tuna_wifi_status_register(
-		void (*callback)(int card_present, void *dev_id),
-		void *dev_id)
-{
-	if (wifi_status_cb)
-		return -EAGAIN;
-	wifi_status_cb = callback;
-	wifi_status_cb_devid = dev_id;
-	return 0;
-}
-
-static unsigned int tuna_wifi_status(struct device *dev)
-{
-	return tuna_wifi_cd;
-}
-
-struct mmc_platform_data tuna_wifi_data = {
-	.ocr_mask		= MMC_VDD_165_195 | MMC_VDD_20_21,
-	.built_in		= 1,
-	.status			= tuna_wifi_status,
-	.card_present		= 0,
-	.register_status_notify	= tuna_wifi_status_register,
-};
-
-static int tuna_wifi_set_carddetect(int val)
-{
-	pr_debug("%s: %d\n", __func__, val);
-	tuna_wifi_cd = val;
-	if (wifi_status_cb) {
-		wifi_status_cb(val, wifi_status_cb_devid);
-	} else
-		pr_warning("%s: Nobody to notify\n", __func__);
-	return 0;
-}
 
 static int tuna_wifi_power_state;
 
@@ -381,7 +343,6 @@ static void *tuna_wifi_get_country_code(char *ccode)
 static struct wifi_platform_data tuna_wifi_control = {
 	.set_power      = tuna_wifi_power,
 	.set_reset      = tuna_wifi_reset,
-	.set_carddetect = tuna_wifi_set_carddetect,
 #ifdef CONFIG_DHD_USE_STATIC_BUF
 	.mem_prealloc	= tuna_wifi_mem_prealloc,
 #else
