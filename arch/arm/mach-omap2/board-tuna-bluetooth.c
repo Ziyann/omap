@@ -28,7 +28,7 @@
 #include <linux/platform_device.h>
 #include <linux/wakelock.h>
 #include <asm/mach-types.h>
-#include <plat/serial.h>
+#include <plat/omap-serial.h>
 #include <plat/board-tuna-bluetooth.h>
 #include <linux/regulator/driver.h>
 
@@ -91,12 +91,12 @@ static void set_wake_locked(int wake)
 		wake_unlock(&bt_lpm.wake_lock);
 
 	if (!wake_uart_enabled && wake)
-		omap_uart_enable(2);
+		omap_serial_ext_uart_enable(2);
 
 	gpio_set_value(BT_WAKE_GPIO, wake);
 
 	if (wake_uart_enabled && !wake)
-		omap_uart_disable(2);
+		omap_serial_ext_uart_disable(2);
 
 	wake_uart_enabled = wake;
 }
@@ -132,10 +132,10 @@ static void update_host_wake_locked(int host_wake)
 	if (host_wake) {
 		wake_lock(&bt_lpm.wake_lock);
 		if (!host_wake_uart_enabled)
-			omap_uart_enable(2);
+			omap_serial_ext_uart_enable(2);
 	} else  {
 		if (host_wake_uart_enabled)
-			omap_uart_disable(2);
+			omap_serial_ext_uart_disable(2);
 		// Take a timed wakelock, so that upper layers can take it.
 		// The chipset deasserts the hostwake lock, when there is no
 		// more data to send.
