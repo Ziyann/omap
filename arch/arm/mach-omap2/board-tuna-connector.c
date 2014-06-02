@@ -29,11 +29,11 @@
 #include <linux/regulator/consumer.h>
 #include <linux/usb/otg.h>
 #include <linux/delay.h>
-#include <linux/sii9234.h>
 #include <linux/i2c/twl.h>
 #include <linux/mutex.h>
 #include <linux/switch.h>
 #include <linux/wakelock.h>
+#include <media/sii9234.h>
 
 #include <plat/usb.h>
 
