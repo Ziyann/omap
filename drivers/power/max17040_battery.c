@@ -20,7 +20,6 @@
 #include <linux/power_supply.h>
 #include <linux/max17040_battery.h>
 #include <linux/slab.h>
-#include <linux/android_alarm.h>
 #include <linux/suspend.h>
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
@@ -255,14 +254,12 @@ static void max17040_get_temp_status(struct max17040_chip *chip)
 
 static void max17040_charger_update(struct max17040_chip *chip)
 {
-	ktime_t ktime;
 	struct timespec cur_time;
 
 	if (!chip->pdata->is_full_charge || !chip->pdata->allow_charging)
 		return;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&cur_time);
 
 	switch (chip->charger_status) {
 		case STATUS_CHARGABLE:
