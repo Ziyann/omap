@@ -58,6 +58,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/remoteproc.h>
+#include <plat/omap_hsi.h>
 
 //#include "mach/omap_fiq_debugger.h"
 
@@ -901,7 +902,7 @@ static struct attribute_group tuna_board_prop_attr_group = {
 static void __init omap4_tuna_create_board_props(void)
 {
 	struct kobject *board_props_kobj;
-	struct kobject *soc_kobj;
+	struct kobject *soc_kobj = NULL;
 	int ret = 0;
 
 	board_props_kobj = kobject_create_and_add("board_properties", NULL);
@@ -1029,7 +1030,7 @@ static void __init tuna_init(void)
 	omap4_tuna_pogo_init();
 #ifdef CONFIG_OMAP_HSI_DEVICE
 	if (TUNA_TYPE_MAGURO == omap4_tuna_get_type())
-		omap_hsi_init();
+		omap_hsi_dev_init();
 #endif
 #ifdef CONFIG_USB_EHCI_HCD_OMAP
 	if (TUNA_TYPE_TORO == omap4_tuna_get_type()) {
