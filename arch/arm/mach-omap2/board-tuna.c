@@ -60,6 +60,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/remoteproc.h>
+#include <plat/omap_hsi.h>
 
 #include <mach/omap_fiq_debugger.h>
 
@@ -1332,7 +1333,7 @@ static void __init tuna_init(void)
 	omap4_tuna_pogo_init();
 #ifdef CONFIG_OMAP_HSI_DEVICE
 	if (TUNA_TYPE_MAGURO == omap4_tuna_get_type())
-		omap_hsi_init();
+		omap_hsi_dev_init();
 #endif
 #ifdef CONFIG_USB_EHCI_HCD_OMAP
 	if (TUNA_TYPE_TORO == omap4_tuna_get_type()) {
