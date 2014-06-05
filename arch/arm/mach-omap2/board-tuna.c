@@ -410,8 +410,6 @@ static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 };
 
-static struct twl4030_platform_data tuna_twldata;
-
 static void tuna_audio_init(void)
 {
 	unsigned int aud_pwron;
@@ -467,6 +465,9 @@ static struct omap_i2c_bus_board_data __initdata omap4_i2c_1_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap4_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap4_i2c_3_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap4_i2c_4_bus_pdata;
+
+static struct twl4030_platform_data tuna_twldata = {
+};
 
 static int __init tuna_i2c_init(void)
 {
