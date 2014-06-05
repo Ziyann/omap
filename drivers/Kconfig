@@ -1,9 +1,5 @@
 menu "Device Drivers"
 
-config LAB126
-	bool "LAB126 device"
-	default y
-
 source "drivers/base/Kconfig"
 
 source "drivers/connector/Kconfig"

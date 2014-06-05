@@ -1048,7 +1048,6 @@ CONFIG_CAIF_HSI_OMAP=m
 #
 # Device Drivers
 #
-CONFIG_LAB126=y
 
 #
 # Generic Driver Options

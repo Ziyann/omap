@@ -1028,7 +1028,6 @@ CONFIG_RFKILL_INPUT=y
 #
 # Device Drivers
 #
-# CONFIG_LAB126 is not set
 
 #
 # Generic Driver Options
