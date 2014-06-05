@@ -491,9 +491,32 @@ static struct regulator_init_data tuna_vaux3 = {
 	.consumer_supplies      = tuna_vaux3_supplies,
 };
 
+static struct regulator_consumer_supply tuna_vusim_supplies[] = {
+	REGULATOR_SUPPLY("vlcd-iovcc", NULL),
+};
+
+static struct regulator_init_data tuna_vusim = {
+	.constraints = {
+		.min_uV			= 2200000,
+		.max_uV			= 2200000,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(tuna_vusim_supplies),
+	.consumer_supplies = tuna_vusim_supplies,
+};
+
 static struct twl4030_platform_data tuna_twldata = {
 	/* Regulators */
 	.vaux3		= &tuna_vaux3,
+	.vusim		= &tuna_vusim,
 };
 
 static int __init tuna_i2c_init(void)
@@ -520,7 +543,6 @@ static int __init tuna_i2c_init(void)
 			TWL_COMMON_PDATA_THERMAL,
 			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
-			TWL_COMMON_REGULATOR_VUSIM |
 			TWL_COMMON_REGULATOR_VANA |
 			TWL_COMMON_REGULATOR_VCXIO |
 			TWL_COMMON_REGULATOR_VDAC |
