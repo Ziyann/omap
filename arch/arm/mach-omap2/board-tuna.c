@@ -366,11 +366,6 @@ static int __init sec_common_init(void)
 	return 0;
 }
 
-static void __init tuna_init_early(void)
-{
-	omap4430_init_early();
-}
-
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
 #ifdef CONFIG_USB_MUSB_OTG
@@ -1083,7 +1078,7 @@ MACHINE_START(TUNA, "Tuna")
 	.atag_offset	= 0x100,
 	.reserve	= tuna_reserve,
 	.map_io		= tuna_map_io,
-	.init_early	= tuna_init_early,
+	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= tuna_init,
