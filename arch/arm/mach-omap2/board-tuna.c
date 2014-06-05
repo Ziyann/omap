@@ -472,6 +472,19 @@ static struct regulator_consumer_supply tuna_vaux3_supplies[] = {
 	},
 };
 
+static struct regulator_init_data tuna_vaux1 = {
+	.constraints = {
+		.min_uV			= 3000000,
+		.max_uV			= 3000000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
 static struct regulator_init_data tuna_vaux3 = {
 	.constraints = {
 		.min_uV			= 3100000,
@@ -515,6 +528,7 @@ static struct regulator_init_data tuna_vusim = {
 
 static struct twl4030_platform_data tuna_twldata = {
 	/* Regulators */
+	.vaux1		= &tuna_vaux1,
 	.vaux3		= &tuna_vaux3,
 	.vusim		= &tuna_vusim,
 };
