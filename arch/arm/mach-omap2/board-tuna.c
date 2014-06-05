@@ -32,7 +32,6 @@
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
 #include <linux/reboot.h>
-#include <linux/memblock.h>
 #include <linux/sysfs.h>
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
