@@ -194,6 +194,9 @@
 #define TWL6040_SYSCLK_SEL_HPPLL	1
 
 struct twl6040_codec_data {
+#ifdef CONFIG_MACH_TUNA
+	u16 ep_step;
+#endif
 	u16 hs_left_step;
 	u16 hs_right_step;
 	u16 hf_left_step;
