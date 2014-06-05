@@ -504,6 +504,31 @@ static struct regulator_init_data tuna_vaux3 = {
 	.consumer_supplies      = tuna_vaux3_supplies,
 };
 
+static struct regulator_consumer_supply tuna_vmmc_supplies[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+static struct regulator_init_data tuna_vmmc = {
+	.constraints = {
+		.min_uV			= 1800000,
+		.max_uV			= 1800000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
+
+	},
+	.num_consumer_supplies  = ARRAY_SIZE(tuna_vmmc_supplies),
+	.consumer_supplies      = tuna_vmmc_supplies,
+};
+
 static struct regulator_consumer_supply tuna_vusim_supplies[] = {
 	REGULATOR_SUPPLY("vlcd-iovcc", NULL),
 };
@@ -530,6 +555,7 @@ static struct twl4030_platform_data tuna_twldata = {
 	/* Regulators */
 	.vaux1		= &tuna_vaux1,
 	.vaux3		= &tuna_vaux3,
+	.vmmc		= &tuna_vmmc,
 	.vusim		= &tuna_vusim,
 };
 
@@ -555,7 +581,6 @@ static int __init tuna_i2c_init(void)
 	omap4_pmic_get_config(&tuna_twldata, TWL_COMMON_PDATA_USB |
 			TWL_COMMON_PDATA_MADC |
 			TWL_COMMON_PDATA_THERMAL,
-			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
 			TWL_COMMON_REGULATOR_VANA |
 			TWL_COMMON_REGULATOR_VCXIO |
