@@ -1406,4 +1406,5 @@ MACHINE_START(TUNA, "Tuna")
 	.init_irq	= gic_init_irq,
 	.init_machine	= tuna_init,
 	.timer		= &omap4_timer,
+	.restart	= omap_prcm_restart,
 MACHINE_END
