@@ -63,6 +63,7 @@
 //#include "mach/omap_fiq_debugger.h"
 
 #include <mach/id.h>
+#include <mach/omap4_ion.h>
 
 #include "omap4-sar-layout.h"
 #include "mux.h"
@@ -72,7 +73,6 @@
 #include "common-board-devices.h"
 #include "board-tuna.h"
 #include "omap_ram_console.h"
-#include "omap4_ion.h"
 //#include "resetreason.h"
 
 struct class *sec_class;
