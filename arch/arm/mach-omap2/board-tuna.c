@@ -1346,12 +1346,6 @@ static void __init tuna_init(void)
 #endif
 }
 
-static void __init tuna_map_io(void)
-{
-	omap2_set_globals_443x();
-	omap44xx_map_common_io();
-}
-
 static void __init tuna_reserve(void)
 {
 	omap_init_ram_size();
@@ -1402,7 +1396,7 @@ MACHINE_START(TUNA, "Tuna")
 	/* Maintainer: Google, Inc */
 	.atag_offset	= 0x100,
 	.reserve	= tuna_reserve,
-	.map_io		= tuna_map_io,
+	.map_io		= omap4_map_io,
 	.init_early	= tuna_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
