@@ -1123,6 +1123,7 @@ static void __init tuna_init(void)
 	}
 	tuna_from_init();
 	omap_init_dmm_tiler();
+	omap4_register_ion();
 	omap4_tuna_display_init();
 	omap4_tuna_input_init();
 	omap4_tuna_nfc_init();
