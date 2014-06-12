@@ -17,7 +17,7 @@
 #include <linux/i2c.h>
 #include <linux/mpu.h>
 #include <linux/gp2a.h>
-#include <linux/i2c/twl4030-madc.h>
+#include <linux/i2c/twl6030-gpadc.h>
 
 #include "mux.h"
 #include "board-tuna.h"
@@ -33,7 +33,7 @@
 
 static int gp2a_light_adc_value(void)
 {
-	return twl4030_get_madc_conversion(GP2A_LIGHT_ADC_CHANNEL);
+	return twl6030_get_gpadc_conversion(GP2A_LIGHT_ADC_CHANNEL);
 }
 
 static void gp2a_power(bool on)

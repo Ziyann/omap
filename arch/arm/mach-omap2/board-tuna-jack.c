@@ -20,7 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
-#include <linux/i2c/twl4030-madc.h>
+#include <linux/i2c/twl6030-gpadc.h>
 #include <linux/sec_jack.h>
 
 #include "mux.h"
@@ -111,7 +111,7 @@ static int sec_jack_get_adc_value(void)
 {
 	int value;
 
-	value =  twl4030_get_madc_conversion(ADC_CHANNEL_JACK);
+	value =  twl6030_get_gpadc_conversion(ADC_CHANNEL_JACK);
 	return (int)(1800*value) / 1024;
 }
 
