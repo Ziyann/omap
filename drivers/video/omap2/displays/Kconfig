@@ -46,6 +46,13 @@ config PANEL_PICODLP
 		A mini-projector used in TI's SDP4430 and EVM boards
 		For more info please visit http://www.dlp.com/projector/
 
+config PANEL_S6E8AA0
+        tristate "S6E8AA0 DSI Panel"
+        depends on OMAP2_DSS_DSI
+        select BACKLIGHT_CLASS_DEVICE
+        help
+          S6E8AA0 video mode panel.
+
 config PANEL_TAAL
         tristate "Taal DSI Panel"
         depends on OMAP2_DSS_DSI
