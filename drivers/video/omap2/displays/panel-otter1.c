@@ -312,17 +312,5 @@ static struct spi_driver otter1_spi_driver = {
 	},
 };
 
-static int __init otter1_lcd_init(void)
-{
-	return spi_register_driver(&otter1_spi_driver);
-}
-
-static void __exit otter1_lcd_exit(void)
-{
-	spi_unregister_driver(&otter1_spi_driver);
-}
-
-module_init(otter1_lcd_init);
-module_exit(otter1_lcd_exit);
-
+module_spi_driver(otter1_spi_driver);
 
