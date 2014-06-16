@@ -320,7 +320,9 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.green	= { .length = 8, .offset = 16, .msb_right = 0 },
 		.blue	= { .length = 8, .offset = 8, .msb_right = 0 },
 		.transp	= { .length = 0, .offset = 0, .msb_right = 0 },
-	}, {
+	},
+#ifdef CONFIG_ARCH_OMAP5
+	{
 		.dssmode = OMAP_DSS_COLOR_BGRA32,
 		.bits_per_pixel = 32,
 		.red	= { .length = 8, .offset = 8, .msb_right = 0 },
@@ -328,6 +330,7 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.blue	= { .length = 8, .offset = 24, .msb_right = 0 },
 		.transp	= { .length = 8, .offset = 0, .msb_right = 0 },
 	},
+#endif
 };
 
 static bool cmp_var_to_colormode(struct fb_var_screeninfo *var,
