@@ -267,13 +267,7 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 /* need to access USB_PRODUCT_ID_LSB to identify which 6030 varient we are */
 #define USB_PRODUCT_ID_LSB	0x02
 
-/* need to check eeprom revision and jtagver number */
-#define TWL6030_REG_EPROM_REV	0xdf
-#define TWL6030_REG_JTAGVERNUM	0x87
-
-/* need to access USB_PRODUCT_ID_LSB to identify which 6030 varient we are */
-#define USB_PRODUCT_ID_LSB	0x02
-
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 /* PMC Master Module */
 #define PHOENIX_START_CONDITION		0x1F
 #define START_COND_STRT_ON_PWRON 	BIT(0)
@@ -292,7 +286,7 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define TURNOFF_DEVOFF_TSHUT 		BIT(3)
 #define TURNOFF_DEVOFF_BCK 		BIT(2)
 #define TURNOFF_DEVOFF_LPK 		BIT(1)
-
+#endif
 
 /*----------------------------------------------------------------------*/
 /* Bit mask of implemented erratums and WAs */
@@ -1355,6 +1349,7 @@ static void clocks_init(struct device *dev,
 
 /*----------------------------------------------------------------------*/
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 /*
  * PROC FS entries for start condition and last turnoff reason
  */
@@ -1445,6 +1440,7 @@ static int twl_resume(struct i2c_client *client)
 #else
 #define twl_suspend	NULL
 #define twl_resume	NULL
+#endif
 #endif
 #endif
 
@@ -1595,7 +1591,9 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	unsigned			i, num_slaves;
 	int				features;
 	u8				temp;
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 	u8 twl_reg = 0;
+#endif
 
 	if (node && !pdata) {
 		/*
