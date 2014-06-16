@@ -1894,6 +1894,7 @@ CONFIG_FB_OMAP2_NUM_FBS=3
 #
 # OMAP2/3 Display Device Drivers
 #
+CONFIG_PANEL_S6E8AA0=y
 # CONFIG_PANEL_TAAL is not set
 # CONFIG_PANEL_LG4591 is not set
 # CONFIG_PANEL_N8X0 is not set
