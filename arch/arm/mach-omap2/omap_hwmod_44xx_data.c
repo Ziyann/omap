@@ -1482,7 +1482,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
 
 static struct omap_hwmod omap44xx_dss_hwmod = {
 	.name		= "dss_core",
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET | HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 #else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
@@ -1590,7 +1590,7 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_dispc_slaves[] = {
 static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap44xx_dispc_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
@@ -1690,7 +1690,7 @@ static struct omap_hwmod_opt_clk dss_dsi1_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
 	.name		= "dss_dsi1",
 	.class		= &omap44xx_dsi_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
@@ -1770,7 +1770,7 @@ static struct omap_hwmod_opt_clk dss_dsi2_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 	.name		= "dss_dsi2",
 	.class		= &omap44xx_dsi_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
@@ -1870,7 +1870,7 @@ static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
 	.name		= "dss_hdmi",
 	.class		= &omap44xx_hdmi_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
@@ -1965,7 +1965,7 @@ static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
 	.name		= "dss_rfbi",
 	.class		= &omap44xx_rfbi_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
@@ -2039,7 +2039,7 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_venc_slaves[] = {
 static struct omap_hwmod omap44xx_dss_venc_hwmod = {
 	.name		= "dss_venc",
 	.class		= &omap44xx_venc_hwmod_class,
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
