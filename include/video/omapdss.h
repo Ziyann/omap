@@ -789,6 +789,8 @@ struct omap_dss_device {
 	int reset_gpio;
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 	int hpd_gpio;
+#endif
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	bool skip_init;
 #endif
 
