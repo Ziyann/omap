@@ -603,6 +603,9 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 	FEAT_FIR_COEF_V,
 	FEAT_ALPHA_FREE_ZORDER,
 	FEAT_FIFO_MERGE,
+#ifdef CONFIG_MACH_TUNA
+	FEAT_DSI_PLL_REFSEL,
+#endif
 	FEAT_WB,
 };
 
