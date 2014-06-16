@@ -971,6 +971,35 @@ static struct omap_dss_device tuna_oled_device = {
 		.dsi_mode	= OMAP_DSS_DSI_VIDEO_MODE,
 		.width_in_um	= 58000,
 		.height_in_um	= 102000,
+		.dsi_vm_data = {
+			/* DSI video mode blanking data */
+
+			/* Unit: byte clock cycles */
+			.hsa					= 1,
+			.hfp					= 118,
+			.hbp					= 119,
+
+			/* Unit: line clocks */
+			.vsa					= 1,
+			.vfp					= 13,
+			.vbp					= 2,
+
+			/* DSI blanking modes */
+			.blanking_mode			= 1,
+			.hsa_blanking_mode		= 1,
+			.hbp_blanking_mode		= 1,
+			.hfp_blanking_mode		= 1,
+
+			/* Video port sync events */
+			.vp_de_pol				= 1,
+			.vp_hsync_pol			= 0,
+			.vp_vsync_pol			= 1,
+			.vp_vsync_end			= 0,
+			.vp_hsync_end			= 0,
+
+			.ddr_clk_always_on		= 0,
+			.window_sync			= 4,
+		}
 	},
 	.clocks = {
 		.dispc		= {
