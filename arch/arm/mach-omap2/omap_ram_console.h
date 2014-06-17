@@ -17,7 +17,7 @@
 #ifndef __OMAP_RAM_CONSOLE_H
 #define __OMAP_RAM_CONSOLE_H
 
-#ifdef CONFIG_MACH_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 #define OMAP_RAM_CONSOLE_START_DEFAULT		(UL(0x80000000) + (SZ_1M * 618))
 #else
 /* Board files use the following if they are ok with 512M size defaults */
