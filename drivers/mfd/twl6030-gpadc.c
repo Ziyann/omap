@@ -577,22 +577,6 @@ static ssize_t set_offset(struct device *dev,
 }
 
 #ifdef CONFIG_MACH_OMAP4_BOWSER
-static ssize_t set_offset(struct device *dev,
-	struct device_attribute *devattr, const char *buf, size_t count)
-{
-	long val;
-	int status = count;
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
-
-	if ((kstrtol(buf, 10, &val) < 0) || (val < 15000)
-							|| (val > 60000))
-		return -EINVAL;
-
-	twl6030_calib_tbl[attr->index].offset_error = val;
-
-	return status;
-}
-
 static ssize_t show_value(struct device *dev,
 	struct device_attribute *devattr, char *buf)
 {
