@@ -195,7 +195,7 @@ void clkdm_deny_idle(struct clockdomain *clkdm);
 bool clkdm_in_hwsup(struct clockdomain *clkdm);
 
 int clkdm_wakeup(struct clockdomain *clkdm);
-#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 int clkdm_wakeup_allow_sleep(struct clockdomain *clkdm);
 #endif
 int clkdm_sleep(struct clockdomain *clkdm);

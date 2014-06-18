@@ -349,7 +349,7 @@ int clkdm_complete_init(void)
 		return -EACCES;
 
 	list_for_each_entry(clkdm, &clkdm_list, node) {
-#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 		if (clkdm->flags & CLKDM_BOOTLOADER) {
 			clkdm_wakeup_allow_sleep(clkdm);
 		} else {
@@ -358,7 +358,7 @@ int clkdm_complete_init(void)
 			clkdm_wakeup(clkdm);
 		else if (clkdm->flags & CLKDM_CAN_DISABLE_AUTO)
 			clkdm_deny_idle(clkdm);
-#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 		}
 #endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 
@@ -782,7 +782,7 @@ int clkdm_sleep(struct clockdomain *clkdm)
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 	return ret;
 }
-#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 /**
  * clkdm_wakeup_allow_sleep - force clockdomain wakeup transition
  * @clkdm: struct clockdomain *

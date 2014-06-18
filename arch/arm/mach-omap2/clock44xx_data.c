@@ -1479,7 +1479,7 @@ static struct clk dss_sys_clk = {
 	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT,
 	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		= ENABLE_ON_INIT,
 #endif
 	.parent		= &syc_clk_div_ck,

@@ -372,6 +372,7 @@ static struct clockdomain l3_dss_443x_446x_clkdm = {
 	.wkdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.sleepdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+#endif
 };
 
 /*
@@ -388,7 +389,7 @@ static struct clockdomain l3_dss_447x_clkdm = {
 	.dep_bit	  = OMAP4430_DSS_STATDEP_SHIFT,
 	.wkdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.sleepdep_srcs	  = l3_dss_wkup_sleep_deps,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.flags		  = CLKDM_CAN_SWSUP | CLKDM_BOOTLOADER,
 #else
 	.flags		  = CLKDM_CAN_SWSUP,
