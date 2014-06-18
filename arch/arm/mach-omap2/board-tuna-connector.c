@@ -890,6 +890,7 @@ static struct i2c_board_info __initdata tuna_i2c5_boardinfo[] = {
 
 int __init omap4_tuna_connector_init(void)
 {
+#if 0
 	struct tuna_otg *tuna_otg = &tuna_otg_xceiv;
 	struct usb_otg *otg;
 	int ret;
@@ -1001,6 +1002,6 @@ int __init omap4_tuna_connector_init(void)
 
 	tuna_otg->dock_switch.name = "dock";
 	switch_dev_register(&tuna_otg->dock_switch);
-
+#endif
 	return 0;
 }
