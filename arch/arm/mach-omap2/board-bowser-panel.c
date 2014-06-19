@@ -479,7 +479,6 @@ static struct omap_dss_device bowser_hdmi_device = {
 			.regm2	= 1,
 		},
 	},
-	.hpd_gpio = HDMI_GPIO_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 	.data = &omap5panda_hdmi_data,
 };
