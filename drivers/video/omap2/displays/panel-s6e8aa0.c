@@ -1901,7 +1901,7 @@ static int s6e8aa0_resume(struct omap_dss_device *dssdev)
 	}
 
 	/* fixup pclk based on pll config */
-	pclk = dispc_mgr_pclk_rate(s6->channel1);
+	pclk = dispc_mgr_pclk_rate(dssdev->channel);
 	if (pclk)
 		dssdev->panel.timings.pixel_clock = (pclk + 500) / 1000;
 
