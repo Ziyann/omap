@@ -1052,8 +1052,6 @@ static void tuna_hdmi_mux_init(void)
 
 static struct omap_dss_hdmi_data tuna_hdmi_data = {
 	.hpd_gpio = TUNA_GPIO_HDMI_HPD,
-	.ls_oe_gpio = TUNA_GPIO_HDMI_LS_OE,
-	.ct_cp_hpd_gpio = TUNA_GPIO_HDMI_CT_CP_HDP,
 };
 
 static struct omap_dss_device tuna_hdmi_device = {
