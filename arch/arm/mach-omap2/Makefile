@@ -266,12 +266,6 @@ obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
-obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
-					   hsmmc.o \
-					   omap_phy_internal.o
-obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
-					   hsmmc.o \
-					   omap_phy_internal.o
 obj-$(CONFIG_MACH_TUNA)			+= board-tuna.o \
 					   hsmmc.o \
 					   omap_phy_internal.o

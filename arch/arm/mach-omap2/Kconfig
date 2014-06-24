@@ -308,23 +308,6 @@ config MACH_TI8168EVM
 	depends on SOC_OMAPTI816X
 	default y
 
-config MACH_OMAP_4430SDP
-	bool "OMAP 4430 SDP board"
-	default y
-	depends on ARCH_OMAP4
-	select OMAP_PACKAGE_CBL
-	select OMAP_PACKAGE_CBS
-	select REGULATOR_FIXED_VOLTAGE
-	select OMAP_TPS6236X
-
-config MACH_OMAP4_PANDA
-	bool "OMAP4 Panda Board"
-	default y
-	depends on ARCH_OMAP4
-	select OMAP_PACKAGE_CBL
-	select OMAP_PACKAGE_CBS
-	select REGULATOR_FIXED_VOLTAGE
-
 config MACH_TUNA
 	bool "Tuna Board"
 	default y
