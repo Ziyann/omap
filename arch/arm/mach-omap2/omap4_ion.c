@@ -39,7 +39,9 @@ static struct ion_platform_data omap4_ion_data = {
 			.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_NONSECURE_TILER,
 			.name = "nonsecure_tiler",
-			.base = 0x80000000 + SZ_512M + SZ_2M,
+			.base = PHYS_ADDR_DUCATI_MEM -
+					OMAP4_ION_HEAP_TILER_SIZE -
+					OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 			.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 		},
 	},
