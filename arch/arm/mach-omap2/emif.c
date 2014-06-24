@@ -90,8 +90,6 @@ void emif_dump(int emif_nr)
 static u32 emif_errata;
 #define is_emif_erratum(erratum) (emif_errata & EMIF_ERRATUM_##erratum)
 
->>>>>>> 9de7d91... ARM: OMAP4: EMIF: implementation of errata i735 for PM timer
-
 static void do_cancel_out(u32 *num, u32 *den, u32 factor)
 {
 	while (1) {
