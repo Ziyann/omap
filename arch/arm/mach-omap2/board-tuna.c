@@ -61,6 +61,7 @@
 #include <mach/omap_fiq_debugger.h>
 
 #include <mach/id.h>
+#include <mach/omap4_ion.h>
 #include "timer-gp.h"
 
 #include "omap4-sar-layout.h"
@@ -259,54 +260,6 @@ static struct platform_device tuna_gpio_i2c5_device = {
 	}
 };
 
-#define PHYS_ADDR_SMC_SIZE			(SZ_1M * 3)
-#define PHYS_ADDR_DUCATI_SIZE			(SZ_1M * 105)
-#define OMAP_TUNA_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 90)
-#define OMAP_TUNA_ION_HEAP_TILER_SIZE		(SZ_1M * 81)
-#define OMAP_TUNA_ION_HEAP_NONSECURE_TILER_SIZE	(SZ_1M * 15)
-
-#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
-#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - \
-				 PHYS_ADDR_DUCATI_SIZE - \
-				 OMAP_TUNA_ION_HEAP_SECURE_INPUT_SIZE)
-
-static struct ion_platform_data tuna_ion_data = {
-	.nr = 3,
-	.heaps = {
-		{
-			.type = ION_HEAP_TYPE_CARVEOUT,
-			.id   = OMAP_ION_HEAP_SECURE_INPUT,
-			.name = "secure_input",
-			.base = PHYS_ADDR_SMC_MEM -
-					OMAP_TUNA_ION_HEAP_SECURE_INPUT_SIZE,
-			.size = OMAP_TUNA_ION_HEAP_SECURE_INPUT_SIZE,
-		},
-		{	.type = OMAP_ION_HEAP_TYPE_TILER,
-			.id   = OMAP_ION_HEAP_TILER,
-			.name = "tiler",
-			.base = PHYS_ADDR_DUCATI_MEM -
-					OMAP_TUNA_ION_HEAP_TILER_SIZE,
-			.size = OMAP_TUNA_ION_HEAP_TILER_SIZE,
-		},
-		{	.type = OMAP_ION_HEAP_TYPE_TILER,
-			.id   = OMAP_ION_HEAP_NONSECURE_TILER,
-			.name = "nonsecure_tiler",
-			.base = PHYS_ADDR_DUCATI_MEM -
-					OMAP_TUNA_ION_HEAP_TILER_SIZE -
-					OMAP_TUNA_ION_HEAP_NONSECURE_TILER_SIZE,
-			.size = OMAP_TUNA_ION_HEAP_NONSECURE_TILER_SIZE,
-		},
-	},
-};
-
-static struct platform_device tuna_ion_device = {
-	.name = "ion-omap4",
-	.id = -1,
-	.dev = {
-		.platform_data = &tuna_ion_data,
-	},
-};
-
 static struct platform_device tuna_spdif_dit_device = {
 	.name		= "spdif-dit",
 	.id		= 0,
@@ -315,7 +268,6 @@ static struct platform_device tuna_spdif_dit_device = {
 static struct platform_device *tuna_devices[] __initdata = {
 	&wl1271_device,
 	&twl6030_madc_device,
-	&tuna_ion_device,
 	&tuna_gpio_i2c5_device,
 	&tuna_spdif_dit_device,
 };
@@ -1357,6 +1309,7 @@ static void __init tuna_init(void)
 	}
 	tuna_from_init();
 	omap_dmm_init();
+	omap4_register_ion();
 	omap4_tuna_display_init();
 	omap4_tuna_input_init();
 	omap4_tuna_nfc_init();
@@ -1388,29 +1341,12 @@ static void __init tuna_map_io(void)
 
 static void __init tuna_reserve(void)
 {
-	int i;
-	int ret;
-
     omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
             OMAP_RAM_CONSOLE_SIZE_DEFAULT);
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 
-	for (i = 0; i < tuna_ion_data.nr; i++)
-		if (tuna_ion_data.heaps[i].type == ION_HEAP_TYPE_CARVEOUT ||
-		    tuna_ion_data.heaps[i].type == OMAP_ION_HEAP_TYPE_TILER) {
-			ret = memblock_remove(tuna_ion_data.heaps[i].base,
-					      tuna_ion_data.heaps[i].size);
-			if (ret)
-				pr_err("memblock remove of %x@%lx failed\n",
-				       tuna_ion_data.heaps[i].size,
-				       tuna_ion_data.heaps[i].base);
-		}
-
-	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					OMAP_TUNA_ION_HEAP_SECURE_INPUT_SIZE);
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#endif
 	omap_reserve();
 }
 
