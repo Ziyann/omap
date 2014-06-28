@@ -166,7 +166,7 @@ static __init int omap4_ldo_trim_init(void)
 	 * 0  1  Fixed test program issue of overlapping of LPDDR & SmartIO
 	 *	 efuse fields, SW WA needed for LPDDR.
 	 * 1  1  New LPDDR trim formula to compensate for vertical vs horizontal
-	 *	 cell layout. No overwrite required.
+	 *	 cell layout.  No overwrite required.
 	 */
 	if (cpu_is_omap443x()) {
 		u32 prod_id;
