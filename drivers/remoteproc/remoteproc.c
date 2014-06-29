@@ -88,8 +88,8 @@ static ssize_t rproc_format_trace_buf(struct rproc *rproc, char __user *userbuf,
 		;
 
 	if (i > w_pos)
-		num_copied =
-			simple_read_from_buffer(userbuf, count, ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count,
+							ppos, src, i);
 		if (!num_copied) {
 			from_beg = 1;
 			*ppos = 0;
@@ -102,8 +102,8 @@ print_beg:
 		;
 
 	if (i) {
-		num_copied =
-			simple_read_from_buffer(userbuf, count, ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count,
+							ppos, src, i);
 		if (!num_copied)
 			from_beg = 0;
 		ret = num_copied;
@@ -834,6 +834,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	u64 trace_da1 = 0;
 	u64 cdump_da0 = 0;
 	u64 cdump_da1 = 0;
+	u64 susp_addr = 0;
 	int ret = 0;
 
 	while (len >= sizeof(*rsc) && !ret) {
@@ -883,6 +884,9 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			break;
 		case RSC_BOOTADDR:
 			*bootaddr = da;
+			break;
+		case RSC_SUSPENDADDR:
+			susp_addr = da;
 			break;
 		case RSC_DEVMEM:
 			ret = rproc_add_mem_entry(rproc, rsc);
@@ -1031,6 +1035,9 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			ret = -EIO;
 		}
 	}
+	/* post-process pm data types */
+	if (susp_addr)
+		ret = rproc->ops->pm_init(rproc, susp_addr);
 
 unlock:
 	mutex_unlock(&rproc->tlock);
@@ -1083,9 +1090,8 @@ static int rproc_process_fw(struct rproc *rproc, struct fw_section *section,
 			ret = rproc_handle_resources(rproc,
 					(struct fw_resource *) section->content,
 					len, bootaddr);
-			if (ret) {
+			if (ret)
 				break;
-			}
 		}
 
 		if (section->type <= FW_DATA) {
@@ -1165,6 +1171,9 @@ static void rproc_loader_cont(const struct firmware *fw, void *context)
 	}
 	memcpy(rproc->header, image->header, image->header_len);
 	rproc->header_len = image->header_len;
+
+	debugfs_create_file("version", 0444, rproc->dbg_dir, rproc,
+							&rproc_version_ops);
 
 	/* Ensure we recognize this BIOS version: */
 	if (image->version != RPROC_BIOS_VERSION) {
@@ -1799,8 +1808,6 @@ int rproc_register(struct device *dev, const char *name,
 	debugfs_create_file("name", 0444, rproc->dbg_dir, rproc,
 							&rproc_name_ops);
 
-	debugfs_create_file("version", 0444, rproc->dbg_dir, rproc,
-							&rproc_version_ops);
 out:
 	return 0;
 }
