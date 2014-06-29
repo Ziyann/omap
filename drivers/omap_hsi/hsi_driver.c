@@ -56,6 +56,12 @@ void hsi_hsr_suspend(struct hsi_dev *hsi_ctrl)
 		hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, hsi_ctrl->base,
 			     HSI_HSR_MODE_REG(port));
 	}
+
+
+	/* Save context */
+	hsi_save_ctx(hsi_ctrl);
+
+	hsi_ctrl->clock_enabled = false;
 }
 
 void hsi_hsr_resume(struct hsi_dev *hsi_ctrl)
@@ -1061,15 +1067,15 @@ int hsi_runtime_resume(struct device *dev)
 	/* Restore context */
 	hsi_restore_ctx(hsi_ctrl);
 
+	/* Allow data reception */
+	hsi_hsr_resume(hsi_ctrl);
+
 	/* Restore HSR_MODE register value */
 	/* WARNING: works only in this configuration: */
 	/* - Flow = Synchronized */
 	/* - Mode = frame */
 	hsi_outl(HSI_HSR_MODE_FRAME, hsi_ctrl->base,
 			HSI_HSR_MODE_REG(HSI_PORT1));
-
-	/* Allow data reception */
-	hsi_hsr_resume(hsi_ctrl);
 
 	/* When HSI is ON, no need for IO wakeup mechanism on any HSI port */
 	for (i = 0; i < hsi_ctrl->max_p; i++)
@@ -1103,11 +1109,6 @@ int hsi_runtime_suspend(struct device *dev)
 
 	/* Forbid data reception */
 	hsi_hsr_suspend(hsi_ctrl);
-
-	/* Save context */
-	hsi_save_ctx(hsi_ctrl);
-
-	hsi_ctrl->clock_enabled = false;
 
 	/* HSI is going to IDLE, it needs IO wakeup mechanism enabled */
 	if (device_may_wakeup(dev))
