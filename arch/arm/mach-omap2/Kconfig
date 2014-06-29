@@ -383,7 +383,7 @@ config OMAP4_DPLL_CASCADING
 	depends on ARCH_OMAP4
 	depends on PM
 	depends on HAS_EARLYSUSPEND
-	default y
+	default n
 	help
 	  Select this option to enable DPLL Cascading during Low power mp3
 	  playback. It will enter DPLL cascade when :
