@@ -42,7 +42,6 @@ void omap4_tuna_sensors_init(void);
 void omap4_tuna_pogo_init(void);
 int omap4_tuna_connector_init(void);
 int tuna_wlan_init(void);
-int omap_hsi_init(void);
 void omap4_tuna_emif_init(void);
 void omap4_ehci_init(void);
 void modem_toro_init(void);
