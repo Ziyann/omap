@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/remoteproc.h>
 #include <linux/memblock.h>
+#include <plat/common.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/remoteproc.h>
@@ -125,6 +126,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.timers_cnt	= ARRAY_SIZE(dsp_timers),
 		.idle_addr	= OMAP4430_CM_DSP_DSP_CLKCTRL,
 		.idle_mask	= OMAP4430_STBYST_MASK,
+		.suspend_addr   = 0xad6e134c,
 		.suspend_mask	= ~0,
 		.sus_timeout	= 5000,
 		.sus_mbox_name	= "mailbox-2",
@@ -142,6 +144,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.timers_cnt	= ARRAY_SIZE(ipu_timers),
 		.idle_addr	= OMAP4430_CM_M3_M3_CLKCTRL,
 		.idle_mask	= OMAP4430_STBYST_MASK,
+		.suspend_addr	= 0xb3bf02d8,
 		.suspend_mask	= ~0,
 		.sus_timeout	= 5000,
 		.sus_mbox_name	= "mailbox-1",
@@ -222,7 +225,17 @@ static int __init omap_rproc_init(void)
 		const char *oh_name_opt = omap4_rproc_data[i].oh_name_opt;
 		oh_count = 0;
 
+		if (omap_total_ram_size() == SZ_512M) {
+			if (!strcmp("ipu", omap4_rproc_data[i].name))
+				omap4_rproc_data[i].firmware =
+					"ducati-m3.512MB.bin";
+			else if (!strcmp("dsp", omap4_rproc_data[i].name))
+				omap4_rproc_data[i].firmware =
+					"tesla-dsp.512MB.bin";
+		}
+
 		oh[0] = omap_hwmod_lookup(oh_name);
+
 		if (!oh[0]) {
 			pr_err("could not look up %s\n", oh_name);
 			continue;

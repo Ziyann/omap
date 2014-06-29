@@ -24,6 +24,10 @@
 #include <asm/mach/map.h>
 #include <asm/pmu.h>
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <mach/omap4-common.h>
+#endif
+
 #include <plat/tc.h>
 #include <plat/board.h>
 #include <plat/mcbsp.h>
@@ -904,11 +908,25 @@ static struct omap_device_pm_latency omap_gpu_latency[] = {
 	},
 };
 
-static struct platform_device omap_omaplfb_device = {
-	.name		= "omaplfb",
-	.id		= -1,
-};
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+int omap_device_scale_gpu(struct device *req_dev, struct device *target_dev,
+			unsigned long rate)
+{
+	unsigned long freq = 0;
+	int ret;
 
+	/* find lowest frequency */
+	opp_find_freq_ceil(target_dev, &freq);
+
+	if (rate > freq)
+		omap4_dpll_cascading_blocker_hold(target_dev);
+	ret = omap_device_scale(req_dev, target_dev, rate);
+	if (!ret && rate <= freq)
+		omap4_dpll_cascading_blocker_release(target_dev);
+
+	return ret;
+}
+#endif
 
 static void omap_init_gpu(void)
 {
@@ -938,8 +956,11 @@ static void omap_init_gpu(void)
 		pr_err("omap_init_gpu: Platform data memory allocation failed\n");
 		return;
 	}
-
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	pdata->device_scale = omap_device_scale_gpu;
+#else
 	pdata->device_scale = omap_device_scale;
+#endif
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
@@ -958,7 +979,6 @@ static void omap_init_gpu(void)
 	     name, oh_name);
 
 	kfree(pdata);
-	platform_device_register(&omap_omaplfb_device);
 }
 
 /*-------------------------------------------------------------------------*/
