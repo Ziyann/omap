@@ -730,12 +730,74 @@ void __init modem_toro_init(void)
 	platform_device_register(&lte_modem_wake);
 }
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
+static void __init omap_hsi_pad_conf(void)
+{
+	/*
+	 * HSI pad conf: hsi1_ca/ac_wake/flag/data/ready
+	 * Also configure gpio_92/95/157/187 used by modem
+	 */
+	/* hsi1_cawake */
+	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
+		OMAP_PIN_INPUT_PULLDOWN | \
+		OMAP_PIN_OFF_NONE | \
+		OMAP_PIN_OFF_WAKEUPENABLE);
+	/* hsi1_caflag */
+	omap_mux_init_signal("usbb1_ulpitll_dir.hsi1_caflag", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_cadata */
+	omap_mux_init_signal("usbb1_ulpitll_stp.hsi1_cadata", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acready */
+	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_OFF_EN);
+	/* hsi1_acwake */
+	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_OFF_EN);
+	/* hsi1_acdata */
+	omap_mux_init_signal("usbb1_ulpitll_dat1.hsi1_acdata", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_OFF_EN);
+	/* hsi1_acflag */
+	omap_mux_init_signal("usbb1_ulpitll_dat2.hsi1_acflag", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_OFF_EN);
+	/* hsi1_caready */
+	omap_mux_init_signal("usbb1_ulpitll_dat3.hsi1_caready", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_92 */
+	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
+		OMAP_PULL_ENA);
+	/* gpio_95 */
+	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
+		OMAP_PIN_INPUT_PULLDOWN | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_157 */
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_187 */
+	omap_mux_init_signal("sys_boot3.gpio_187", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+}
+#endif
+
 static int __init init_modem(void)
 {
 	pr_debug("[MODEM_IF] init_modem\n");
 
 	switch (omap4_tuna_get_type()) {
 	case TUNA_TYPE_MAGURO:	/* HSPA */
+#ifdef CONFIG_OMAP_HSI_DEVICE
+		/* HSI devices registration */
+		omap_hsi_pad_conf();
+#endif
 		/* umts gpios configuration */
 		umts_modem_cfg_gpio();
 		platform_device_register(&umts_modem);
@@ -754,6 +816,7 @@ static int __init init_modem(void)
 	default:
 		break;
 	}
+
 	return 0;
 }
 late_initcall(init_modem);
