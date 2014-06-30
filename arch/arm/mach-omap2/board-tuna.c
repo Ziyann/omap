@@ -811,6 +811,8 @@ static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_4_bus_pdata;
 
 static int __init tuna_i2c_init(void)
 {
+	u32 r;
+
 	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_1_bus_pdata);
 	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
 	omap_i2c_hwspinlock_init(3, 2, &sdp4430_i2c_3_bus_pdata);
@@ -820,8 +822,6 @@ static int __init tuna_i2c_init(void)
 	omap_register_i2c_bus_board_data(2, &sdp4430_i2c_2_bus_pdata);
 	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
-
-	u32 r;
 
 	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP |
 						OMAP_WAKEUP_EN);
@@ -1226,7 +1226,7 @@ static struct attribute_group tuna_board_prop_attr_group = {
 static void __init omap4_tuna_create_board_props(void)
 {
 	struct kobject *board_props_kobj;
-	struct kobject *soc_kobj;
+	struct kobject *soc_kobj = NULL;
 	int ret = 0;
 
 	board_props_kobj = kobject_create_and_add("board_properties", NULL);
