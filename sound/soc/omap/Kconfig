@@ -140,7 +140,7 @@ config SND_OMAP_SOC_OMAP4_HDMI
 config SND_OMAP_SOC_ABE_DL2
 	bool "Use ABE DL2 path"
 	depends on SND_OMAP_SOC && SND_OMAP_SOC_ABE_DSP
-	default n
+	default y
 	help
 	  Say Y if you want to enable ABE DL2 path for PDM_DL2, otherwise it will be
 	  connected to DL1 path.
