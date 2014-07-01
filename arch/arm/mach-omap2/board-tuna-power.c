@@ -22,7 +22,7 @@
 #include <linux/moduleparam.h>
 #include <linux/pda_power.h>
 #include <linux/platform_device.h>
-#include <linux/i2c/twl6030-madc.h>
+#include <linux/i2c/twl6030-gpadc.h>
 #include <linux/delay.h>
 
 #include <plat/cpu.h>
@@ -263,11 +263,11 @@ static int twl6030_get_adc_data(int ch)
 	int i, j;
 
 	for (i = 0; i < ADC_NUM_SAMPLES; i++) {
-		adc_data = twl6030_get_madc_conversion(ch);
+		adc_data = twl6030_get_gpadc_conversion(ch);
 		if (adc_data == -EAGAIN) {
 			for (j = 0; j < ADC_LIMIT_ERR_COUNT; j++) {
 				msleep(20);
-				adc_data = twl6030_get_madc_conversion(ch);
+				adc_data = twl6030_get_gpadc_conversion(ch);
 				if (adc_data > 0)
 					break;
 			}
