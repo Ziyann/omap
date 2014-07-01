@@ -1118,9 +1118,9 @@ static int tuna_notifier_call(struct notifier_block *this,
 	 * DSS/panel drivers shutdown in reboot path.
 	 */
 	{
-		extern void dsscomp_early_suspend(struct early_suspend *h);
+		//extern void dsscomp_early_suspend(struct early_suspend *h);
 
-		dsscomp_early_suspend(NULL);
+		//dsscomp_early_suspend(NULL);
 	}
 #endif
 
