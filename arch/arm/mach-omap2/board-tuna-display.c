@@ -20,6 +20,7 @@
 
 #include <linux/platform_data/panel-s6e8aa0.h>
 
+#include <plat/android-display.h>
 #include <plat/vram.h>
 
 #include <video/omapdss.h>
@@ -967,6 +968,10 @@ static struct omap_dss_device tuna_oled_device = {
 		.data4_pol	= 0,
 	},
 	.panel = {
+		.timings = {
+			.x_res = 720,
+			.y_res = 1280,
+		},
 		.width_in_um	= 58000,
 		.height_in_um	= 102000,
 	},
@@ -1065,6 +1070,15 @@ static struct omapfb_platform_data tuna_fb_pdata = {
 		},
 	},
 };
+
+void tuna_android_display_setup(struct omap_ion_platform_data *ion)
+{
+	omap_android_display_setup(&tuna_dss_data,
+				   NULL,
+				   NULL,
+				   &tuna_fb_pdata,
+				   ion);
+}
 
 void __init omap4_tuna_display_init(void)
 {
