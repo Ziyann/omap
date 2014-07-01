@@ -46,6 +46,9 @@ void omap4_tuna_emif_init(void);
 void omap4_ehci_init(void);
 void modem_toro_init(void);
 
+struct omap_ion_platform_data;
+void tuna_android_display_setup(struct omap_ion_platform_data *ion);
+
 enum pogo_power_state {
 	POGO_POWER_DISCONNECTED,
 	POGO_POWER_CHARGER,
