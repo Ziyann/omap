@@ -565,3 +565,8 @@ service mdnsd /system/bin/mdnsd
     socket mdnsd stream 0660 mdnsr inet
     disabled
     oneshot
+
+	
+# PVR stuff
+insmod /system/lib/modules/pvrsrvkm_sgx540_120.ko
+chmod 0666 /dev/pvrsrvkm
