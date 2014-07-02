@@ -21,7 +21,6 @@
 #include <linux/platform_data/panel-s6e8aa0.h>
 
 #include <plat/android-display.h>
-#include <plat/vram.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-generic-dpi.h>
@@ -1118,7 +1117,6 @@ void __init omap4_tuna_display_init(void)
 
 	pr_info("Using %ps\n", panel->factory_info);
 
-	omap_vram_set_sdram_vram(TUNA_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&tuna_fb_pdata);
 	tuna_hdmi_mux_init();
 	omap_display_init(&tuna_dss_data);
