@@ -1372,6 +1372,13 @@ static void __init tuna_map_io(void)
 static void __init tuna_reserve(void)
 {
 	omap_init_ram_size();
+	
+#ifdef CONFIG_ION_OMAP
+	tuna_android_display_setup(get_omap_ion_platform_data());
+	omap_ion_init();
+#else
+	tuna_android_display_setup(NULL);
+#endif
 
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 						OMAP_RAM_CONSOLE_SIZE_DEFAULT);
@@ -1385,12 +1392,6 @@ static void __init tuna_reserve(void)
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
 								PHYS_ADDR_DUCATI_SIZE + OMAP4_ION_HEAP_SECURE_INPUT_SIZE + OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
 
-#ifdef CONFIG_ION_OMAP
-	tuna_android_display_setup(get_omap_ion_platform_data());
-	omap_ion_init();
-#else
-	tuna_android_display_setup(NULL);
-#endif
 	omap_reserve();
 }
 
