@@ -1385,12 +1385,6 @@ static void __init tuna_reserve(void)
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
 								PHYS_ADDR_DUCATI_SIZE + OMAP4_ION_HEAP_SECURE_INPUT_SIZE + OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
 
-#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
-	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
-	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM,
-								PHYS_ADDR_TESLA_SIZE);
-#endif
-
 #ifdef CONFIG_ION_OMAP
 	tuna_android_display_setup(get_omap_ion_platform_data());
 	omap_ion_init();
