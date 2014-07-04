@@ -88,6 +88,8 @@
 #define PRESSURE_MIN		95000
 #define PRESSURE_FUZZ		5
 #define PRESSURE_FLAT		5
+#define TEMP_MAX			900
+#define TEMP_MIN			-900
 
 struct bmp180_eeprom_data {
 	s16 AC1, AC2, AC3;
@@ -231,6 +233,7 @@ static void bmp180_get_pressure_data(struct work_struct *work)
 	unsigned long b4, b7;
 	long p;
 	int pressure;
+	int temperature;
 
 	struct bmp180_data *barom =
 	    container_of(work, struct bmp180_data, work_pressure);
@@ -250,7 +253,7 @@ static void bmp180_get_pressure_data(struct work_struct *work)
 	x2 = (barom->bmp180_eeprom_vals.MC << 11) /
 	    (x1 + barom->bmp180_eeprom_vals.MD);
 	b5 = x1 + x2;
-
+	temperature = (x1+x2+8) >> 4;
 	b6 = (b5 - 4000);
 	x1 = (barom->bmp180_eeprom_vals.B2 * ((b6 * b6) >> 12)) >> 11;
 	x2 = (barom->bmp180_eeprom_vals.AC2 * b6) >> 11;
@@ -277,6 +280,7 @@ static void bmp180_get_pressure_data(struct work_struct *work)
 		__func__, pressure);
 
 	input_report_abs(barom->input_dev, ABS_PRESSURE, pressure);
+	input_report_abs(barom->input_dev, ABS_MISC, temperature);
 	input_sync(barom->input_dev);
 
 	return;
@@ -301,6 +305,9 @@ static int bmp180_input_init(struct bmp180_data *barom)
 				PRESSURE_MIN, PRESSURE_MAX,
 				PRESSURE_FUZZ, PRESSURE_FLAT);
 
+	input_set_capability(barom->input_dev, EV_ABS, ABS_MISC);
+	input_set_abs_params(barom->input_dev, ABS_MISC,
+				TEMP_MIN, TEMP_MAX, 0, 0);
 	pr_debug("%s: registering barometer input device\n", __func__);
 
 	err = input_register_device(barom->input_dev);
