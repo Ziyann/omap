@@ -48,30 +48,22 @@ static DEFINE_SPINLOCK(rprocs_lock);
 /* debugfs parent dir */
 static struct dentry *rproc_dbg;
 
-static ssize_t rproc_format_trace_buf(struct rproc *rproc, char __user *userbuf,
-					size_t count, loff_t *ppos,
-					const void *src, int size)
+static ssize_t rproc_format_trace_buf(char __user *userbuf, size_t count,
+				    loff_t *ppos, const void *src, int size)
 {
 	const char *buf = (const char *) src;
 	ssize_t num_copied = 0;
 	static int from_beg;
 	loff_t pos = *ppos;
 	int *w_idx;
-	int i, w_pos, ret = 0;
-
-	if (mutex_lock_interruptible(&rproc->tlock))
-		return -EINTR;
+	int i, w_pos;
 
 	/* When src is NULL, the remoteproc is offline. */
-	if (!src) {
-		ret = -EIO;
-		goto unlock;
-	}
+	if (!src)
+		return -EIO;
 
-	if (size < 2 * sizeof(u32)) {
-		ret = -EINVAL;
-		goto unlock;
-	}
+	if (size < 2 * sizeof(u32))
+		return -EINVAL;
 
 	/* Assume write_idx is the penultimate byte in the buffer trace*/
 	size = size - (sizeof(u32) * 2);
@@ -84,8 +76,7 @@ static ssize_t rproc_format_trace_buf(struct rproc *rproc, char __user *userbuf,
 	if (pos == 0)
 		*ppos = w_pos;
 
-	for (i = w_pos; i < size && buf[i]; i++)
-		;
+	for (i = w_pos; i < size && buf[i]; i++);
 
 	if (i > w_pos)
 		num_copied = simple_read_from_buffer(userbuf, count,
@@ -93,24 +84,19 @@ static ssize_t rproc_format_trace_buf(struct rproc *rproc, char __user *userbuf,
 		if (!num_copied) {
 			from_beg = 1;
 			*ppos = 0;
-		} else {
-			ret = num_copied;
-			goto unlock;
-		}
+		} else
+			return num_copied;
 print_beg:
-	for (i = 0; i < w_pos && buf[i]; i++)
-		;
+	for (i = 0; i < w_pos && buf[i]; i++);
 
 	if (i) {
 		num_copied = simple_read_from_buffer(userbuf, count,
 							ppos, src, i);
 		if (!num_copied)
 			from_beg = 0;
-		ret = num_copied;
+		return num_copied;
 	}
-unlock:
-	mutex_unlock(&rproc->tlock);
-	return ret;
+	return 0;
 }
 
 static ssize_t rproc_name_read(struct file *filp, char __user *userbuf,
@@ -147,12 +133,12 @@ static int rproc_open_generic(struct inode *inode, struct file *file)
 	return 0;
 }
 
-#define DEBUGFS_READONLY_FILE(name, v, l)				\
+#define DEBUGFS_READONLY_FILE(name, value, len)				\
 static ssize_t name## _rproc_read(struct file *filp,			\
-		char __user *ubuf, size_t count, loff_t *ppos)		\
+		char __user *userbuf, size_t count, loff_t *ppos)	\
 {									\
 	struct rproc *rproc = filp->private_data;			\
-	return rproc_format_trace_buf(rproc, ubuf, count, ppos, v, l);	\
+	return rproc_format_trace_buf(userbuf, count, ppos, value, len);\
 }									\
 									\
 static const struct file_operations name ##_rproc_ops = {		\
@@ -948,14 +934,10 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	 * trace buffer memory _is_ normal memory, so we cast away the
 	 * __iomem to make sparse happy
 	 */
-
-	if (mutex_lock_interruptible(&rproc->tlock))
-		goto error;
-
 	if (trace_da0) {
 		ret = rproc_da_to_pa(rproc, trace_da0, &pa);
 		if (ret)
-			goto unlock;
+			goto error;
 		rproc->trace_buf0 = (__force void *)
 				ioremap_nocache(pa, rproc->trace_len0);
 		if (rproc->trace_buf0) {
@@ -966,20 +948,20 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 							GFP_KERNEL);
 				if (!rproc->last_trace_buf0) {
 					ret = -ENOMEM;
-					goto unlock;
+					goto error;
 				}
 				DEBUGFS_ADD(trace0_last);
 			}
 		} else {
 			dev_err(dev, "can't ioremap trace buffer0\n");
 			ret = -EIO;
-			goto unlock;
+			goto error;
 		}
 	}
 	if (trace_da1) {
 		ret = rproc_da_to_pa(rproc, trace_da1, &pa);
 		if (ret)
-			goto unlock;
+			goto error;
 		rproc->trace_buf1 = (__force void *)
 				ioremap_nocache(pa, rproc->trace_len1);
 		if (rproc->trace_buf1) {
@@ -990,14 +972,13 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 							GFP_KERNEL);
 				if (!rproc->last_trace_buf1) {
 					ret = -ENOMEM;
-					goto unlock;
+					goto error;
 				}
 				DEBUGFS_ADD(trace1_last);
 			}
 		} else {
 			dev_err(dev, "can't ioremap trace buffer1\n");
 			ret = -EIO;
-			goto unlock;
 		}
 	}
 
@@ -1011,7 +992,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	if (cdump_da0) {
 		ret = rproc_da_to_pa(rproc, cdump_da0, &pa);
 		if (ret)
-			goto unlock;
+			goto error;
 		rproc->cdump_buf0 = (__force void *)
 					ioremap_nocache(pa, rproc->cdump_len0);
 		if (rproc->cdump_buf0)
@@ -1019,13 +1000,13 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 		else {
 			dev_err(dev, "can't ioremap cdump buffer0\n");
 			ret = -EIO;
-			goto unlock;
+			goto error;
 		}
 	}
 	if (cdump_da1) {
 		ret = rproc_da_to_pa(rproc, cdump_da1, &pa);
 		if (ret)
-			goto unlock;
+			goto error;
 		rproc->cdump_buf1 = (__force void *)
 					ioremap_nocache(pa, rproc->cdump_len1);
 		if (rproc->cdump_buf1)
@@ -1033,14 +1014,12 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 		else {
 			dev_err(dev, "can't ioremap cdump buffer1\n");
 			ret = -EIO;
+			goto error;
 		}
 	}
 	/* post-process pm data types */
 	if (susp_addr)
 		ret = rproc->ops->pm_init(rproc, susp_addr);
-
-unlock:
-	mutex_unlock(&rproc->tlock);
 
 error:
 	if (ret && rproc->dbg_dir) {
@@ -1398,9 +1377,6 @@ void rproc_put(struct rproc *rproc)
 	if (--rproc->count)
 		goto out;
 
-	if (mutex_lock_interruptible(&rproc->tlock))
-		goto out;
-
 	if (rproc->trace_buf0)
 		/* iounmap normal memory, so make sparse happy */
 		iounmap((__force void __iomem *) rproc->trace_buf0);
@@ -1416,8 +1392,6 @@ void rproc_put(struct rproc *rproc)
 		/* iounmap normal memory, so make sparse happy */
 		iounmap((__force void __iomem *) rproc->cdump_buf1);
 	rproc->cdump_buf0 = rproc->cdump_buf1 = NULL;
-
-	mutex_unlock(&rproc->tlock);
 
 	rproc_reset_poolmem(rproc);
 	memset(rproc->memory_maps, 0, sizeof(rproc->memory_maps));
@@ -1768,7 +1742,6 @@ int rproc_register(struct device *dev, const char *name,
 #endif
 	mutex_init(&rproc->lock);
 	mutex_init(&rproc->secure_lock);
-	mutex_init(&rproc->tlock);
 	INIT_WORK(&rproc->error_work, rproc_error_work);
 	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->nbh);
 
