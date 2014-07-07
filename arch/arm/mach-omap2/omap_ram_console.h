@@ -18,7 +18,11 @@
 #define __OMAP_RAM_CONSOLE_H
 
 /* Board files use the following if they are ok with the defaults */
+#ifdef CONFIG_MACH_TUNA
+#define OMAP_RAM_CONSOLE_START_DEFAULT	(PLAT_PHYS_OFFSET + SZ_512M)
+#else
 #define OMAP_RAM_CONSOLE_START_DEFAULT	(PLAT_PHYS_OFFSET + SZ_256M)
+#endif
 #define OMAP_RAM_CONSOLE_SIZE_DEFAULT	SZ_2M
 
 #ifdef CONFIG_OMAP_RAM_CONSOLE
