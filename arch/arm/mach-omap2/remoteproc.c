@@ -145,7 +145,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.idle_mask	= OMAP4430_STBYST_MASK,
 #ifdef CONFIG_MACH_TUNA
 		/*Susepdn address = IPU_MEM_IPC_DATA + Offset f02d8*/
-		.suspend_addr	= 0xb8bf02d8,
+		.suspend_addr	= 0xb3bf02d8,
 #endif
 		.suspend_mask	= ~0,
 		.sus_timeout	= 5000,
