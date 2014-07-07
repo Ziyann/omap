@@ -127,6 +127,16 @@ config MACH_TUNA
 	select OMAP_TPS6236X
 	select OMAP_RAM_CONSOLE
 
+config FORCE_SILICON_PERFORMANCE
+	bool "Force SILICON_TYPE_PERFORMANCE higher CPU Ghz settings"
+	depends on MACH_OMAP4_BOWSER
+	default N
+	help
+	  Enables the SILICON_TYPE_PERFORMANCE flag for CPU settings.
+	  This puts the OMAP4430's max at 1.2Ghz.
+	  This puts the OMAP4460's max at 1.5Ghz.
+	  This puts the OMAP4470's max at 1.7Ghz (WIP).
+
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
 	depends on ARCH_OMAP3

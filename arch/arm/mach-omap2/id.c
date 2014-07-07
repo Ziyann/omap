@@ -236,6 +236,10 @@ static void __init omap4_check_features(void)
 	si_type =
 	  (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 3;
 
+#ifdef CONFIG_FORCE_SILICON_PERFORMANCE
+	si_type = OMAP4_SILICON_TYPE_PERFORMANCE;
+#endif
+
 	switch (si_type) {
 	case OMAP4_SILICON_TYPE_PERFORMANCE:
 		/* High performance device */
