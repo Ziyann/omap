@@ -526,6 +526,46 @@ config USE_AMAZON_DUCATI
         bool "Ducati settings which are compatible with the stock binary from Amazon"
         depends on MACH_OMAP4_BOWSER
 
+config MACH_OMAP_BN
+	bool "OMAP4 B&N boards"
+	depends on ARCH_OMAP4
+
+config MACH_OMAP_ACCLAIM
+	bool "OMAP 4430 Acclaim Board"
+	default n
+	depends on MACH_OMAP_BN
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select KEYBOARD_GPIO
+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select HWMON
+	select OMAP_REBOOT_REASON
+	select WIRELESS_EXT
+
+config MACH_OMAP_OVATION
+	bool "OMAP 44xx Ovation Board"
+	default n
+	depends on MACH_OMAP_BN
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select LEDS_OMAP4430_SDP_DISPLAY
+	select LEDS_OMAP4430_SDP_KEYPAD
+	select KEYBOARD_GPIO
+	select HWMON
+	select OMAP_REBOOT_REASON
+
+config MACH_OMAP_HUMMINGBIRD
+	bool "OMAP 44xx Hummingbird Board"
+	default n
+	depends on MACH_OMAP_BN
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select LEDS_OMAP4430_SDP_DISPLAY
+	select LEDS_OMAP4430_SDP_KEYPAD
+	select KEYBOARD_GPIO
+	select HWMON
+	select OMAP_REBOOT_REASON
+
 config MACH_TUNA
 	bool "Tuna Board"
 	depends on ARCH_OMAP4
