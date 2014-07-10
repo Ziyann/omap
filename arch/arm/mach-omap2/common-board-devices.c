@@ -142,7 +142,7 @@ void __init omap_nand_flash_init(int options, struct mtd_partition *parts,
 
 #if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
 /*
- * SDRAM memory data
+ * SDRAM Elpida memory data
  */
 struct ddr_device_info lpddr2_elpida_2G_S4_x1_info = {
 	.type		= DDR_TYPE_LPDDR2_S4,
@@ -166,8 +166,31 @@ struct ddr_device_info lpddr2_elpida_2G_S4_x2_info = {
  * AC timings for Elpida LPDDR2-s4 2Gb memory device
  */
 struct lpddr2_timings lpddr2_elpida_2G_S4_timings[] = {
-	/* Speed bin 800(400 MHz) */
+	/* Speed bin 933(466 MHz) */
 	[0] = {
+		.max_freq	= 466666666,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 800(400 MHz) */
+	[1] = {
 		.max_freq	= 400000000,
 		.min_freq	= 10000000,
 		.tRPab		= 21000,
@@ -189,8 +212,37 @@ struct lpddr2_timings lpddr2_elpida_2G_S4_timings[] = {
 		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 6000,
 	},
+#ifdef CONFIG_MACH_OMAP_BN
+	/* Speed bin 666(333 MHz) */
+	[2] = {
+		.max_freq	= 333000000,
+#else
+	/* Speed bin 533(266 MHz) */
+	[2] = {
+		.max_freq	= 266666666,
+#endif
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
 	/* Speed bin 400(200 MHz) */
-	[1] = {
+	[3] = {
 		.max_freq	= 200000000,
 		.min_freq	= 10000000,
 		.tRPab		= 21000,
@@ -309,9 +361,15 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 6000,
 	},
+#ifdef CONFIG_MACH_OMAP_BN
+	/* Speed bin 666(333 MHz) */
+	[3] = {
+		.max_freq	= 333000000,
+#else
 	/* Speed bin 533(266 MHz) */
 	[3] = {
 		.max_freq	= 266666666,
+#endif
 		.min_freq	= 10000000,
 		.tRPab		= 21000,
 		.tRCD		= 18000,
@@ -381,7 +439,7 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 };
 
 /*
- * SDRAM memory data
+ * SDRAM Elpida memory data
  */
 struct ddr_device_info lpddr2_elpida_4G_S4_x2_info = {
 	.type		= DDR_TYPE_LPDDR2_S4,
@@ -400,4 +458,281 @@ struct ddr_device_info lpddr2_elpida_4G_S4_info = {
 	.cal_resistors_per_cs = false,
 	.manufacturer	= "Elpida"
 };
+
+
+
+/*
+ * AC timings for Samsung LPDDR2-s4 4Gb memory device
+ */
+struct lpddr2_min_tck lpddr2_samsung_S4_min_tck = {
+	.tRPab		= 3,
+	.tRCD		= 3,
+	.tWR		= 3,
+	.tRASmin	= 3,
+	.tRRD		= 2,
+	.tWTR		= 2,
+	.tXP		= 2,
+	.tRTP		= 2,
+	.tCKE		= 3,
+	.tCKESR		= 3,
+	.tFAW		= 8,
+};
+
+/*
+ * AC timings for Samsung LPDDR2-s4 4Gb memory device
+ */
+struct lpddr2_timings lpddr2_samsung_4G_S4_timings[] = {
+	/* Speed bin 933(466 MHz) */
+	[0] = {
+		.max_freq	= 466666666,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 800(400 MHz) */
+	[1] = {
+		.max_freq	= 400000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 666(333 MHz) */
+	[2] = {
+		.max_freq	= 333000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 400(200 MHz) */
+	[3] = {
+		.max_freq	= 200000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 10000,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	}
+};
+
+/*
+ * SDRAM Samsung memory data
+ */
+struct ddr_device_info lpddr2_samsung_4G_S4_x2_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= true,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Samsung"
+};
+
+struct ddr_device_info lpddr2_samsung_4G_S4_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= false,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Samsung"
+};
+
+
+
+/*
+ * AC timings for Hynix LPDDR2-s4 4Gb memory device
+ */
+struct lpddr2_min_tck lpddr2_hynix_S4_min_tck = {
+	.tRPab		= 3,
+	.tRCD		= 3,
+	.tWR		= 3,
+	.tRASmin	= 3,
+	.tRRD		= 2,
+	.tWTR		= 2,
+	.tXP		= 2,
+	.tRTP		= 2,
+	.tCKE		= 3,
+	.tCKESR		= 3,
+	.tFAW		= 8,
+};
+
+/*
+ * AC timings for Hynix LPDDR2-s4 4Gb memory device
+ */
+struct lpddr2_timings lpddr2_hynix_4G_S4_timings[] = {
+	/* Speed bin 933(466 MHz) */
+	[0] = {
+		.max_freq	= 466666666,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 800(400 MHz) */
+	[1] = {
+		.max_freq	= 400000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 666(333 MHz) */
+	[2] = {
+		.max_freq	= 333000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 400(200 MHz) */
+	[3] = {
+		.max_freq	= 200000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 10000,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
+		.tDQSCK_max_derated = 6000,
+	}
+};
+
+/*
+ * SDRAM Hynix memory data
+ */
+struct ddr_device_info lpddr2_hynix_4G_S4_x2_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= true,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Hynix"
+};
+
+struct ddr_device_info lpddr2_hynix_4G_S4_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= false,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Hynix"
+};
+
 #endif
