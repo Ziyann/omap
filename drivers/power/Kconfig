@@ -131,7 +131,6 @@ config CHARGER_BQ2415x
 
 config CHARGER_BQ2419x
 	tristate "BQ2419x charger"
-	default y
 	help
 	  Say Y to enable support for BQ24196 battery charger.
 
