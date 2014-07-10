@@ -17,6 +17,7 @@
  * 02111-1307, USA
  */
 
+#include <linux/module.h>
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
