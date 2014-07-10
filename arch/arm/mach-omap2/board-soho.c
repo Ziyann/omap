@@ -903,7 +903,9 @@ static void __init omap_soho_init(void)
 	usb_musb_init(&musb_board_data);
 
 	omap_init_dmm_tiler();
+#ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
+#endif
 
 	bowser_panel_init();
 	omap_enable_smartreflex_on_init();
@@ -918,8 +920,11 @@ static void __init omap_soho_reserve(void)
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
-	bowser_android_display_setup(NULL);
+
+	bowser_android_display_setup();
+#ifdef CONFIG_ION_OMAP
 	omap4_ion_init();
+#endif
 	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
