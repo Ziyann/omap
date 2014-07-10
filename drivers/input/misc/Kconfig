@@ -806,4 +806,11 @@ config INPUT_KXTF9
 	  This driver can also be built as a module.  If so, the module
 	  will be called kxtf9.
 
+config INPUT_TWL6040_HSKEYS
+	bool "TWL6040 HSKEYS Driver"
+	depends on TWL4030_CORE && TWL6030_GPADC && TWL6040_CODEC
+	default n
+	 help
+	 enable TWL6040 headset buttons driver
+
 endif
