@@ -301,7 +301,7 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 			u32 timings_arr_size,
 			struct lpddr2_min_tck *min_tck,
 			struct emif_custom_configs *custom_configs);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_BN)
 #define SAMSUNG_SDRAM		0x1
 #define ELPIDA_SDRAM		0x3
 #define HYNIX_SDRAM		0x6
