@@ -18,7 +18,7 @@
 #include <plat/omap_device.h>
 #include "common.h"
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_BN)
 #include <linux/io.h>
 
 #define OMAP44XX_EMIF1				0x4c000000
@@ -133,7 +133,7 @@ error:
 }
 subsys_initcall(init_emif_timings);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_BN)
 static int read_reg_data(int mrid)
 {
 	int val;
