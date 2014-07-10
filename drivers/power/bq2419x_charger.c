@@ -2172,9 +2172,9 @@ static int __devinit bq2419x_charger_probe(struct i2c_client *client,
 		bqRstREG(di);
 	}
 
-	di->otg = otg_get_transceiver();
+	di->otg = usb_get_phy(USB_PHY_TYPE_USB2);
 	if (di->otg) {
-		ret = otg_register_notifier(di->otg, &di->nb);
+		ret = usb_register_notifier(di->otg, &di->nb);
 		if (ret) {
 			dev_err(di->dev, "otg register notifier"
 						" failed %d\n", ret);
@@ -2224,17 +2224,17 @@ static int __devexit bq2419x_charger_remove(struct i2c_client *client)
 
 	sysfs_remove_group(&client->dev.kobj, &bq2419x_mfg_attr_group);
 	flush_scheduled_work();
-	otg_unregister_notifier(di->otg, &di->nb);
+	usb_unregister_notifier(di->otg, &di->nb);
 	kfree(di);
 
 	return 0;
 }
 
-static int bq2419x_charger_shutdown(struct i2c_client *client)
+static void bq2419x_charger_shutdown(struct i2c_client *client)
 {
 	struct bq2419x_device_info * const di = i2c_get_clientdata(client);
 	free_irq(OMAP_GPIO_IRQ(di->gpio_int),di->dev);
-	otg_unregister_notifier(di->otg, &di->nb);
+	usb_unregister_notifier(di->otg, &di->nb);
 	stopdmtimershutdown = true;
 	omap_dm_timer_stop(wdt_timer_ptr);
 	omap_dm_timer_disable(wdt_timer_ptr);
@@ -2244,7 +2244,6 @@ static int bq2419x_charger_shutdown(struct i2c_client *client)
 	cancel_work_sync(&di->wdt_work);
 	bqRstREG(di);
 	dev_dbg(di->dev, "%s \n", __func__);
-	return 0;
 }
 
 static int bq2419x_charger_suspend(struct device *dev)
