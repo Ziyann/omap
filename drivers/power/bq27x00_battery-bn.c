@@ -36,7 +36,7 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 #include <linux/usb/otg.h>
-#include <linux/power/bq27x00_battery.h>
+#include <linux/power/bq27x00_battery-bn.h>
 
 #include <mach/gpio.h>
 #include <linux/interrupt.h>
@@ -118,9 +118,9 @@ struct bq27x00_device_info {
 	struct power_supply bat;
 	struct bq27x00_access_methods bus;
 	struct mutex lock;
-	struct otg_transceiver	*otg;
+	struct usb_phy	*otg;
 	struct notifier_block	nb;
-	enum usb_xceiv_events current_usb_event;
+	enum usb_phy_events current_usb_event;
 
 	/* Cached property registers - snatched upon device probe */
 	int sys_device_type;
@@ -705,6 +705,7 @@ int bq27x00_read_voltage_mv(void)
 {
 	union power_supply_propval val;
 
+	val.intval = 0;
 	bq27x00_battery_voltage(bq27x00_di, &val, false);
 	return val.intval;
 }
@@ -1204,9 +1205,9 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, di);
 
 	di->nb.notifier_call = usb_xceiv_events_callback;
-	di->otg = otg_get_transceiver();
+	di->otg = usb_get_phy(USB_PHY_TYPE_USB2);
 	if (di->otg) {
-		retval = otg_register_notifier(di->otg, &di->nb);
+		retval = usb_register_notifier(di->otg, &di->nb);
 		if (retval) {
 			dev_err(di->dev, "otg register notifier"
 						" failed %d\n", retval);
