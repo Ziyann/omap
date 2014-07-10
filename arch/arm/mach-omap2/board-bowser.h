@@ -31,6 +31,6 @@ extern struct mmc_platform_data bowser_wifi_data;
 extern int bowser_wifi_init(void);
 
 struct omap_ion_platform_data;
-void bowser_android_display_setup(struct omap_ion_platform_data *ion);
+void bowser_android_display_setup(void);
 
 #endif

@@ -787,7 +787,7 @@ static void bowser_backlight_init(void)
 }
 #endif  /*CONFIG_BACKLIGHT_LP855X*/
 
-void __init bowser_android_display_setup(struct omap_ion_platform_data *ion)
+void __init bowser_android_display_setup(void)
 {
 	omap_android_display_setup(&bowser_dss_data,
 				   &dsscomp_config_bowser,

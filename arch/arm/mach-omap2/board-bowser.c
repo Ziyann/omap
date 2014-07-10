@@ -520,8 +520,10 @@ static void __init omap_bowser_init(void)
 	usb_musb_init(&musb_board_data);
 
 	omap_init_dmm_tiler();
-	bowser_android_display_setup(NULL);
+	bowser_android_display_setup();
+#ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
+#endif
 
 	bowser_panel_init();
 
