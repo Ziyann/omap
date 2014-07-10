@@ -465,20 +465,19 @@ bool dispc_mgr_go_busy(enum omap_channel channel)
 		return REG_GET(DISPC_CONTROL, bit, bit) == 1;
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-void dispc_set_dithering(enum omap_channel channel)
+void dispc_set_dithering(enum omap_channel channel, bool enable)
 {
-	int temp;
-
-	if (channel == OMAP_DSS_CHANNEL_LCD)
+	if (channel == OMAP_DSS_CHANNEL_LCD2) {
+		REG_FLD_MOD(DISPC_CONTROL2, enable ? 1 : 0, 7, 7);
+	}
+	else
 	{
-		temp = 2;
-		REG_FLD_MOD(DISPC_CONTROL, temp, 31, 30);
-		temp = 1;
-		REG_FLD_MOD(DISPC_CONTROL, temp, 7, 7);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		REG_FLD_MOD(DISPC_CONTROL, 2, 31, 30);
+#endif
+		REG_FLD_MOD(DISPC_CONTROL, enable ? 1 : 0, 7, 7);
 	}
 }
-#endif
 
 void dispc_mgr_go(enum omap_channel channel)
 {
