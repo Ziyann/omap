@@ -796,4 +796,14 @@ config INPUT_PIC12LF1822_PROXIMITY
         Say Y here if you want to use proximity sensor pic12lf1822_proximity.
         through I2C interface.
 
+config INPUT_KXTF9
+	tristate "Kionix KXTF9 tri-axis digital accelerometer"
+	depends on I2C && SYSFS
+	default y
+	  help
+	  if you say yes here you get support for the Kionix KXTF9 digital tri axis- accelerometer.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called kxtf9.
+
 endif
