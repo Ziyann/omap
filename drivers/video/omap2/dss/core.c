@@ -131,7 +131,6 @@ void dss_dsi_disable_pads(int dsi_id, unsigned lane_mask)
 	return board_data->dsi_disable_pads(dsi_id, lane_mask);
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 int dss_set_dispc_clk(unsigned long freq)
 {
 	struct clk *clk;
@@ -150,7 +149,6 @@ int dss_set_dispc_clk(unsigned long freq)
 	}
 	return 0;
 }
-#endif
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 static int dss_debug_show(struct seq_file *s, void *unused)
