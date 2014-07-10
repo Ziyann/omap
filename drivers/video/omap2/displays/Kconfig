@@ -127,4 +127,36 @@ config PANEL_LP_101
         depends on OMAP2_DSS_DPI
         help
           LCD Panel used in TI's OMAP5 uevm board attachable on LCD2 interface
+
+config PANEL_BOXER
+        tristate "Boxer DLP Panel"
+        depends on OMAP2_DSS
+        help
+          LCD Panel used in BN Acclaim
+
+config PANEL_AUO
+	tristate "AUO DLP Panel"
+	depends on OMAP2_DSS
+	help
+	  LCD Panel used in BN Ovation
+
+config PANEL_HYDIS
+	tristate "Hydis HV080X01-100 panel"
+	depends on OMAP2_DSS
+        select BACKLIGHT_CLASS_DEVICE
+	help
+	  Hydis panel HV080X01-100
+
+config PANEL_ORISE
+	tristate "Orise based TCON display panel"
+	depends on OMAP2_DSS
+	help
+	  Say yes here if you have an Orise TCON based panel.
+
+config PANEL_NOVATEK
+	tristate "Novatek based TCON display panel"
+	depends on OMAP2_DSS
+	help
+	  Say yes here if you have a Novatek TCON based panel.
+
 endmenu

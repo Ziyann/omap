@@ -16,3 +16,9 @@ obj-$(CONFIG_PANEL_TC358765) += panel-tc358765.o
 obj-$(CONFIG_PANEL_OTTER1) += panel-otter1.o
 obj-$(CONFIG_PANEL_NT71391_HYDIS) += panel-nt71391.o
 obj-$(CONFIG_PANEL_NT51012_LG) += panel-nt51012.o
+
+obj-$(CONFIG_PANEL_BOXER) += panel-boxer.o
+obj-$(CONFIG_PANEL_AUO) += panel-auo.o
+obj-$(CONFIG_PANEL_HYDIS) += panel-hydis.o
+obj-$(CONFIG_PANEL_NOVATEK) += panel-novatek.o
+obj-$(CONFIG_PANEL_ORISE) += panel-orise.o
