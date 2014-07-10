@@ -27,6 +27,7 @@
 #define PRINTK_COLORS
 #define CONFIG_TOUCHSCREEN_FT5x06_TEST
 
+#include <linux/module.h>
 #include <linux/kobject.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -326,8 +327,6 @@ static void ft5x06_late_resume(struct early_suspend *handler);
 #if defined(CONFIG_DEBUG_FS)
 static int ftx_dbgfs_open(struct inode *inode, struct file *file);
 static int ftx_dbgfs_release(struct inode *inode, struct file *file);
-static ssize_t ftx_dbgfs_object_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
-static ssize_t ftx_dbgfs_object_read(struct file *file, char __user *buf, size_t count, loff_t *offset);
 static int ftx_dbgfs_create(struct ft5x06 *ts);
 static int ftx_dbgfs_destroy(struct ft5x06 *ts);
 #endif /* defined(CONFIG_DEBUG_FS) */
@@ -336,7 +335,10 @@ static int ft5x0x_i2c_Read(struct i2c_client *client, char *writebuf, int writel
 static int ft5x06_read_rawdata(struct i2c_client *client, int data[][FT5x06_NUM_RX]);
 
 static int readCfg(char *filepath, int *pNum, int *pDelta);
-static int writebuftofile(char * filepath, char *buf);
+
+static int ft5x06_module_init(void);
+static void ft5x06_module_remove(void);
+
 /*****************************************************************************
  * Global Variables
  ****************************************************************************/
@@ -539,13 +541,11 @@ error_return:
 static ssize_t ftx_dbgfs_write_raw_data_params(struct ft5x06 *ts, struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	char *write_buf;
-	u16 *tmp_raw_data;
 	struct ftx_dbgfs_entry *tmp_dbgfs_entry = file->private_data;
 	int tmp_tx_start, tmp_rx_start, tmp_tx_end, tmp_rx_end;
 	int tmp_raw_data_offset;
 	int retval;
 	int buf_pos, buf_offset;
-	int max_data_points;
 
 	write_buf = kzalloc(count, GFP_KERNEL);
 	if(write_buf == NULL)
@@ -631,7 +631,6 @@ static ssize_t ftx_dbgfs_write_raw_data_params(struct ft5x06 *ts, struct file *f
 		goto err_bad_format;
 	}
 
-err_alloc_raw_data_buf:
 err_bad_format:
 err_copy_from_user:
 	kfree(write_buf);
@@ -670,7 +669,6 @@ static ssize_t ftx_dbgfs_read_raw_data_params(struct ft5x06 *ts, struct file *fi
 err_copy_to_user:
 	kfree(usr_buf);
 err_alloc_usr_buf:
-err_return:
 	return chars_read;
 }
 
@@ -824,7 +822,6 @@ static struct file_operations ftx_dbg_file_ops = {
 	.open    = ftx_dbgfs_open,
 	.read    = ftx_dbgfs_read,
 	.write   = ftx_dbgfs_write,
-//	.llseek  = ftx_dbgfs_lseek,
 	.release = ftx_dbgfs_release
 };
 
@@ -859,8 +856,6 @@ static int ftx_dbgfs_create(struct ft5x06 *ts)
 	ret = 0;
 	goto err_create_root;
 
-//err_create_files:
-//	debugfs_remove(ts->dbgfs_root);
 err_create_root:
 	return ret;
 }
@@ -1456,7 +1451,7 @@ static void ft5x06_process_touch(struct work_struct *work)
 				{
 					pending_gesture_none = 1;
 					ts->gesture_in_progress = 0;
-					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: no gesture triggered with %d events....ignoring\n", dev_name(&(ts->client->dev)), __func__, cur_tch->n_fingers);
+					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: no gesture triggered with %lu events....ignoring\n", dev_name(&(ts->client->dev)), __func__, cur_tch->n_fingers);
 				}
 				else
 				{
@@ -1469,7 +1464,7 @@ static void ft5x06_process_touch(struct work_struct *work)
 						 */
 						DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT1X event: hat1x=%u\n", dev_name(&(ts->client->dev)), __func__, gest_id);
 						input_report_abs(ts->input, ABS_HAT1X, gest_id);
-						DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2X event: hat2x=%lu\n", dev_name(&(ts->client->dev)), __func__, finger_num);
+						DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2X event: hat2x=%d\n", dev_name(&(ts->client->dev)), __func__, finger_num);
 						input_report_abs(ts->input, ABS_HAT2X, finger_num);
 						DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2Y event: hat2y=%u\n", dev_name(&(ts->client->dev)), __func__, ts->gest_count);
 						input_report_abs(ts->input, ABS_HAT2Y, ts->gest_count);
@@ -1489,7 +1484,7 @@ static void ft5x06_process_touch(struct work_struct *work)
 					// zero if there's no actual gesture code.
 					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT1X event: hat1x=%u\n", dev_name(&(ts->client->dev)), __func__, gest_id);
 					input_report_abs(ts->input, ABS_HAT1X, gest_id);
-					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2X event: hat2x=%lu\n", dev_name(&(ts->client->dev)), __func__, finger_num);
+					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2X event: hat2x=%d\n", dev_name(&(ts->client->dev)), __func__, finger_num);
 					input_report_abs(ts->input, ABS_HAT2X, finger_num);
 					DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reporting HAT2Y event: hat2y=%u\n", dev_name(&(ts->client->dev)), __func__, ts->gest_count);
 					input_report_abs(ts->input, ABS_HAT2Y, ts->gest_count);
@@ -1519,7 +1514,6 @@ static void ft5x06_process_touch(struct work_struct *work)
 		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not read  n_touches from the Touch Panel registers.\n", dev_name(&(ts->client->dev)), __func__);
 	}
 
-//err_cleanup:
 	mutex_unlock(&ts->lock_fingers);
 
 	return;
@@ -2484,12 +2478,10 @@ static int ft5606_read_rx_offset(struct i2c_client *client, u8 offset[], int rx)
 	int err = 0;
 	u8 testmode = 0x00;
 	u8 regaddr = 0x00;
-//	u8 writebuf[2] = {0};
 	u8 read_buffer[FT5x06_CALIBRATION_NUM_BYTES];
 
 	/*get rx offset*/
 	/* Read the data*/
-	//for (j = 0; j < (rx/FT5606_TEST_MODE_RX + 1); j++) {
 	for (j = 0; j < rx; j++) {
 		if (j >= FT5606_TEST_MODE_RX) {
 			if (j >= FT5606_TEST_MODE_RX*2)
@@ -2587,7 +2579,6 @@ static ssize_t ft5x06_calibrate_show2(struct device *dev, struct device_attribut
 	int     i       = 0;
 	int     retval  = 0;
 	u8      regval  = 0x00;
-	u8      devmode = 0x00;
 	u8  calibration_data[FT5x06_CALIBRATION_NUM_BYTES];
 
 	mutex_lock(&ts->device_mode_mutex);
@@ -2716,110 +2707,6 @@ error_restore_mode:
 	mutex_unlock(&ts->device_mode_mutex);
 	return num_read_chars;
 }
-static ssize_t ft5x06_calibrate_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-	struct ft5x06     *ts     = (struct ft5x06 *)i2c_get_clientdata(client);
-	ssize_t num_read_chars = 0;
-	int     i       = 0;
-	int     retval  = 0;
-	u8      regval  = 0x00;
-	u8      devmode = 0x00;
-	u8  calibration_data[FT5x06_CALIBRATION_NUM_BYTES];
-
-	mutex_lock(&ts->device_mode_mutex);
-
-	retval = ft5x06_enter_factory_mode(ts);
-	if (0 != retval)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not put the touch panel in factory mode.\n", dev_name(dev), __func__);
-		goto error_restore_mode;
-	}
-
-	DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Configuring the CALIBRATE register.\n", dev_name(dev), __func__);
-
-	regval = FT5x06_CALIBRATE_START;
-	retval = i2c_smbus_write_i2c_block_data(ts->client, FT5x06_FMREG_CALIBRATE, sizeof(u8), &regval);
-	if (0 != retval)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not write to the CALIBRATE register.\n", dev_name(dev), __func__);
-		goto error_restore_mode;
-	}
-
-	msleep(1000);
-
-	/* Wait for finish and back to working mode */
-	for (i = 0; i < 100; i++) {
-		msleep(10);
-		/* Configuring the Calibration register should put us back in Working Mode. */
-		retval = i2c_smbus_read_i2c_block_data(ts->client, FT5x06_WMREG_DEVICE_MODE, sizeof(u8), &devmode);
-		if (0 > retval)
-		{
-			DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not read from the DEVICE MODE register.\n", dev_name(dev), __func__);
-			goto error_restore_mode;
-		}
-		printk("i=%d devmode=0x%x\n", i, devmode);
-		if (FT5x06_MODE_WORKING == devmode)
-		{
-			break;
-		}
-	}
-
-	/* Go back to Factory Mode, but don't call ft5x06_enter_factory_mode()
-	 * since that function will disable the IRQ a second time without
-	 * re-enabling the IRQ first.
-	 */
-	DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Putting the touch panel in factory mode.\n", dev_name(dev), __func__);
-
-	regval = FT5x06_MODE_FACTORY;
-	retval = i2c_smbus_write_i2c_block_data(ts->client, FT5x06_WMREG_DEVICE_MODE, sizeof(u8), &regval);
-	if (0 != retval)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not write to the DEVICE MODE register.\n", dev_name(dev), __func__);
-		goto error_restore_mode;
-	}
-
-	msleep(100);
-
-	DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Verifying that the touch panel is in factory mode.\n", dev_name(dev), __func__);
-	retval = i2c_smbus_read_i2c_block_data(ts->client, FT5x06_FMREG_DEVICE_MODE, sizeof(u8), &regval);
-	if (0 > retval)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not read from the DEVICE MODE register.\n", dev_name(dev), __func__);
-		goto error_restore_mode;
-	}
-
-
-	if ((regval & FT5x06_MODE_MASK) != FT5x06_MODE_FACTORY)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: The DEVICE MODE register contains 0x%02x (expected 0x%02x).\n", dev_name(dev), __func__, regval, FT5x06_MODE_FACTORY);
-		retval = FT5x06_ERR_NOT_FACTORY_MODE;
-		goto error_restore_mode;
-	}
-
-	DBG_PRINT(dbg_level_verbose, "%s: " FTX_TAG ": %s(): VERBOSE: Reading calibration data...\n", dev_name(dev), __func__);
-	retval = ft5606_read_rx_offset(client, calibration_data, FT5x06_CALIBRATION_NUM_BYTES);
-
-	msleep(100);
-
-	/* Each calibration byte holds two offsets that can each be up to 2 chars long. Add two spaces and we need 6 chars to store it. */
-	for (i = 0; ((i < FT5x06_CALIBRATION_NUM_BYTES) && ((num_read_chars + 6) < PAGE_SIZE)); i++)
-	{
-		num_read_chars += sprintf(&(buf[num_read_chars]), "%u ", calibration_data[i]);
-	}
-
-	buf[num_read_chars-1] = '\n';
-
-error_restore_mode:
-	retval = ft5x06_exit_factory_mode(ts);
-	if (0 != retval)
-	{
-		DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not return the touch panel to working mode.\n", dev_name(dev), __func__);
-	}
-
-	mutex_unlock(&ts->device_mode_mutex);
-	return num_read_chars;
-}
 
 
 static ssize_t ft5x06_voltage_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -2918,7 +2805,7 @@ static ssize_t ft5x06_interrupttest_show(struct device *dev, struct device_attri
 {
 	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
 	struct ft5x06     *ts     = (struct ft5x06 *)i2c_get_clientdata(client);
-	const int gpio_num = irq_to_gpio(ts->client->irq);
+	const int gpio_num = OMAP_IRQ_TO_GPIO(ts->client->irq);
 	int test_result = 0;
 	int retval   = 0;
 	u8  regval   = 0x00;
@@ -3496,7 +3383,7 @@ int N = 4;
 double c = 0.5;
 double G = 0.8;
 
-// short/open 
+// short/open
 int threshold_mean_Rx = 275;
 int threshold_very_small = 50;
 int threshold_small = 275;
@@ -3637,11 +3524,7 @@ static int readCfg(char *filepath, int *pNum, int *pDelta) {
 	int i;
 	off_t fsize;
 	char databuf[MAX_READ_DATA];
-	//int baseline[FT5x06_NUM_TX][FT5x06_NUM_RX];
-	char tmpbuf;
 	loff_t pos;
-	//int filelen = 0;
-	int index=0;int tx=0;int rx=0;
 	mm_segment_t old_fs;
 
 	if(NULL == pfile){
@@ -3666,7 +3549,7 @@ static int readCfg(char *filepath, int *pNum, int *pDelta) {
 	if (i <= 0) printk("sscanf fail!\n");
 
 	printk("maxnum=%d  maxdelta=%d \n", *pNum, *pDelta);
-	
+
 	printk(KERN_DEBUG"close file and resume the fs\n");
 	filp_close(pfile, NULL);
 	set_fs(old_fs);
@@ -3681,12 +3564,13 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 	int i;
 	off_t fsize;
 	char databuf[MAX_READ_DATA];
-	//int baseline[FT5x06_NUM_TX][FT5x06_NUM_RX];
 	char tmpbuf;
 	loff_t pos;
-	//int filelen = 0;
-	int index=0;int tx=0;int rx=0;
+	int index=0;
+	int tx=0;
+	int rx=0;
 	mm_segment_t old_fs;
+	char * buf;
 
 	if(NULL == pfile){
 		pfile = filp_open(filepath, O_RDONLY, 0);
@@ -3698,7 +3582,6 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 	inode=pfile->f_dentry->d_inode;
 	magic=inode->i_sb->s_magic;
 	fsize=inode->i_size;
-	char * buf;
 	buf=(char *) kmalloc(fsize+1,GFP_ATOMIC);
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -3706,14 +3589,12 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 
 	memset(databuf, 0, sizeof(databuf));
 	vfs_read(pfile, buf, fsize, &pos);
-	//printk("read data from file size = %d\n", fsize);
 	for(i=0; i<fsize; i++){
 		tmpbuf = buf[i];
 		if(tmpbuf == ' '){
 			if(strlen(databuf)==0)
 				continue;
-			strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
-			//printk("%03d ", data[tx][rx]);
+			index =strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
 			index = 0;
 			rx++;
 			memset(databuf, 0, sizeof(databuf));
@@ -3721,9 +3602,7 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 		else if(tmpbuf == '\n'){
 			if(strlen(databuf)==0)
 				continue;
-			strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
-			//printk("%03d ", data[tx][rx]);
-			//printk("\n");
+			index = strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
 			rx = 0;
 			tx++;
 			index = 0;
@@ -3732,9 +3611,7 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 		else if(tmpbuf == '\r'){
 			if(strlen(databuf)==0)
 				continue;
-			strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
-			//printk("%03d ", data[tx][rx]);
-			//printk("\n");
+			index = strict_strtoul(databuf, 10, (unsigned long *)&data[tx][rx]);
 			rx = 0;
 			tx++;
 			index = 0;
@@ -3747,7 +3624,6 @@ static int readTXRXdatafromfile(char * filepath, int data[][FT5x06_NUM_RX])
 			}
 		}
 	kfree(buf);
-	//printk("close file and resume the fs\n");
 	filp_close(pfile, NULL);
 	set_fs(old_fs);
 	return 0;
@@ -3761,12 +3637,9 @@ static int writeTXRXdatatofile(char * filepath, int data[][FT5x06_NUM_RX])
 	int i, j;
 	off_t fsize;
 	char databuf[MAX_READ_DATA];
-	//int baseline[FT5x06_NUM_TX][FT5x06_NUM_RX];
-	char tmpbuf;
 	loff_t pos;
-	//int filelen = 0;
-	int index=0;int tx=0;int rx=0;
 	mm_segment_t old_fs;
+	char * buf;
 
 	printk("%s %s\n", __FUNCTION__, filepath);
 
@@ -3780,7 +3653,6 @@ static int writeTXRXdatatofile(char * filepath, int data[][FT5x06_NUM_RX])
 	inode=pfile->f_dentry->d_inode;
 	magic=inode->i_sb->s_magic;
 	fsize=inode->i_size;
-	char * buf;
 	buf=(char *) kmalloc(fsize+1,GFP_ATOMIC);
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -3788,61 +3660,18 @@ static int writeTXRXdatatofile(char * filepath, int data[][FT5x06_NUM_RX])
 
 	for (i = 0; i < FT5x06_NUM_TX; i++) {
 		for (j = 0; j < FT5x06_NUM_RX; j++) {
-			memset(databuf, 0, sizeof(databuf));			
+			memset(databuf, 0, sizeof(databuf));
 			snprintf(databuf, sizeof(databuf),  "%d ", data[i][j]);
-			//printk("%s ", databuf);
 			vfs_write(pfile, databuf, strlen(databuf), &pos);
 		}
 		vfs_write(pfile, "\n", 1, &pos);
-		//printk("\n");
 	}
 
-	//printk("read data from file size = %d\n", fsize);
 	kfree(buf);
-	//printk("close file and resume the fs\n");
 	filp_close(pfile, NULL);
 	set_fs(old_fs);
 	return 0;
-}	
-
-static int writebuftofile(char * filepath, char *buf)
-{
-	struct file* pfile = NULL;
-	struct inode *inode;
-	unsigned long magic;
-	int i, j;
-	off_t fsize;
-	char databuf[MAX_READ_DATA];
-	//int baseline[FT5x06_NUM_TX][FT5x06_NUM_RX];
-	char tmpbuf;
-	loff_t pos;
-	//int filelen = 0;
-	int index=0;int tx=0;int rx=0;
-	mm_segment_t old_fs;
-
-	if(NULL == pfile){
-		pfile = filp_open(filepath, O_RDWR|O_CREAT, 0);
-	}
-	if(IS_ERR(pfile)){
-		printk("error occured while opening file %s.\n", filepath);
-		return -1;
-	}
-	inode=pfile->f_dentry->d_inode;
-	magic=inode->i_sb->s_magic;
-	fsize=inode->i_size;
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	pos = 0;
-
-	vfs_write(pfile, buf, strlen(buf), &pos);
-
-
-	printk("write  size = %d\n", strlen(buf));
-	//printk("close file and resume the fs\n");
-	filp_close(pfile, NULL);
-	set_fs(old_fs);
-	return 0;
-}	
+}
 
 /*Same as ft5x06_read_data */
 static int ft5x06_read_rawdata(struct i2c_client *client, int data[][FT5x06_NUM_RX])
@@ -3942,8 +3771,6 @@ static int ft5x06_read_rawdata(struct i2c_client *client, int data[][FT5x06_NUM_
 				DBG_PRINT(dbg_level_error, "%s: " FTX_TAG ": %s(): ERROR: Could not read row %u raw data.\n", dev_name(&(client->dev)), __func__, rownum);
 				goto error_return;
 			}
-
-			//printk("j=%d  real=%d except=%d\n", j, retval, readlen);
 		}
 
 		/*return test mode 0*/
@@ -3956,7 +3783,6 @@ static int ft5x06_read_rawdata(struct i2c_client *client, int data[][FT5x06_NUM_
 		}
 
 		rx = 0;
-		//printk("read_data %d\n", *p_num_read_chars);
 		/* Each data value can be up to 5 chars long. Add a space and we need 6 chars to store it. */
 		for (j = 0; j < FT5x06_NUM_RX * 2; j += 2)
 		{
@@ -3965,7 +3791,6 @@ static int ft5x06_read_rawdata(struct i2c_client *client, int data[][FT5x06_NUM_
 			dataval |= read_buffer[j+1];
 			data[i][rx] = dataval;
 			rx++;
-			//*p_num_read_chars += sprintf(&(output_buffer[*p_num_read_chars]), "%u ", dataval);
 		}
 	}
 	retval = 0;
@@ -3983,7 +3808,6 @@ static ssize_t ft5x06_ftsfullpanel_show(struct device *dev, struct device_attrib
 	ssize_t num_read_chars = 0;
 	int 	retval = 0;
 	int i, j;
-//	u8		regval = 0x00;
 	int flag = 1;
 	int totalfailed = 0;
 	int maxnum = 10;
@@ -3993,10 +3817,10 @@ static ssize_t ft5x06_ftsfullpanel_show(struct device *dev, struct device_attrib
 	int differ[FT5x06_NUM_TX][FT5x06_NUM_RX];
 	char filepath_fullpanel[64];
 	char cfgfilepath[64];
-	
+
 	sprintf(cfgfilepath, "/config/limitconfig_fullpaneltouch_%s.txt", szstation);
 	readCfg(cfgfilepath, &maxnum, &maxdelta);
-	
+
 	sprintf(filepath_fullpanel, "/config/fullpaneltouch_%s.txt", szstation);
 	g_ftsfullpaneltest = 1;
 	mutex_lock(&ts->device_mode_mutex);
@@ -4017,7 +3841,7 @@ static ssize_t ft5x06_ftsfullpanel_show(struct device *dev, struct device_attrib
 	}
 	//read baseline form file
 	dev_dbg(dev, "baseline test:read baseline form file\n");
-	memset(baseline_file, 0xffff, sizeof(baseline_file));	
+	memset(baseline_file, 0xffff, sizeof(baseline_file));
 	if(readTXRXdatafromfile(filepath_fullpanel, baseline_file) <0){
 		dev_err(dev, "%s() - ERROR: read baseline_max from file error\n", __FUNCTION__);
         	goto error_return;
@@ -4052,7 +3876,7 @@ static ssize_t ft5x06_ftsfullpanel_show(struct device *dev, struct device_attrib
 			writeTXRXdatatofile(filepath_fullpanel, baseline_file);
 		}
 	}
-	
+
 error_return:
 	retval = ft5x06_exit_factory_mode(ts);
 	if (0 != retval)
@@ -4074,12 +3898,8 @@ static ssize_t ft5x06_ftsbaseline_show(struct device *dev, struct device_attribu
 	ssize_t num_read_chars = 0;
 	int retval = 0;
 	int i, j;
-	u8		regval = 0x00;
 	int flag = 1;
-	int num = 10;
-	int delta = 10;
 	int totalfailed = 0;
-	//ssize_t testresult = LWJ_FAILED;
 	int maxnum = 10;
 	int maxdelta = 10;
 	bool minchanged = false;
@@ -4091,43 +3911,17 @@ static ssize_t ft5x06_ftsbaseline_show(struct device *dev, struct device_attribu
 	char cfgfilepath[64];
 	sprintf(cfgfilepath, "/config/limitconfig_baseline_%s.txt", szstation);
 	readCfg(cfgfilepath, &maxnum, &maxdelta);
-	
+
 	sprintf(filepath_max, "/config/baseline_%s_max.txt", szstation);
 	sprintf(filepath_min, "/config/baseline_%s_min.txt", szstation);
 	g_ftsbaselineresult = 1;
 	mutex_lock(&ts->device_mode_mutex);
 	retval = ft5x06_enter_factory_mode(ts);
-	   if (0 != retval)
-	   {
-		   dev_err(dev, "%s() - ERROR: Could not put the Touch Panel in Factory Mode.\n", __FUNCTION__);
-		   goto error_restore_baseline;
-	   }
-/*
-//	add by zhangjk @20110915; read raw data, not the baseline
-	regval = FT5x06_BASELINE_ENABLE;
-	retval = i2c_smbus_write_i2c_block_data(client, FT5x06_FMREG_BASELINE_ENABLE, sizeof(u8), &regval);
 	if (0 != retval)
 	{
-		dev_err(dev, "%s() - ERROR: Could not write to the Baseline register.\n", __FUNCTION__);
-		goto error_return;
-	}
-
-	msleep(FT5x06_VERIFICATION_DELAY_MS);
-
-	regval = FT5x06_BASELINE_DISABLE;
-	retval = i2c_smbus_read_i2c_block_data(client, FT5x06_FMREG_BASELINE_ENABLE, sizeof(u8), &regval);
-	if (0 > retval)
-	{
-		dev_err(dev, "%s() - ERROR: Could not read the updated value of the Baseline register.\n", __FUNCTION__);
+		dev_err(dev, "%s() - ERROR: Could not put the Touch Panel in Factory Mode.\n", __FUNCTION__);
 		goto error_restore_baseline;
 	}
-
-	if (FT5x06_BASELINE_ENABLE != (FT5x06_BASELINE_MASK & regval))
-	{
-		dev_err(dev,  "%s() - ERROR: The Baseline register contained 0x%02X (expected 0x%02X).\n", __FUNCTION__, (FT5x06_BASELINE_MASK & regval), FT5x06_BASELINE_ENABLE);
-		goto error_restore_baseline;
-	}
-*/
 	/* Read raw data */
 	dev_dbg(dev, "baseline test:read raw data\n");
 	retval = ft5x06_read_rawdata(client, baseline);
@@ -4175,7 +3969,7 @@ static ssize_t ft5x06_ftsbaseline_show(struct device *dev, struct device_attribu
 					printk("update %d,%d %d\n", i,j, maxdelta);
 					baseline_min[i][j] = baseline[i][j];
 					minchanged = true;
-				}				
+				}
 			}
 		}
 		buf[num_read_chars-1] = '\n';
@@ -4196,35 +3990,9 @@ static ssize_t ft5x06_ftsbaseline_show(struct device *dev, struct device_attribu
 		}
 	} else {
 		printk("failed to much %d > %d\n", totalfailed, maxnum);
-	}	
+	}
 error_restore_baseline:
 	dev_dbg(dev,  "%s() - Restoring the Baseline register...\n", __FUNCTION__);
-/*
-//	add by zhangjk @20110915; read raw data, not the baseline
-	regval = FT5x06_BASELINE_DISABLE;
-	retval = i2c_smbus_write_i2c_block_data(client, FT5x06_FMREG_BASELINE_ENABLE, sizeof(u8), &regval);
-	if (0 != retval)
-	{
-		dev_err(dev, "%s() - ERROR: Could not write to the Baseline register.\n", __FUNCTION__);
-		goto error_return;
-	}
-
-	msleep(FT5x06_VERIFICATION_DELAY_MS);
-
-	regval = FT5x06_BASELINE_ENABLE;
-	retval = i2c_smbus_read_i2c_block_data(client, FT5x06_FMREG_BASELINE_ENABLE, sizeof(u8), &regval);
-	if (0 > retval)
-	{
-		dev_err(dev, "%s() - ERROR: Could not read the updated value of the Baseline register.\n", __FUNCTION__);
-		goto error_return;
-	}
-
-	if (FT5x06_BASELINE_DISABLE != (FT5x06_BASELINE_MASK & regval))
-	{
-		dev_err(dev, "%s() - ERROR: The Baseline register contained 0x%02X (expected 0x%02X).\n", __FUNCTION__, (FT5x06_BASELINE_MASK & regval), FT5x06_BASELINE_DISABLE);
-		//goto error_restore_mode;
-	}
-*/
 	retval = ft5x06_exit_factory_mode(ts);
 	if (0 != retval)
 	{
@@ -4246,20 +4014,19 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 
 	ssize_t num_read_chars = 0;
 	int flag = 1;
-	//int testresult = LWJ_FAILED;
 
 	char filepath_max[64];
 	char filepath_min[64];
 	u8 original_voltage;
 	int     retval  = 0;
 	u8      currvoltage = 0;
-	int i,j,k;
+	int i,j;
 	char cfgfilepath[64];
 	int maxnum = 10;
 	int maxdelta = 10;
 	int totalfailed = 0;
 	bool maxchanged, minchanged;
-	
+
 	sprintf(cfgfilepath, "/config/limitconfig_voltage_%s.txt", szstation);
 	readCfg(cfgfilepath, &maxnum, &maxdelta);
 
@@ -4276,12 +4043,12 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 	}
 
 	//step 1: get original voltage
-    retval = i2c_smbus_read_i2c_block_data(client, FT5x06_FMREG_DRIVER_VOLTAGE, sizeof(u8), &original_voltage);
-    if (0 > retval)
-    {
-        dev_err(dev, "%s() - ERROR: Could not read the value of the Device Voltage register.\n", __FUNCTION__);
-        goto error_retrun;
-    }
+	retval = i2c_smbus_read_i2c_block_data(client, FT5x06_FMREG_DRIVER_VOLTAGE, sizeof(u8), &original_voltage);
+	if (0 > retval)
+	{
+		dev_err(dev, "%s() - ERROR: Could not read the value of the Device Voltage register.\n", __FUNCTION__);
+		goto error_retrun;
+	}
 
 	//step 2: get rawbase_before
 	retval = ft5x06_read_rawdata(client, rawbase_before);
@@ -4294,11 +4061,11 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 	//step 3: set voltage=1
 	currvoltage = 1;
 	retval = i2c_smbus_write_i2c_block_data(client, FT5x06_FMREG_DRIVER_VOLTAGE, sizeof(u8), &currvoltage);
-    if (0 > retval)
-    {
-        dev_err(dev, "%s() - ERROR: Could not write the value of the Device Voltage register.\n", __FUNCTION__);
-        goto error_restore_voltage;
-    }
+	if (0 > retval)
+	{
+		dev_err(dev, "%s() - ERROR: Could not write the value of the Device Voltage register.\n", __FUNCTION__);
+		goto error_restore_voltage;
+	}
 
 	//step 4: get rawbase_after
 	for(i=0; i<3; i++){
@@ -4312,11 +4079,11 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 	//step 5:set voltage=original_voltage
 	}
 	retval = i2c_smbus_write_i2c_block_data(client, FT5x06_FMREG_DRIVER_VOLTAGE, sizeof(u8), &original_voltage);
-    if (0 > retval)
-    {
-        dev_err(dev, "%s() - ERROR: Could not write the value of the Device Voltage register.\n", __FUNCTION__);
-        goto error_restore_voltage;
-    }
+	if (0 > retval)
+	{
+		dev_err(dev, "%s() - ERROR: Could not write the value of the Device Voltage register.\n", __FUNCTION__);
+		goto error_restore_voltage;
+	}
 
 	//step 6: computer differ and compare to voltage that from file
 	//differ >= voltage
@@ -4362,19 +4129,6 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 		}
 		buf[num_read_chars-1] = '\n';
 	}
-#if 0
-	//step: search "V" shape in tx and rx
-	if(flag){
-		//search "V" in tx
-		for(i=0; i<FT5x06_NUM_TX; i++){
-			for(j=0; j<FT5x06_NUM_RX; j++){
-				for(k=(j-1); k>=0; k--){
-					if(voltage[i][j]voltage[i][k]
-					}
-				}
-			}
-		}
-#endif
 	if(flag)
 		g_ftsvoltageresult = 0;
 
@@ -4389,7 +4143,7 @@ static ssize_t ft5x06_ftsvoltage_show(struct device *dev, struct device_attribut
 			writeTXRXdatatofile(filepath_min, voltage_min);
 		}
 	}
-	
+
 error_restore_voltage:
 	retval = i2c_smbus_write_i2c_block_data(client, FT5x06_FMREG_DRIVER_VOLTAGE, sizeof(u8), &original_voltage);
     if (0 > retval)
@@ -4431,8 +4185,7 @@ static ssize_t ft5x06_ftscrosstalkodd_show(struct device *dev, struct device_att
 	u8 m = 1;
 
 	u8	original_rx_cac[FT5x06_NUM_RX];
-#ifdef CONFIG_MACH_OMAP_HUMMINGBIRD
-#else
+#ifndef CONFIG_MACH_OMAP_HUMMINGBIRD
 	u8	original_tx_cac[FT5x06_NUM_TX];
 #endif
 
@@ -4441,10 +4194,10 @@ static ssize_t ft5x06_ftscrosstalkodd_show(struct device *dev, struct device_att
 	int totalfailed = 0;
 	char cfgfilepath[64];
 	bool limitchanged = false;
-	
+
 	sprintf(cfgfilepath, "/config/limitconfig_crosstalk_odd_%s.txt", szstation);
 	readCfg(cfgfilepath, &maxnum, &maxdelta);
-	
+
 	g_ftscrosstalkoddresult = 1;
 	sprintf(filepath_crosstalk, "/config/crosstalk_odd_%s.txt", szstation);
 	memset(original_rx_cac, 0x00, FT5x06_NUM_RX);
@@ -4457,8 +4210,7 @@ static ssize_t ft5x06_ftscrosstalkodd_show(struct device *dev, struct device_att
 		goto error_return;
 	}
 
-#ifdef CONFIG_MACH_OMAP_HUMMINGBIRD
-#else
+#ifndef CONFIG_MACH_OMAP_HUMMINGBIRD
 	// adjust the TX CAC for FT56
 	m = 1;
 	for (i = 0; i < FT5x06_NUM_TX; i ++) {
@@ -4645,7 +4397,7 @@ static ssize_t ft5x06_ftscrosstalkodd_show(struct device *dev, struct device_att
 	}
 	if(flag)
 		g_ftscrosstalkoddresult = 0;
-	
+
 	if (totalfailed < maxnum) {
 		if (limitchanged) {
 			printk("update max files %d < %d\n", totalfailed, maxnum);
@@ -4686,8 +4438,7 @@ error_restore_cac_values:
 		}
 	}
 
-#ifdef CONFIG_MACH_OMAP_HUMMINGBIRD
-#else
+#ifndef CONFIG_MACH_OMAP_HUMMINGBIRD
 	// restore the org TX CAP
 	m = 1;
 	for (i = 0; i < FT5x06_NUM_TX; i ++) {
@@ -4739,14 +4490,6 @@ error_return:
 //get correlation coefficient
 static int getcorrelationcoefficient(int x[], int y[], int len)
 {
-/*
-	double c = 0.0;
-	int sum_xy = 0;
-	int sum_x = 0;
-	int sum_y = 0;
-	int sum_xx = 0;
-	int sum_yy = 0;
-*/
 	int similarity = 0;
 	int sum = 0;int avg = 0;
 	int delta[len];int min = 10000;int max = 0;
@@ -4758,20 +4501,13 @@ static int getcorrelationcoefficient(int x[], int y[], int len)
 	for(i=0; i<len; i++){
 		delta[i] = x[i] - y[i];
 		sum += delta[i];
-		/*
-		sum_x += x[i];
-		sum_y += y[i];
-		sum_xy += x[i] * y[i];
-		sum_xx += x[i] * x[i];
-		sum_yy += y[i] * y[i];
-		*/
 		}
 	avg = sum/len;
 	for(i=0; i<len; i++){
 		tmp = delta[i]-avg;
 		if(tmp<0)
 			tmp = 0-tmp;
-		sum_delta += tmp;//����ֵ
+		sum_delta += tmp;
 		delta[i] -= avg;
 		if(delta[i] > max){
 			max = delta[i];
@@ -4782,40 +4518,37 @@ static int getcorrelationcoefficient(int x[], int y[], int len)
 			minindex = i;
 			}
 		}
-	//printk("%s:sum_delta=%d max_delta=%d min_delta=%d\n", __FUNCTION__, sum_delta, max, min);
 	if(sum_delta > threshold)
 		similarity = 0;
 	else
 		similarity = 1;
-	//c = (len*sum_xy - sum_x*sum_y)/sqrt(len*sum_xx - sum_x*sum_x*sqrt(len*sum_yy - sum_y*sum_y));
 
 	return similarity;
 }
 static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_read_chars)
 {
-	//int mean_crosstalk_TX[FT5x06_NUM_TX-2];
 	int mean_crosstalk_RX[FT5x06_NUM_RX-2];
 	int mean_voltage_TX[FT5x06_NUM_TX];
 	int mean_voltage_RX[FT5x06_NUM_RX];
-	//int delta_voltage_TX[FT5x06_NUM_RX];
-	//int avg_voltage_TX[FT5x06_NUM_RX];
 	int max_crosstalk_RX=0, min_crosstalk_RX=10000;
 
 	int flag_voltage_TX[FT5x06_NUM_TX];
 	int flag_voltage_RX[FT5x06_NUM_RX];
-	int abnormalindex = 0;int abnormal = 0;// 0-normal  1-abnormal
-	//int abnormalindex2 = 0;
+	int abnormalindex = 0;
+	int abnormal = 0;// 0-normal  1-abnormal
 	int sum_crosstalk_RX;
 	int sum_voltage_TX, sum_voltage_RX;
-	int i, j, m,n,k;int rxflag=0;int rxopen1=0, rxopen2=0,txopen1=0, txopen2=0;
-	//int avg;
+	int i, j, m, n;
+	int rxflag=0;
+	int rxopen2=0;
 	int tmp;
 	int flag_small[FT5x06_NUM_TX][FT5x06_NUM_RX];
-	int very_small_num = 0;int very_small_tx=-1,very_small_rx=-1;
-	int small_tx = -1,small_rx=-1;
-	int min_rx = 0;int min_rx_index = 0;
-	int small_num = 0;//int min_small = 10000;int min_small_index = 0;
-	//int flag_small[FT5x06_NUM_TX][FT5x06_NUM_RX];
+	int very_small_num = 0;
+	int very_small_tx = -1, very_small_rx = -1;
+	int small_tx = -1, small_rx = -1;
+	int min_rx = 0;
+	int min_rx_index = 0;
+	int small_num = 0;
 
 	for(i=0; i<FT5x06_NUM_TX; i++){
 		sum_voltage_TX = 0;
@@ -4865,22 +4598,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 			}
 		mean_crosstalk_RX[i-1] = sum_crosstalk_RX / (FT5x06_NUM_TX-2);
 		}
-#if 0
-	printk("\nflag_voltage_RX:\n");
-	for(i=0; i<FT5x06_NUM_RX; i++)
-		printk("%d ", flag_voltage_RX[i]);
-	printk("\nflag_voltage_TX:\n");
-	for(i=0; i<FT5x06_NUM_TX; i++)
-		printk("%d ", flag_voltage_TX[i]);
-	printk("\n");
-	printk("\nmean_voltage_RX:\n");
-	for(i=0; i<FT5x06_NUM_RX; i++)
-		printk("%d ", mean_voltage_RX[i]);
-	printk("\nmean_voltage_TX:\n");
-	for(i=0; i<FT5x06_NUM_TX; i++)
-		printk("%d ", mean_voltage_TX[i]);
-	printk("\n");
-#endif
 
 	//TX line
 	abnormalindex = -1;abnormal = 0;
@@ -4898,17 +4615,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 	sum_voltage_RX = 0;
 	if(abnormal==1){
 		rxflag = 1;
-		/*
-		for(i=0; i<FT5x06_NUM_RX; i++){
-			sum_voltage_RX += voltage[abnormalindex][i];
-			avg = sum_crosstalk_RX/(i+1);
-			if(voltage[abnormalindex][i] > (avg*N)){
-				//tx open
-				// *p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "open. tx=%d\n", (abnormalindex+1));
-				printk("line;%d open. tx=%d rx=%d\n", __LINE__, (abnormalindex+1), (i+1));
-				return 0;
-				}
-			}*/
 		for(i=0; i<FT5x06_NUM_RX; i++){
 			if(voltage[abnormalindex][i]>threshold_TX_OPEN)
 			{
@@ -4917,7 +4623,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 			}
 		}
 		if(rxflag){
-			//�ж������Ƿ���·
 			#ifdef LWJ_DEBUG
 			*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "tx=%d single open at bonding point. \n", (abnormalindex+1));
 			#else
@@ -4986,7 +4691,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 			return 0;
 			}
 		}
-	//���з���(RX)
 	abnormalindex = -1;abnormal = 0;
 	for(i=0; i<FT5x06_NUM_RX; i++){
 		if(flag_voltage_RX[i]){
@@ -5009,7 +4713,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 			}
 		}
 		if(rxflag){
-			//���е㶼С��threshold_RX_Short,ֱ���жϿ�·
 			#ifdef LWJ_DEBUG
 			*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "rx=%d single open at bonding point. \n", (abnormalindex+1));
 			#else
@@ -5078,51 +4781,7 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 				}
 			}
 		}
-			{
-			//Ѱ�ҵ�һ��������һ��С����ֵΪ275��TX��
-			//�ж�Ϊrx=? Tx=? And Tx=?
-			/*if(flag_voltage_RX[abnormalindex])
-				rxflag=1;
-			if(rxflag)
-				{
-				for(j=0; j<FT5x06_NUM_TX; j++){
-					if(voltage[j][abnormalindex] < threshold_Rx){
-						txopen1 = j;
-						break;
-						}
-					}
-				for(j=(FT5x06_NUM_TX-1); j>=0; j--){
-					if(voltage[j][abnormalindex] < threshold_Rx){
-						txopen2 = j;
-						break;
-						}
-					}
-				if(txopen1 == txopen2){
-					#ifdef LWJ_DEBUG
-					*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "open. rx=%d tx=%d\n", (abnormalindex+1), (txopen1+1));
-					#else
-					printk("line;%d open. rx=%d tx=%d\n", __LINE__, (abnormalindex+1), (txopen1+1));
-					#endif
-					}
-				else{
-					#ifdef LWJ_DEBUG
-					*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "open. rx=%d tx=%d and tx=%d\n", (abnormalindex+1), (txopen1+1), (txopen2+1));
-					#else
-					printk("line;%d open. rx=%d tx=%d and tx=%d\n", __LINE__, (abnormalindex+1), (txopen1+1), (txopen2+1));
-					#endif
-					}
-				}
-			else{
-				#ifdef LWJ_DEBUG
-				*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "short. rx=%d\n", (i+1));
-				#else
-				printk("line;%d short. rx=%d\n", __LINE__, (i+1));
-				#endif
-				}
-			return 0;
-			*/
-		}
-		}
+	}
 	else if(abnormal>=2){
 		for(i=abnormalindex+1; i<FT5x06_NUM_RX; i++){
 			if(flag_voltage_RX[i]){
@@ -5146,7 +4805,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 		return 0;
 		}
 
-	//Ѱ���쳣�ĵ���
 	if(very_small_num==1){
 	// add by zhangjk: only when no small data can it be said that TX single open
 	      if (small_num == 0)
@@ -5169,9 +4827,7 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 					{
 						if(j<(FT5x06_NUM_RX-1))
 						{
-							//if(flag_small[i][j+1]==1)
 							{
-								//tmp++;
 								for(m=j+1; m<FT5x06_NUM_RX; m++)
 								{
 									if(flag_small[i][m]==2)	// 2 is for "small", 1 is for "very small"
@@ -5189,7 +4845,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 						}
 						if(i<(FT5x06_NUM_TX-1))
 						{
-							//if(flag_small[i+1][j]==1)	// comment this because there is only one very small point
 							{
 								for(m=i+1; m<FT5x06_NUM_TX; m++)
 								{
@@ -5218,7 +4873,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 				if(flag_small[i][j]==1){
 					if(j<(FT5x06_NUM_RX-1)){
 						if(flag_small[i][j+1]==1){
-							//tmp++;
 							for(m=j+1; m<FT5x06_NUM_RX; m++){
 								if(flag_small[i][m]==1){
 									tmp++;
@@ -5299,47 +4953,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 				return 0;
 			}
 		}
-#if 0		//deleted by zhangjk: change the algorithm.
-		if(small_num>1)
-		{
-			for(i=0; i<FT5x06_NUM_TX; i++)
-			{
-				for(j=0; j<FT5x06_NUM_RX; j++)
-				{
-					if(flag_small[i][j]==2)
-					{
-						small_num = 1;
-						for(m=i; m<FT5x06_NUM_TX; m++)
-						{
-							if(flag_small[m][j] == 2)
-							{
-								/*
-								if(flag_small[m][j] < min_small){
-									min_small = flag_small[m][j];
-									min_small_index = m;
-									}*/
-								if(flag_small[m][j]==2)
-								{
-									tmp++;
-								}
-								//small_num++;
-							}
-							else break;
-						}
-						if(small_num > 1)
-						{
-							#ifdef LWJ_DEBUG
-							*p_num_read_chars = snprintf(output_buffer, PAGE_SIZE, "rx=%d double open at tx=%d and tx=%d. \n", __LINE__, (j+1), (i+1), (i+tmp+1));
-							#else
-							printk("line;%d rx=%d double open at tx=%d and tx=%d. \n", __LINE__, (j+1), (i+1), (i+tmp+1));
-							#endif
-							return 0;
-						}
-					}
-				}
-			}
-		}
-#endif // 0
 	}
 
 	//No shielding���ж�
@@ -5351,12 +4964,6 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 				min_crosstalk_RX = mean_crosstalk_RX[i];
 			}
 		}
-#if 0
-	printk("\nmean_crosstalk_RX:\n");
-	for(i=0; i<FT5x06_NUM_RX-2; i++)
-		printk("%d ", mean_crosstalk_RX[i]);
-	printk("\nmax_crosstalk_RX=%d min_crosstalk_RX=%d \n", max_crosstalk_RX, min_crosstalk_RX);
-#endif
 	if(max_crosstalk_RX > threshold_min_Rx){
 		if(min_crosstalk_RX*2 > max_crosstalk_RX){
 			//No shielding
@@ -5374,20 +4981,15 @@ static ssize_t fx5x06_analyse_short_open(char * output_buffer, ssize_t * p_num_r
 	#else
 	printk("Unclear defect. \n");
 	#endif
-	//*p_num_read_chars = 0;
 	return 0;
 }
 
 static ssize_t ft5x06_ftssetstation_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
 {
-//	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-//	struct ft5x06	  *ts	  = (struct ft5x06 *)i2c_get_clientdata(client);
-	//int len=0;
 	int i;
 	memset(szstation, 0, sizeof(szstation));
 	sprintf(szstation, "%s", buf);
 	szstation[size-1]='\0';
-	//strlwr(szstation);
 	for(i=0; i<size-1; i++){
 		if(szstation[i]>='A' && szstation[i]<='Z'){
 			szstation[i] = szstation[i] - 'A' + 'a';
@@ -5439,8 +5041,6 @@ static ssize_t ft5x06_ftssetstation_store(struct device *dev, struct device_attr
 
 static ssize_t ft5x06_ftssetstation_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-//	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-//	struct ft5x06	  *ts	  = (struct ft5x06 *)i2c_get_clientdata(client);
 	ssize_t num_read_chars = 0;
 	num_read_chars = snprintf(buf, PAGE_SIZE, "test station:%s\n", szstation);
 
@@ -5449,8 +5049,6 @@ static ssize_t ft5x06_ftssetstation_show(struct device *dev, struct device_attri
 
 static ssize_t ft5x06_ftstestresult_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-//	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-//	struct ft5x06	  *ts	  = (struct ft5x06 *)i2c_get_clientdata(client);
 	ssize_t num_read_chars = 0;
 #ifndef TEST_SIMULATION		// for the real test
 	if(g_ftsbaselineresult==1 ||
@@ -6131,8 +5729,6 @@ static void ftx_input_close(struct input_dev *dev)
 
 static void ftx_input_device_destroy(struct ft5x06 *ts)
 {
-	struct input_dev *input_device = ts->input;
-
 	if (NULL != ts->input)
 	{
 		DBG_PRINT(dbg_level_debug, "%s: " FTX_TAG ": %s(): DEBUG: Freeing input device\n", dev_name(&ts->client->dev), __func__);
@@ -6188,7 +5784,6 @@ static int ftx_input_device_initialize(struct ft5x06 *ts)
 {
 	struct input_dev *input_device;
 	int use_mt_protocol;
-	int retval;
 
 	if(NULL != ts->input)
 	{
@@ -6362,8 +5957,6 @@ static int ft5x06_initialize(struct ft5x06 *ts)
 	retval = 0;
 	goto success;
 
-error_destroy_device:
-	ftx_input_device_destroy(ts);
 error_free_irq:
 	free_irq(ts->client->irq, ts);
 	atomic_set(&ts->irq_enabled, 0);
@@ -6563,7 +6156,6 @@ static int __devinit ft5x06_probe(struct i2c_client *client, const struct i2c_de
 	goto error_return;
 
 #if defined(CONFIG_DEBUG_FS)
-error_raw_data_mutex_destroy:
 	mutex_destroy(&ts->ftx_raw_data_mutex);
 #endif /* defined(CONFIG_DEBUG_FS) */
 error_device_mode_mutex_destroy:
@@ -6682,7 +6274,6 @@ static int ft5x06_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	int retval = 0;
 	struct ft5x06 *ts = NULL;
-	u8 dummy_val;
 
 
 	DBG_PRINT(dbg_level_info, "%s: " FTX_TAG ": %s(): INFO: driver is resuming.\n", dev_name(dev), __func__);
@@ -6889,7 +6480,7 @@ static void  ft5x06_shutdown(struct i2c_client *client)
 {
 	struct ft5x06 *ts = (struct ft5x06 *) i2c_get_clientdata(client);
 
-	DBG_PRINT(dbg_level_info, "%s: " FTX_TAG ": INFO: Shutdown.\n", dev_name(&ts->client->dev), __func__);
+	DBG_PRINT(dbg_level_info, "%s: " FTX_TAG ": %s(): INFO: Shutdown.\n", dev_name(&ts->client->dev), __func__);
 
 	/* Disable the irq */
 	if(ts->client->irq)
@@ -6990,7 +6581,7 @@ static int ft5x06_init(void)
 
 	touchpanel_kobj = kobject_create_and_add("ft5x06_driver", NULL);
 	if (touchpanel_kobj)
-		sysfs_create_group(touchpanel_kobj, &touchpanel_attr_group);
+		ret = sysfs_create_group(touchpanel_kobj, &touchpanel_attr_group);
 
 	ret = ft5x06_module_init();
 
