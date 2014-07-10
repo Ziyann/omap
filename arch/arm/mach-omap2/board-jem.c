@@ -676,7 +676,9 @@ static void __init omap_jem_init(void)
 	usb_musb_init(&musb_board_data);
 
 	omap_init_dmm_tiler();
+#ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
+#endif
 
 	/*Config key VolumeUp/VolumeDown*/
 	platform_add_devices(bowser_devices, ARRAY_SIZE(bowser_devices));
@@ -700,11 +702,9 @@ static void __init omap_jem_reserve(void)
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 
+	bowser_android_display_setup();
 #ifdef CONFIG_ION_OMAP
-	bowser_android_display_setup(get_omap_ion_platform_data());
 	omap4_ion_init();
-#else
-	bowser_android_display_setup(NULL);
 #endif
 
 	omap4_secure_workspace_addr_default();
