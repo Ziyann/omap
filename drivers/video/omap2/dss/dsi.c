@@ -1334,7 +1334,7 @@ static int dsi_calc_clock_rates(struct omap_dss_device *dssdev,
 	else
 		cinfo->dsi_pll_hsdiv_dsi_clk = 0;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	dsi->current_cinfo.use_sys_clk = cinfo->use_sys_clk;
 	dsi->current_cinfo.highfreq = cinfo->highfreq;
 
@@ -2064,11 +2064,9 @@ static int dsi_cio_power(struct platform_device *dsidev,
 	/* PWR_CMD */
 	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG1, state, 28, 27);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (cpu_is_omap44xx())
 		/*bit 30 has to be set to 1 to GO in omap4*/
 		REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG1, 1, 30, 30);
-#endif
 
 	/* PWR_STATUS */
 	while (FLD_GET(dsi_read_reg(dsidev, DSI_COMPLEXIO_CFG1),
@@ -2242,11 +2240,7 @@ static inline unsigned ddr2ns(struct platform_device *dsidev, unsigned ddr)
 	return ddr * 1000 * 1000 / (ddr_clk / 1000);
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 static void dsi_cio_timings(struct omap_dss_device *dssdev)
-#else
-static void dsi_cio_timings(struct platform_device *dsidev)
-#endif
 {
 	u32 r;
 	u32 ths_prepare, ths_prepare_ths_zero, ths_trail, ths_exit;
@@ -2254,41 +2248,38 @@ static void dsi_cio_timings(struct platform_device *dsidev)
 	u32 tclk_prepare;
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 	u32 reg_ttaget;
-	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 #endif
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 
 	/* calculate timings */
 
 	/* 1 * DDR_CLK = 2 * UI */
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if(dssdev->panel.dsi_cio_data.tclk_prepare == 0)
 	{
-#endif
-	/* min 40ns + 4*UI	max 85ns + 6*UI */
-	ths_prepare = ns2ddr(dsidev, 70) + 2;
+		/* min 40ns + 4*UI	max 85ns + 6*UI */
+		ths_prepare = ns2ddr(dsidev, 70) + 2;
 
-	/* min 145ns + 10*UI */
-	ths_prepare_ths_zero = ns2ddr(dsidev, 175) + 2;
+		/* min 145ns + 10*UI */
+		ths_prepare_ths_zero = ns2ddr(dsidev, 175) + 2;
 
-	/* min max(8*UI, 60ns+4*UI) */
-	ths_trail = ns2ddr(dsidev, 60) + 5;
+		/* min max(8*UI, 60ns+4*UI) */
+		ths_trail = ns2ddr(dsidev, 60) + 5;
 
-	/* min 100ns */
-	ths_exit = ns2ddr(dsidev, 145);
+		/* min 100ns */
+		ths_exit = ns2ddr(dsidev, 145);
 
-	/* tlpx min 50n */
-	tlpx_half = ns2ddr(dsidev, 25);
+		/* tlpx min 50n */
+		tlpx_half = ns2ddr(dsidev, 25);
 
-	/* min 60ns */
-	tclk_trail = ns2ddr(dsidev, 60) + 2;
+		/* min 60ns */
+		tclk_trail = ns2ddr(dsidev, 60) + 2;
 
-	/* min 38ns, max 95ns */
-	tclk_prepare = ns2ddr(dsidev, 65);
+		/* min 38ns, max 95ns */
+		tclk_prepare = ns2ddr(dsidev, 65);
 
-	/* min tclk-prepare + tclk-zero = 300ns */
-	tclk_zero = ns2ddr(dsidev, 260);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* min tclk-prepare + tclk-zero = 300ns */
+		tclk_zero = ns2ddr(dsidev, 260);
 	} else {
 		ths_prepare = dssdev->panel.dsi_cio_data.ths_prepare;
 		ths_prepare_ths_zero =
@@ -2299,9 +2290,10 @@ static void dsi_cio_timings(struct platform_device *dsidev)
 		tclk_trail = dssdev->panel.dsi_cio_data.tclk_trail;
 		tclk_zero = dssdev->panel.dsi_cio_data.tclk_zero;
 		tclk_prepare = dssdev->panel.dsi_cio_data.tclk_prepare;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		reg_ttaget = dssdev->panel.dsi_cio_data.reg_ttaget;
-	}
 #endif
+	}
 
 	DSSDBG("ths_prepare %u (%uns), ths_prepare_ths_zero %u (%uns)\n",
 		ths_prepare, ddr2ns(dsidev, ths_prepare),
@@ -2470,7 +2462,7 @@ static int dsi_cio_init(struct omap_dss_device *dssdev)
 	if (r)
 		return r;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* HS_AUTO_STOP_ENABLE */
 	REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 18, 18);
 #endif
@@ -2558,11 +2550,7 @@ static int dsi_cio_init(struct omap_dss_device *dssdev)
 	/* FORCE_TX_STOP_MODE_IO */
 	REG_FLD_MOD(dsidev, DSI_TIMING1, 0, 15, 15);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	dsi_cio_timings(dssdev);
-#else
-	dsi_cio_timings(dsidev);
-#endif
 
 	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
 		/* DDR_CLK_ALWAYS_ON */
@@ -2839,15 +2827,13 @@ static void dsi_vc_initial_config(struct platform_device *dsidev, int channel)
 	if (dss_has_feature(FEAT_DSI_VC_OCP_WIDTH))
 		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH = 32 bit */
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* TO DO: This is a HACK as performing this command on blaze
 	 * causes DSI errors and does not allow blaze to display anything
 	 * for now cause it to skip on blaze but allow this on tablet video
 	 * displays */
-	if (1) {
-		if (channel == 0)
-			r = FLD_MOD(r, 1, 11, 10); /* OCP_WIDTH = 32 bit */
-	}
+	if (channel == 0)
+		r = FLD_MOD(r, 1, 11, 10); /* OCP_WIDTH = 24 bit */
 #endif
 
 	r = FLD_MOD(r, 4, 29, 27); /* DMA_RX_REQ_NB = no dma */
@@ -3225,7 +3211,7 @@ static int dsi_vc_write_nosync_common(struct omap_dss_device *dssdev,
 		r = dsi_vc_send_short(dsidev, channel,
 				MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM, 0, 0);
 	} else if (len == 1) {
-#if defined (CONFIG_PANEL_NT71391_HYDIS)
+#if defined(CONFIG_PANEL_NT71391_HYDIS) || defined(CONFIG_PANEL_S6E8AA0)
 		u8 data_cmd = 0;
 		if(data[0] == MIPI_DSI_TURN_ON_PERIPHERAL)
 		r = dsi_vc_send_short(dsidev, channel,
@@ -3766,7 +3752,7 @@ err:
 }
 
 static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
-		unsigned ticks, bool x4, bool x16)
+		unsigned ticks, bool x4, bool x16, bool to)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3778,7 +3764,7 @@ static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING2);
-	r = FLD_MOD(r, 1, 15, 15);	/* LP_RX_TO */
+	r = FLD_MOD(r, to ? 1 : 0, 15, 15);	/* LP_RX_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 14, 14);	/* LP_RX_TO_X16 */
 	r = FLD_MOD(r, x4 ? 1 : 0, 13, 13);	/* LP_RX_TO_X4 */
 	r = FLD_MOD(r, ticks, 12, 0);	/* LP_RX_COUNTER */
@@ -3786,14 +3772,21 @@ static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = %lu ns\n",
-			total_ticks,
-			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-			(total_ticks * 1000) / (fck / 1000 / 1000));
+	if (fck != 0) {
+		DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = %lu ns\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+				(total_ticks * 1000) / (fck / 1000 / 1000));
+	}
+	else {
+		DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
+	}
 }
 
 static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
-		bool x8, bool x16)
+		bool x8, bool x16, bool to)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3805,7 +3798,7 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, 1, 31, 31);	/* TA_TO */
+	r = FLD_MOD(r, to ? 1 : 0, 31, 31);	/* TA_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 30, 30);	/* TA_TO_X16 */
 	r = FLD_MOD(r, x8 ? 1 : 0, 29, 29);	/* TA_TO_X8 */
 	r = FLD_MOD(r, ticks, 28, 16);	/* TA_TO_COUNTER */
@@ -3813,14 +3806,22 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x8 ? 8 : 1);
 
-	DSSDBG("TA_TO %lu ticks (%#x%s%s) = %lu ns\n",
-			total_ticks,
-			ticks, x8 ? " x8" : "", x16 ? " x16" : "",
-			(total_ticks * 1000) / (fck / 1000 / 1000));
+	if (fck != 0) {
+		DSSDBG("TA_TO %lu ticks (%#x%s%s) = %lu ns\n",
+				total_ticks,
+				ticks, x8 ? " x8" : "", x16 ? " x16" : "",
+				(total_ticks * 1000) / (fck / 1000 / 1000));
+	}
+	else {
+		DSSDBG("TA_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
+				total_ticks,
+				ticks, x8 ? " x8" : "", x16 ? " x16" : "");
+	}
 }
 
 static void dsi_set_stop_state_counter(struct platform_device *dsidev,
-		unsigned ticks, bool x4, bool x16)
+		unsigned ticks, bool x4, bool x16,
+		bool stop_mode)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3832,7 +3833,7 @@ static void dsi_set_stop_state_counter(struct platform_device *dsidev,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, 1, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
+	r = FLD_MOD(r, stop_mode ? 1 : 0, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 14, 14);	/* STOP_STATE_X16_IO */
 	r = FLD_MOD(r, x4 ? 1 : 0, 13, 13);	/* STOP_STATE_X4_IO */
 	r = FLD_MOD(r, ticks, 12, 0);	/* STOP_STATE_COUNTER_IO */
@@ -3840,14 +3841,21 @@ static void dsi_set_stop_state_counter(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = %lu ns\n",
-			total_ticks,
-			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-			(total_ticks * 1000) / (fck / 1000 / 1000));
+	if (fck != 0) {
+		DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = %lu ns\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+				(total_ticks * 1000) / (fck / 1000 / 1000));
+	}
+	else {
+		DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
+	}
 }
 
 static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
-		unsigned ticks, bool x4, bool x16)
+		unsigned ticks, bool x4, bool x16, bool to)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3859,7 +3867,7 @@ static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
 	fck = dsi_get_txbyteclkhs(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING2);
-	r = FLD_MOD(r, 1, 31, 31);	/* HS_TX_TO */
+	r = FLD_MOD(r, to ? 1 : 0, 31, 31);	/* HS_TX_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 30, 30);	/* HS_TX_TO_X16 */
 	r = FLD_MOD(r, x4 ? 1 : 0, 29, 29);	/* HS_TX_TO_X8 (4 really) */
 	r = FLD_MOD(r, ticks, 28, 16);	/* HS_TX_TO_COUNTER */
@@ -3867,10 +3875,17 @@ static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = %lu ns\n",
-			total_ticks,
-			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-			(total_ticks * 1000) / (fck / 1000 / 1000));
+	if (fck != 0) {
+		DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = %lu ns\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+				(total_ticks * 1000) / (fck / 1000 / 1000));
+	}
+	else {
+		DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
+				total_ticks,
+				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
+	}
 }
 
 static void dsi_config_vp_num_line_buffers(struct omap_dss_device *dssdev)
@@ -4034,10 +4049,18 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 			DSI_FIFO_SIZE_32);
 
 	/* XXX what values for the timeouts? */
-	dsi_set_stop_state_counter(dsidev, 0x1000, false, false);
-	dsi_set_ta_timeout(dsidev, 0x1fff, true, true);
-	dsi_set_lp_rx_timeout(dsidev, 0x1fff, true, true);
-	dsi_set_hs_tx_timeout(dsidev, 0x1fff, true, true);
+	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
+		dsi_set_stop_state_counter(dsidev, 0x1fff, true, true, false);
+		dsi_set_ta_timeout(dsidev, 0x1fff, true, true, true);
+		dsi_set_lp_rx_timeout(dsidev, 0x1fff, true, true, false);
+		dsi_set_hs_tx_timeout(dsidev, 0x1fff, true, true, true);
+	}
+	else {
+		dsi_set_stop_state_counter(dsidev, 0x1000, false, false, true);
+		dsi_set_ta_timeout(dsidev, 0x1fff, true, true, true);
+		dsi_set_lp_rx_timeout(dsidev, 0x1fff, true, true, true);
+		dsi_set_hs_tx_timeout(dsidev, 0x1fff, true, true, true);
+	}
 
 	switch (dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt)) {
 	case 16:
@@ -4054,7 +4077,7 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	}
 
 	r = dsi_read_reg(dsidev, DSI_CTRL);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	r = FLD_MOD(r, 0, 1, 1);	/* CS_RX_EN */
 	r = FLD_MOD(r, 0, 2, 2);	/* ECC_RX_EN */
 #else
@@ -4083,16 +4106,12 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 		dsi_check_dispc_hsync_period(dssdev);
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if(!dssdev->skip_init){
-#endif
-	dsi_vc_initial_config(dsidev, 0);
-	dsi_vc_initial_config(dsidev, 1);
-	dsi_vc_initial_config(dsidev, 2);
-	dsi_vc_initial_config(dsidev, 3);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (!dssdev->skip_init) {
+		dsi_vc_initial_config(dsidev, 0);
+		dsi_vc_initial_config(dsidev, 1);
+		dsi_vc_initial_config(dsidev, 2);
+		dsi_vc_initial_config(dsidev, 3);
 	}
-#endif
 
 	return 0;
 }
@@ -4676,9 +4695,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 			OMAP_DSS_LCD_DISPLAY_TFT);
 		dispc_mgr_set_tft_data_lines(dssdev->manager->id,
 			dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt));
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-		dispc_set_dithering(dssdev->manager->id);
-#endif
+		dispc_set_dithering(dssdev->manager->id, dssdev->ctrl.dither);
 	return 0;
 }
 
@@ -4717,17 +4734,13 @@ static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
 		return r;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if(!dssdev->skip_init){
-#endif
-	r = dsi_pll_set_clock_div(dsidev, &cinfo);
-	if (r) {
-		DSSERR("Failed to set dsi clocks\n");
-		return r;
+	if (!dssdev->skip_init) {
+		r = dsi_pll_set_clock_div(dsidev, &cinfo);
+		if (r) {
+			DSSERR("Failed to set dsi clocks\n");
+			return r;
+		}
 	}
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	}
-#endif
 
 	return 0;
 }
@@ -4764,7 +4777,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	int dsi_module = dsi_get_dsidev_id(dsidev);
 	int r;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 	dsi->debug_write = true;
 	dsi->debug_read = true;
@@ -4776,7 +4789,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* The SCPClk is required for PLL and complexio registers on OMAP4 */
 	if (cpu_is_omap44xx())
 		REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 14, 14);
@@ -4814,20 +4827,16 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 
 	DSSDBG("PLL OK\n");
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (!dssdev->skip_init) {
-#endif
-	r = dsi_configure_dispc_clocks(dssdev);
-	if (r)
-		goto err2;
+		r = dsi_configure_dispc_clocks(dssdev);
+		if (r)
+			goto err2;
 
-	r = dsi_cio_init(dssdev);
-	if (r)
-		goto err2;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+		r = dsi_cio_init(dssdev);
+		if (r)
+			goto err2;
 	} else
 		dsi_enable_scp_clk(dsidev);
-#endif
 
 	_dsi_print_reset_status(dsidev);
 
@@ -4837,23 +4846,26 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	if (1)
 		_dsi_print_reset_status(dsidev);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (!dssdev->skip_init) {
-#endif
+#if !defined(CONFIG_MACH_OMAP4_BOWSER)
 	r = dsi_proto_config(dssdev);
 	if (r)
 		goto err3;
-
-	/* enable interface */
-	dsi_vc_enable(dsidev, 0, 1);
-	dsi_vc_enable(dsidev, 1, 1);
-	dsi_vc_enable(dsidev, 2, 1);
-	dsi_vc_enable(dsidev, 3, 1);
-	dsi_if_enable(dsidev, 1);
-	dsi_force_tx_stop_mode_io(dsidev);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	}
 #endif
+
+	if (!dssdev->skip_init) {
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	        r = dsi_proto_config(dssdev);
+		if (r)
+			goto err3;
+#endif
+		/* enable interface */
+		dsi_vc_enable(dsidev, 0, 1);
+		dsi_vc_enable(dsidev, 1, 1);
+		dsi_vc_enable(dsidev, 2, 1);
+		dsi_vc_enable(dsidev, 3, 1);
+		dsi_if_enable(dsidev, 1);
+		dsi_force_tx_stop_mode_io(dsidev);
+	}
 
 	return 0;
 err3:
@@ -4918,7 +4930,7 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 static int _dsi_wait_reset(struct platform_device *dsidev)
 {
 	int t = 0;
@@ -4963,30 +4975,24 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err_get_dsi;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if(!dssdev->skip_init) {
-#endif
-	dsi_enable_pll_clock(dsidev, 1);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (!dssdev->skip_init) {
+		dsi_enable_pll_clock(dsidev, 1);
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 		REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 		_dsi_wait_reset(dsidev);
 
 		/* ENWAKEUP */
 		REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 2, 2);
-	}
 #endif
+	}
 
 	_dsi_initialize_irq(dsidev);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if(!dssdev->skip_init) {
-#endif
-	r = dsi_display_init_dispc(dssdev);
-	if (r)
-		goto err_init_dispc;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (!dssdev->skip_init) {
+		r = dsi_display_init_dispc(dssdev);
+		if (r)
+			goto err_init_dispc;
 	}
-#endif
 
 	r = dsi_display_init_dsi(dssdev);
 	if (r)
@@ -5395,7 +5401,6 @@ void dsi_uninit_platform_driver(void)
 	return platform_driver_unregister(&omap_dsihw_driver);
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -5443,6 +5448,18 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	 * HBP_HS_INTERLEAVING(7:0)=0
 	 */
 	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
+#elif defined (CONFIG_PANEL_S6E8AA0)
+	/* HSA=1, HFP=118, HBP=119 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x01076077);
+	/* WINDOW_SIZE=4, VSA=1, VFP=13, VBP=2 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04010d02);
+	/* TL(31:16)=780, VACT(15:0)=1280 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x030c0500);
+        /*
+         * HSA_HS_INTERLEAVING(23:16)=0, HFP_HS_INTERLEAVING(15:8)=0,
+         * HBP_HS_INTERLEAVING(7:0)=0
+         */
+        dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
 #else
 	/* HSA=1, HFP=24, HBP=20 */
 	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x01018014);
@@ -5479,6 +5496,11 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x00000005);
 	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x0017000E);
 	dsi_write_reg(dsidev, DSI_STOPCLK_TIMING, 0x07);
+#elif defined (CONFIG_PANEL_S6E8AA0)
+        /* BL_HS_INTERLEAVING(23:16)=31335, BL_LP_INTERLEAVING(15:0)=12753 */
+        dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);
+        /* ENTER_HS_MODE_LATENCY(31:16)=14 EXIT_HS_MODE_LATENCY(15:0)=19 */
+        dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x00170014);
 #else
 	/* BL_HS_INTERLEAVING(23:16)=31335, BL_LP_INTERLEAVING(15:0)=12753 */
 	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);
@@ -5499,4 +5521,3 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	return;
 }
 EXPORT_SYMBOL(dsi_videomode_panel_preinit);
-#endif

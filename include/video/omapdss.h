@@ -358,15 +358,10 @@ int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel);
 void dsi_disable_video_output(struct omap_dss_device *dssdev, int channel);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 int dsi_vc_gen_write_nosync_sclk(struct omap_dss_device *dssdev, int channel,
                 u8 *data, int len);
-int dsi_vc_gen_write_nosync(struct omap_dss_device *dssdev, int channel,
-		u8 *data, int len);
-
-int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type);
-void dsi_video_mode_disable(struct omap_dss_device *dssdev);
 #endif
 
 /* Board specific data */
@@ -405,7 +400,6 @@ struct omap_video_timings {
 	u16 vbp;	/* Vertical back porch */
 };
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 struct omap_cio_timings {
 	u32 ths_prepare;
 	u32 ths_prepare_ths_zero;
@@ -417,7 +411,6 @@ struct omap_cio_timings {
 	u32 tclk_prepare;
 	u32 reg_ttaget;
 };
-#endif
 
 #ifdef CONFIG_OMAP2_DSS_VENC
 /* Hardcoded timings for tv modes. Venc only uses these to
@@ -772,9 +765,7 @@ struct omap_dss_device {
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		struct omap_cio_timings dsi_cio_data;
-#endif
 		u32 width_in_um;
 		u32 height_in_um;
 		u16 fb_xres;
@@ -784,12 +775,11 @@ struct omap_dss_device {
 	struct {
 		u8 pixel_size;
 		struct rfbi_timings rfbi_timings;
+		u8 dither;
 	} ctrl;
 
 	int reset_gpio;
-#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	bool skip_init;
-#endif
 
 	int max_backlight_level;
 
@@ -984,12 +974,14 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 
 int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
 					 struct omapdss_ovl_cb *cb);
-
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask);
 int dss_set_dispc_clk(unsigned long freq);
+
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 bool omap_dss_overlay_ensure_bw(void);
 void dss_tput_request(u32 tput);
+#endif
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask);
 #endif
 
 /* generic callback handling */

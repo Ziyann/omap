@@ -132,9 +132,7 @@ struct mgr_priv_data {
 	/* callback data for the last 3 states */
 	struct callback_states cb;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	bool skip_init;
-#endif
 };
 
 static struct {
@@ -835,13 +833,11 @@ static void dss_set_go_bits(void)
 		if (!dss_data.irq_enabled && need_isr())
 			dss_register_vsync_isr();
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		DSSDBG("%s %d\n",__FUNCTION__,mp->skip_init);
 		if(mp->skip_init)
 			mp->skip_init = false;
 		else
-#endif
-		dispc_mgr_go(mgr->id);
+			dispc_mgr_go(mgr->id);
 	}
 
 }
@@ -1367,10 +1363,8 @@ static void omap_dss_mgr_apply_mgr(struct omap_overlay_manager *mgr)
 	mp->user_info_dirty = false;
 	mp->info_dirty = true;
 	mp->info = mp->user_info;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	mp->skip_init = mgr->device->skip_init;
 	DSSDBG("%s %d\n",__FUNCTION__,mp->skip_init);
-#endif
 }
 
 #ifdef CONFIG_MACH_OMAP4_BOWSER
