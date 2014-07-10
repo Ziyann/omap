@@ -427,6 +427,66 @@ void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup)
 }
 
 /**
+ * omap2_i2c_pullup - enable/disable strong pull-up resistors for I2C bus
+ * @bus_id: bus id counting from number 1
+ * @en: 1 - enable strong pull-ups, 0 - disable strong pull-ups
+ *
+ */
+void omap2_i2c_pullups_en_dis(int bus_id, unsigned int enable)
+{
+	u32 val = 0;
+
+	if (bus_id < 1 || bus_id > omap_i2c_nr_ports()) {
+		pr_err("%s:Wrong I2C port (%d)\n", __func__, bus_id);
+		return;
+	}
+
+	val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
+	switch (bus_id) {
+	case 1:
+		if (enable) {
+			val &= ~(OMAP4_I2C1_SDA_PULLUPRESX_MASK |
+				 OMAP4_I2C1_SCL_PULLUPRESX_MASK);
+		} else {
+			val |= (OMAP4_I2C1_SDA_PULLUPRESX_MASK |
+				OMAP4_I2C1_SCL_PULLUPRESX_MASK);
+		}
+		break;
+	case 2:
+		if (enable) {
+			val &= ~(OMAP4_I2C2_SDA_PULLUPRESX_MASK |
+				 OMAP4_I2C2_SCL_PULLUPRESX_MASK);
+		} else {
+			val |= (OMAP4_I2C2_SDA_PULLUPRESX_MASK |
+				OMAP4_I2C2_SCL_PULLUPRESX_MASK);
+		}
+		break;
+	case 3:
+		if (enable) {
+			val &= ~(OMAP4_I2C3_SDA_PULLUPRESX_MASK |
+				 OMAP4_I2C3_SCL_PULLUPRESX_MASK);
+		} else {
+			val |= (OMAP4_I2C3_SDA_PULLUPRESX_MASK |
+				OMAP4_I2C3_SCL_PULLUPRESX_MASK);
+		}
+		break;
+	case 4:
+		if (enable) {
+			val &= ~(OMAP4_I2C4_SDA_PULLUPRESX_MASK |
+				 OMAP4_I2C4_SCL_PULLUPRESX_MASK);
+		} else {
+			val |= (OMAP4_I2C4_SDA_PULLUPRESX_MASK |
+				OMAP4_I2C4_SCL_PULLUPRESX_MASK);
+		}
+		break;
+	default:
+		return;
+	}
+
+	omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
+}
+
+/**
  * omap_i2c_get_hwspinlockid - Get HWSPINLOCK ID for I2C device
  * @dev: I2C device
  *

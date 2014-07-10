@@ -90,6 +90,7 @@ void __init omap2_i2c_mux_pins(int bus_id);
 struct omap_hwmod;
 int omap_i2c_reset(struct omap_hwmod *oh);
 void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup);
+void omap2_i2c_pullups_en_dis(int bus_id, unsigned int enable);
 void omap5_i2c_pullup(int bus_id, int enable, int glitch_free);
 void __init omap5_i2c_weak_pullup(int bus_id, bool enable);
 
