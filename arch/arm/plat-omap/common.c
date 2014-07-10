@@ -92,6 +92,11 @@ void omap_init_ram_size(void)
 		omap4_total_ram_size += meminfo.bank[i].size;
 }
 
+void omap_set_ram_size(phys_addr_t ram_size)
+{
+	omap4_total_ram_size += ram_size;
+}
+
 phys_addr_t omap_total_ram_size(void)
 {
 	return omap4_total_ram_size;

@@ -39,6 +39,7 @@ void omap_sram_init(void);
 
 extern struct meminfo meminfo;
 void omap_init_ram_size(void);
+void omap_set_ram_size(phys_addr_t);
 phys_addr_t omap_total_ram_size(void);
 
 #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
