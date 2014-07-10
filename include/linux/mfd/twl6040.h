@@ -203,6 +203,13 @@ struct twl6040_codec_data {
 	u16 hf_right_step;
 	u16 amic_bias_settle_ms;
 	int vddhf_uV;
+#ifdef CONFIG_MACH_OMAP_BN
+	int vddhf_gpo;
+	int lineout_gpio;
+	int hook_gpadc_ch;
+	int hook_ref_vol;
+	int hs_jack_debounce;
+#endif
 };
 
 struct twl6040_vibra_data {
