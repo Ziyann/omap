@@ -163,7 +163,7 @@ static struct omapfb_platform_data sdp4430_fb_data = {
 	},
 };
 
-void __init omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
+void __init omap4_kc1_android_display_setup(void)
 {
 	omap_android_display_setup(&sdp4430_dss_data,
 				   &dsscomp_config_tablet,
