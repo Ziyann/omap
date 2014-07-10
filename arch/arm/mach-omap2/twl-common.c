@@ -437,7 +437,7 @@ static struct regulator_init_data omap4_vaux1_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_BN)
 		.always_on		= true,
 #endif
 		.state_mem = {
@@ -573,7 +573,11 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 		.state_mem = {
+#ifdef CONFIG_MACH_OMAP_BN
+			.disabled	= true,
+#else
 			.enabled	= true,
+#endif
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},
