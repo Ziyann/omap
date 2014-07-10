@@ -33,6 +33,7 @@
 #include <linux/i2c/tmp103.h>
 #include <linux/dev_info.h>
 #include <linux/omap_die_governor.h>
+#include <linux/omap4_duty_cycle_governor.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
