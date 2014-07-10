@@ -799,7 +799,7 @@ config INPUT_PIC12LF1822_PROXIMITY
 config INPUT_KXTF9
 	tristate "Kionix KXTF9 tri-axis digital accelerometer"
 	depends on I2C && SYSFS
-	default y
+	default n
 	  help
 	  if you say yes here you get support for the Kionix KXTF9 digital tri axis- accelerometer.
 
