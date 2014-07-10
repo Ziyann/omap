@@ -162,6 +162,9 @@
 				 IH_MPUIO_BASE + ((nr) & 0x0f) : \
 				 IH_GPIO_BASE + (nr))
 
+#define OMAP_IRQ_TO_GPIO(nr)	((((nr) - IH_GPIO_BASE) < OMAP_MAX_GPIO_LINES) ? \
+				 ((nr) - IH_GPIO_BASE) : (-EIO))
+
 struct omap_gpio_dev_attr {
 	int bank_width;		/* GPIO bank width */
 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
