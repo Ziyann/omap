@@ -20,8 +20,12 @@
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 #include <linux/delay.h>
+
+#include <asm/system_info.h>
+
 #include <plat/omap-serial.h>
 #include <plat/gpio.h>
+
 #include "board-ovation.h"
 #include "mux.h"
 
@@ -116,7 +120,7 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 static bool uart_req;
 static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
-static int plat_uart_disable(void)
+static int plat_uart_disable(struct kim_data_s *kdata)
 {
 	int port_id = 0;
 	int err = 0;
@@ -131,7 +135,7 @@ static int plat_uart_disable(void)
 }
 
 /* Call the uart enable of serial driver */
-static int plat_uart_enable(void)
+static int plat_uart_enable(struct kim_data_s *kdata)
 {
 	int port_id = 0;
 	int err = 0;
@@ -179,16 +183,16 @@ void bn_wilink_set_power(bool enable)
 	}
 }
 
-static int plat_chip_enable(void)
+static int plat_chip_enable(struct kim_data_s *kdata)
 {
 	bn_wilink_set_power(true);
-	return plat_uart_enable();
+	return plat_uart_enable(NULL);
 }
 
-static int plat_chip_disable(void)
+static int plat_chip_disable(struct kim_data_s *kdata)
 {
 	bn_wilink_set_power(false);
-	return plat_uart_disable();
+	return plat_uart_disable(NULL);
 }
 
 /* wl2xx WiFi platform data */
@@ -207,10 +211,10 @@ static struct ti_st_plat_data ti_st_pdata = {
 	.baud_rate = 3686400,
 	.suspend = plat_wlink_kim_suspend,
 	.resume = plat_wlink_kim_resume,
-	.chip_asleep = plat_uart_disable,
-	.chip_awake  = plat_uart_enable,
 	.chip_enable = plat_chip_enable,
 	.chip_disable = plat_chip_disable,
+	.chip_asleep = plat_uart_disable,
+	.chip_awake  = plat_uart_enable,
 };
 
 static struct platform_device ti_st_device = {
