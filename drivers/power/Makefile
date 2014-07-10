@@ -51,3 +51,4 @@ obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
 obj-$(CONFIG_POWER_AVS)		+= avs/
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-bowser.o
 obj-$(CONFIG_SUMMIT_SMB347_Q)	+= smb347-otter.o
+obj-$(CONFIG_CHARGER_BQ2419x)	+= bq2419x_charger.o
