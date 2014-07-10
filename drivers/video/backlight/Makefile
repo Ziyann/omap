@@ -22,7 +22,11 @@ obj-$(CONFIG_BACKLIGHT_GENERIC)	+= generic_bl.o
 obj-$(CONFIG_BACKLIGHT_HP700)	+= jornada720_bl.o
 obj-$(CONFIG_BACKLIGHT_HP680)	+= hp680_bl.o
 obj-$(CONFIG_BACKLIGHT_LOCOMO)	+= locomolcd.o
+ifdef CONFIG_MACH_OMAP_BN
+obj-$(CONFIG_BACKLIGHT_LP855X)	+= lp855x_bl-bn.o
+else
 obj-$(CONFIG_BACKLIGHT_LP855X)	+= lp855x_bl.o
+endif
 obj-$(CONFIG_BACKLIGHT_OMAP1)	+= omap1_bl.o
 obj-$(CONFIG_BACKLIGHT_PANDORA)	+= pandora_bl.o
 obj-$(CONFIG_BACKLIGHT_PROGEAR) += progear_bl.o

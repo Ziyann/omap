@@ -47,10 +47,10 @@
 				(LP8556_I2C_ONLY << BRT_MODE_SHFT))
 #define LP8556_COMB2_CONFIG	(LP8556_COMBINED2 << BRT_MODE_SHFT)
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 #define LP8556_FAST_CONFIG	BIT(7) /* use it if EPROMs should be maintained
 					  when exiting the low power mode */
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 /* CONFIG register - LP8557 */
 #define LP8557_PWM_STANDBY	BIT(7)
 #define LP8557_PWM_FILTER	BIT(6)
@@ -131,6 +131,43 @@ struct lp855x_rom_data {
 	u8 val;
 };
 
+#ifdef CONFIG_MACH_OMAP_BN
+/* CFG5 8556 */
+#define CFG5_REG		0xA5
+#define CFG6_REG		0xA6
+#define PWM_DIRECT		(0x1 << 7)
+
+#define PS_MODE_6P6D		(0x00 << 4)
+#define PS_MODE_5P5D		(0x01 << 4)
+#define PS_MODE_4P4D		(0x02 << 4)
+#define PS_MODE_3P3D		(0x03 << 4)
+#define PS_MODE_2P2D		(0x04 << 4)
+#define PS_MODE_3P6D		(0x05 << 4)
+#define PS_MODE_2P6D		(0x06 << 4)
+#define PS_MODE_1P6D		(0x07 << 4)
+
+#define PWM_FREQ4808HZ		0x00
+#define PWM_FREQ6010HZ		0x01
+#define PWM_FREQ2712HZ		0x02
+#define PWM_FREQ8414HZ		0x03
+#define PWM_FREQ6916HZ		0x04
+#define PWM_FREQ12020HZ		0x05
+#define PWM_FREQ13222HZ		0x06
+#define PWM_FREQ14424HZ		0x07
+#define PWM_FREQ15626HZ		0x08
+#define PWM_FREQ16828HZ		0x09
+#define PWM_FREQ10830HZ		0x0A
+#define PWM_FREQ19232HZ		0x0B
+#define PWM_FREQ24040HZ		0x0C
+#define PWM_FREQ38848HZ		0x0D
+#define PWM_FREQ33656HZ		0x0E
+#define PWM_FREQ38464HZ		0x0F
+
+#define BOOST_FREQ312KHZ	0x00
+#define BOOST_FREQ625KHZ	0x40
+#define BOOST_FREQ1250KHZ	0x80
+#endif
+
 /**
  * struct lp855x_platform_data
  * @name : Backlight driver name. If it is not defined, default name is set.
@@ -151,9 +188,7 @@ struct lp855x_platform_data {
 	enum lp855x_brightness_ctrl_mode mode;
 	u8 device_control;
 	int initial_brightness;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	int max_brightness;
-#endif
 	struct lp855x_pwm_data pwm_data;
 	u8 load_new_rom_data;
 	int size_program;
@@ -161,6 +196,15 @@ struct lp855x_platform_data {
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 	int gpio_en;
 	const char *regulator_name;
+#endif
+#ifdef CONFIG_MACH_OMAP_BN
+	u8 led_setting;
+	u8 boost_freq;
+	u8 nonlinearity_factor;
+	int (*request_resources)(struct device *dev);
+	int (*release_resources)(struct device *dev);
+	int (*power_on)(struct device *dev);
+	int (*power_off)(struct device *dev);
 #endif
 };
 
