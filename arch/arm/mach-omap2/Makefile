@@ -318,7 +318,6 @@ obj-$(CONFIG_MACH_OMAP_OVATION)		+= board-ovation.o \
 					   board-bn-wifi.o
 obj-$(CONFIG_MACH_OMAP_HUMMINGBIRD)	+= board-hummingbird.o \
 					   board-hummingbird-touch.o \
-					   board-hummingbird-sensors.o \
 					   board-hummingbird-panel.o \
 					   board-hummingbird-buttons.o \
 					   board-bn-power.o \
