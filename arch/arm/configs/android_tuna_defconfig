@@ -25,6 +25,7 @@ CONFIG_IFB=y
 CONFIG_BCMDHD=y
 CONFIG_BCMDHD_FW_PATH="/system/vendor/firmware/fw_bcmdhd.bin"
 CONFIG_BCMDHD_NVRAM_PATH="/system/etc/wifi/bcmdhd.cal"
+CONFIG_CFG80211=y
 # CONFIG_WL12XX_MENU is not set
 # CONFIG_INPUT_MOUSEDEV is not set
 # CONFIG_INPUT_JOYDEV is not set
