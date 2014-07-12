@@ -186,6 +186,10 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
 		DEBUG_LL_OMAP4(3, omap4_bowser);
 		DEBUG_LL_OMAP4(3, tuna);
 
+		/* omap4 based boards using UART1 */
+		DEBUG_LL_OMAP4(1, omap_ovation);
+		DEBUG_LL_OMAP4(1, omap_hummingbird);
+
 #ifdef CONFIG_MACH_OMAP_5430ZEBU
 		/* omap5 based boards using UART1 */
 		DEBUG_LL_OMAP5(1, omap5_sevm);
