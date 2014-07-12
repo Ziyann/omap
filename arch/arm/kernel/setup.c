@@ -104,6 +104,13 @@ EXPORT_SYMBOL(system_serial_high);
 unsigned int elf_hwcap __read_mostly;
 EXPORT_SYMBOL(elf_hwcap);
 
+#ifdef CONFIG_MACH_OMAP_BN
+unsigned int system_modelid;
+EXPORT_SYMBOL(system_modelid);
+
+unsigned char system_cpuid[20];
+EXPORT_SYMBOL(system_cpuid);
+#endif
 
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 
@@ -878,6 +885,24 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 }
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
+
+#ifdef CONFIG_MACH_OMAP_BN
+static int __init parse_tag_modelid(const struct tag *tag)
+{
+	system_modelid = tag->u.modelid.id;
+	return 0;
+}
+
+__tagtable(ATAG_MODELID , parse_tag_modelid);
+
+static int __init parse_tag_cpuid(const struct tag *tag)
+{
+	memcpy(system_cpuid, tag->u.cpuid.id, 20);
+	return 0;
+}
+
+__tagtable(ATAG_CPUID , parse_tag_cpuid);
+#endif
 
 /*
  * Scan the tag table for this tag, and call its parse function.
