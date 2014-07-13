@@ -17,15 +17,32 @@
 #include <linux/input.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
-#include <plat/omap4-keypad.h>
+
 #include <plat/omap_apps_brd_id.h>
 
 #include "mux.h"
 #include "board-ovation.h"
+#include <plat/omap4-keypad.h>
 
 static int ovation_keymap[] = {
 	KEY(0, 0, KEY_VOLUMEUP),
 	KEY(1, 0, KEY_VOLUMEDOWN),
+};
+
+static struct omap_device_pad keypad_pads[] = {
+	{	.name   = "kpd_col0.kpd_col0",
+		.enable = OMAP_WAKEUP_EN | OMAP_MUX_MODE0,
+	},
+	{	.name   = "kpd_row0.kpd_row0",
+		.enable = OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
+				OMAP_INPUT_EN,
+	},
+	{	.name   = "kpd_row1.kpd_row1",
+		.enable = OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
+				OMAP_INPUT_EN,
+	},
 };
 
 static struct matrix_keymap_data ovation_keymap_data = {
@@ -40,22 +57,11 @@ static struct omap4_keypad_platform_data ovation_keypad_data = {
 	.cols                   = 1,
 };
 
-void keyboard_mux_init(void)
-{
-	/* Column mode */
-	omap_mux_init_signal("kpd_col0.kpd_col0",
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0);
-	/* Row mode */
-	omap_mux_init_signal("kpd_row0.kpd_row0",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
-			OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row1.kpd_row1",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
-			OMAP_INPUT_EN);
-}
-
+static struct omap_board_data keypad_data = {
+	.id	    		= 1,
+	.pads	 		= keypad_pads,
+	.pads_cnt       	= ARRAY_SIZE(keypad_pads),
+};
 
 static struct gpio_led ovation_gpio_leds[] = {
 	{
@@ -128,10 +134,8 @@ int __init ovation_button_init(void)
 {
 	int status;
 	platform_add_devices(ovation_devices, ARRAY_SIZE(ovation_devices));
-	keyboard_mux_init();
 	gpio_key_buttons_mux_init();
-	status = omap4_keyboard_init(&ovation_keypad_data);
-
+	status = omap4_keyboard_init(&ovation_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 	return 0;
