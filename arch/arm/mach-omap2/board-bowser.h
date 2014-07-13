@@ -22,10 +22,7 @@
 #define GPIO_TOUCH_IRQ   24
 #endif
 
-//int bowser_sensor_init(void);
 int bowser_panel_init(void);
-//int bowser_keypad_init(void);
-void omap4_create_board_props(void);
 
 extern struct mmc_platform_data bowser_wifi_data;
 extern int bowser_wifi_init(void);
