@@ -25,12 +25,9 @@
 #define HUMMINGBIRD_PVT			0x5
 
 int hummingbird_touch_init(void);
-int hummingbird_sensor_init(void);
-void omap4_create_board_props(void);
 int hummingbird_panel_init(void);
 int hummingbird_button_init(void);
-struct omap_ion_platform_data;
-void hummingbird_android_display_setup(struct omap_ion_platform_data *ion);
+void hummingbird_android_display_setup(void);
 void bn_power_init(void);
 void bn_wilink_init(void);
 
