@@ -35,8 +35,11 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/i2c.h>
+
+#include <video/mipi_display.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-generic.h>
+
 #include "../dss/dss.h"
 
 #include "panel-nt71391.h"
@@ -308,7 +311,7 @@ static int nt71391_power_on(struct omap_dss_device *dssdev)
 {
 	struct nt71391_data *d2d = dev_get_drvdata(&dssdev->dev);
 	int r;
-	u8 dcs_cmd = 0x32;
+	u8 dcs_cmd = MIPI_DSI_TURN_ON_PERIPHERAL;
 
 	r = dss_set_dispc_clk(192000000);
 	if (r)
