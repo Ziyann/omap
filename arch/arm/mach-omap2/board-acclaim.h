@@ -18,7 +18,6 @@
 #define _MACH_OMAP_BOARD_ACCLAIM_H
 
 int acclaim_touch_init(void);
-void omap4_create_board_props(void);
 int acclaim_panel_init(void);
 int acclaim_button_init(void);
 

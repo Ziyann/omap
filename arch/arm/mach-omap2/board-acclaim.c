@@ -28,19 +28,17 @@
 #include <linux/wl12xx.h>
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
-#include <plat/omap-serial.h>
+#include <linux/wakelock.h>
 
-#include <mach/dmm.h>
-#include <mach/hardware.h>
-#include <mach/omap4-common.h>
-#include <mach/emif.h>
-#include <mach/lpddr2-elpida.h>
-#include <mach/lpddr2-samsung.h>
-#include <mach/board-4430-acclaim.h>
-
+#include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+
+#include <mach/hardware.h>
+#include <mach/omap-secure.h>
+#include <mach/omap4_ion.h>
+#include <mach/board-4430-acclaim.h>
 
 #include <plat/board.h>
 #include <plat/common.h>
@@ -50,17 +48,17 @@
 #include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
 #include <plat/omap-pm.h>
-#include <linux/wakelock.h>
+#include <plat/drm.h>
+
 #include "mux.h"
 #include "hsmmc.h"
-#include "timer-gp.h"
+#include "common.h"
 #include "control.h"
 #include "common-board-devices.h"
 #include "pm.h"
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 #include "board-acclaim.h"
-#include "omap4_ion.h"
 #include "omap_ram_console.h"
 
 #ifdef CONFIG_INPUT_KXTF9
@@ -74,10 +72,6 @@
 #ifdef CONFIG_CHARGER_MAX8903
 #include <linux/max8903.h>
 #endif //CONFIG_CHARGER_MAX8903
-
-#define  SAMSUNG_SDRAM 0x01
-#define  ELPIDA_SDRAM  0x03
-#define  HYNIX_SDRAM   0x06
 
 #ifdef CONFIG_INPUT_KXTF9
 
@@ -227,15 +221,6 @@ static inline void max8903_init_charger(void)
 static struct omap_board_config_kernel tablet_config[] __initdata = {
 };
 
-static void __init omap_tablet_init_early(void)
-{
-	omap2_init_common_infrastructure();
-	omap2_init_common_devices(NULL, NULL);
-#ifdef CONFIG_OMAP_32K_TIMER
-	omap2_gp_clockevent_set_gptimer(1);
-#endif
-}
-
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
 #ifdef CONFIG_USB_MUSB_OTG
@@ -263,6 +248,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp	= -EINVAL,
 		.nonremovable   = true,
 		.ocr_mask	= MMC_VDD_29_30,
+		.built_in	= 1,
 		.no_off_init	= true,
 	},
 	{
@@ -277,6 +263,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195,
+		.built_in	= 1,
 		.nonremovable	= true,
 	},
 	{}	/* Terminator */
@@ -333,21 +320,22 @@ static struct platform_device omap_vwlan_device = {
 
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 {
-	int ret = 0;
+	int irq = 0;
 	struct platform_device *pdev = container_of(dev,
 				struct platform_device, dev);
 	struct omap_mmc_platform_data *pdata = dev->platform_data;
 
 	/* Setting MMC1 Card detect Irq */
 	if (pdev->id == 0) {
-		ret = twl6030_mmc_card_detect_config();
-		if (ret)
+		irq = twl6030_mmc_card_detect_config();
+		if (irq) {
 			pr_err("Failed configuring MMC1 card detect\n");
-		pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
-						MMCDETECT_INTR_OFFSET;
+			return irq;
+		}
+		pdata->slots[0].card_detect_irq = irq;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
-	return ret;
+	return 0;
 }
 
 static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
@@ -367,9 +355,9 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
 	struct omap2_hsmmc_info *c;
 
-	omap2_hsmmc_init(controllers);
+	omap_hsmmc_init(controllers);
 	for (c = controllers; c->mmc; c++)
-		omap4_twl6030_hsmmc_set_late_init(c->dev);
+		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
 
 	return 0;
 }
@@ -654,9 +642,9 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 	/* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id, USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
@@ -729,34 +717,11 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
-
-/*
- * LPDDR2 Configeration Data:
- * The memory organisation is as below :
- *	EMIF1 - CS0 -	2 Gb
- *		CS1 -	2 Gb
- *	EMIF2 - CS0 -	2 Gb
- *		CS1 -	2 Gb
- *	--------------------
- *	TOTAL -		8 Gb
- *
- * Same devices installed on EMIF1 and EMIF2
- */
-static __initdata struct emif_device_details emif_devices_elpida = {
-	.cs0_device = &lpddr2_elpida_2G_S4_dev,
-	.cs1_device = &lpddr2_elpida_2G_S4_dev
-};
-
-static __initdata struct emif_device_details emif_devices_samsung = {
-	.cs0_device = &lpddr2_samsung_4G_S4_dev,
-	.cs1_device = 0
-};
-
-
 #else
 #define board_mux	NULL
-#define board_wkup_mux	NULL
 #endif
+
+#define DEFAULT_UART_AUTOSUSPEND_DELAY	3000	/* Runtime autosuspend (msecs)*/
 
 static struct omap_device_pad tablet_uart1_pads[] __initdata = {
 	{
@@ -779,17 +744,22 @@ static struct omap_device_pad tablet_uart1_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data tablet_uart1_board_data __initdata = {
+	.id = 0,
+	.pads = tablet_uart1_pads,
+	.pads_cnt = ARRAY_SIZE(tablet_uart1_pads),
+};
+
 static struct omap_uart_port_info tablet_uart_info __initdata = {
-	.use_dma	= 0,
-	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
-        .wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
+	.dma_enabled = 0,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
+//      .wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
 };
 
 static inline void __init board_serial_init(void)
 {
 	/* console */
-	omap_serial_init_port_pads(0, tablet_uart1_pads,
-		ARRAY_SIZE(tablet_uart1_pads), &tablet_uart_info);
+	omap_serial_init_port(&tablet_uart1_board_data, &tablet_uart_info);
 }
 
 
@@ -888,18 +858,38 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static phys_addr_t acclaim_get_ram_size(void)
+{
+	phys_addr_t ram_size = SZ_1G;
+	return ram_size;
+}
+
 static void acclaim_mem_init(void)
 {
-	switch(sdram_vendor()) {
+	switch(omap_sdram_vendor()) {
 		case SAMSUNG_SDRAM:
 			printk(KERN_INFO "Samsung DDR Memory\n");
-			omap_emif_setup_device_details(&emif_devices_samsung, &emif_devices_samsung);
+			omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_info,
+					lpddr2_samsung_4G_S4_timings,
+					ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+					&lpddr2_samsung_S4_min_tck, NULL);
+			omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_info,
+					lpddr2_samsung_4G_S4_timings,
+					ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+					&lpddr2_samsung_S4_min_tck, NULL);
 		break;
 		case ELPIDA_SDRAM:
 		/* Re-use ELPIDA timings as they are absolutely the same */
 		case HYNIX_SDRAM:
 			printk(KERN_INFO "Elpida/Hynix DDR Memory\n");
-			omap_emif_setup_device_details(&emif_devices_elpida, &emif_devices_elpida);
+			omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
+					lpddr2_elpida_2G_S4_timings,
+					ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+					&lpddr2_elpida_S4_min_tck, NULL);
+			omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
+					lpddr2_elpida_2G_S4_timings,
+					ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+					&lpddr2_elpida_S4_min_tck, NULL);
 		break;
 		default:
 			pr_err("Memory type does not exist\n");
@@ -919,19 +909,22 @@ static void __init omap_tablet_init(void)
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 	tablet_rev = omap_init_board_version(0);
-	omap4_create_board_props();
+	omap_create_board_props();
 	omap4_i2c_init();
 #ifdef CONFIG_CHARGER_MAX8903
 	max8903_init_charger();
 #endif //CONFIG_CHARGER_MAX8903
 	acclaim_touch_init();
-	omap_dmm_init();
 	acclaim_panel_init();
 	tablet_pmic_mux_init();
 	acclaim_button_init();
+	omap_init_dmm_tiler();
+#ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
+#endif
 	board_serial_init();
 	omap4_tablet_wifi_init();
+	omap_sdrc_init(NULL, NULL);
 	omap4_twl6030_hsmmc_init(mmc);
 
 	omap4_ehci_ohci_init();
@@ -943,36 +936,32 @@ static void __init omap_tablet_init(void)
 
 }
 
-static void __init omap_tablet_map_io(void)
-{
-	omap2_set_globals_443x();
-	omap44xx_map_common_io();
-}
-
 static void __init omap_tablet_reserve(void)
 {
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#ifdef CONFIG_ION_OMAP
-	omap_ion_init();
-#endif
-	omap_reserve();
+	omap_set_ram_size(acclaim_get_ram_size());
 
-	omap_ram_console_init(ACCLAIM_RAM_CONSOLE_START, ACCLAIM_RAM_CONSOLE_SIZE);
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+
+#ifdef CONFIG_ION_OMAP
+	omap4_ion_init();
+#endif
+
+	omap4_secure_workspace_addr_default();
+
+	omap_reserve();
 }
 
 
 MACHINE_START(OMAP_ACCLAIM, "OMAP4 acclaim board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
-	.boot_params	= 0x80000100,
+	.atag_offset	= 0x100,
 	.reserve	= omap_tablet_reserve,
-	.map_io		= omap_tablet_map_io,
-	.init_early	= omap_tablet_init_early,
+	.map_io		= omap4_map_io,
+	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,
+	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_tablet_init,
-	.timer		= &omap_timer,
+	.timer		= &omap4_timer,
+	.restart	= omap_prcm_restart,
 MACHINE_END
