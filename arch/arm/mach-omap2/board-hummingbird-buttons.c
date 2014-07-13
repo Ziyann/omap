@@ -17,15 +17,32 @@
 #include <linux/input.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
-#include <plat/omap4-keypad.h>
+
 #include <plat/omap_apps_brd_id.h>
 
 #include "mux.h"
 #include "board-hummingbird.h"
+#include <plat/omap4-keypad.h>
 
 static int hummingbird_keymap[] = {
 	KEY(0, 0, KEY_VOLUMEUP),
 	KEY(1, 0, KEY_VOLUMEDOWN),
+};
+
+static struct omap_device_pad keypad_pads[] = {
+	{	.name   = "kpd_col0.kpd_col0",
+		.enable = OMAP_WAKEUP_EN | OMAP_MUX_MODE0,
+	},
+	{	.name   = "kpd_row0.kpd_row0",
+		.enable = OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
+				OMAP_INPUT_EN,
+	},
+	{	.name   = "kpd_row1.kpd_row1",
+		.enable = OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
+				OMAP_INPUT_EN,
+	},
 };
 
 static struct matrix_keymap_data hummingbird_keymap_data = {
@@ -40,22 +57,11 @@ static struct omap4_keypad_platform_data hummingbird_keypad_data = {
 	.cols                   = 1,
 };
 
-void keyboard_mux_init(void)
-{
-	/* Column mode */
-	omap_mux_init_signal("kpd_col0.kpd_col0",
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0);
-	/* Row mode */
-	omap_mux_init_signal("kpd_row0.kpd_row0",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
-			OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row1.kpd_row1",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE0 |
-			OMAP_INPUT_EN);
-}
-
+static struct omap_board_data keypad_data = {
+	.id	    		= 1,
+	.pads	 		= keypad_pads,
+	.pads_cnt       	= ARRAY_SIZE(keypad_pads),
+};
 
 static struct gpio_led hummingbird_gpio_leds[] = {
 	{
@@ -105,7 +111,6 @@ static struct gpio_keys_button hummingbird_gpio_keys_buttons[] = {
 
 static void gpio_key_buttons_mux_init(void)
 {
-	int err;
 	/* Hall sensor */
 	omap_mux_init_gpio(31, OMAP_PIN_INPUT |
 			OMAP_PIN_OFF_WAKEUPENABLE);
@@ -135,10 +140,7 @@ int __init hummingbird_button_init(void)
 	int status;
 	gpio_key_buttons_mux_init();
 	platform_add_devices(hummingbird_devices, ARRAY_SIZE(hummingbird_devices));
-
-	keyboard_mux_init();
-	status = omap4_keyboard_init(&hummingbird_keypad_data);
-
+	status = omap4_keyboard_init(&hummingbird_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 	return 0;
