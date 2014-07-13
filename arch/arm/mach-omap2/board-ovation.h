@@ -28,12 +28,10 @@
 
 int ovation_touch_init(void);
 int ovation_sensor_init(void);
-void omap4_create_board_props(void);
 int ovation_panel_init(void);
 int ovation_button_init(void);
 void bn_power_init(void);
 void bn_wilink_init(void);
-struct omap_ion_platform_data;
-void ovation_android_display_setup(struct omap_ion_platform_data *ion);
+void ovation_android_display_setup(void);
 
 #endif

@@ -23,48 +23,54 @@
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
-#include <linux/i2c/bq2419x.h>
-#include <linux/power/bq27x00_battery.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <plat/omap-serial.h>
-#include <linux/input/kxtf9.h>
-#include <mach/dmm.h>
-#include <mach/omap4-common.h>
-#include <mach/emif.h>
-#include <mach/lpddr2-elpida.h>
-#include <mach/lpddr2-hynix.h>
-#include <mach/lpddr2-samsung.h>
+#include <linux/wakelock.h>
 
+#include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/setup.h>
+#include <asm/system_info.h>
+
+#include <mach/hardware.h>
+#include <mach/omap-secure.h>
+#include <mach/omap4_ion.h>
 
 #include <plat/board.h>
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/omap_apps_brd_id.h>
 #include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
 #include <plat/omap-pm.h>
-#include <linux/wakelock.h>
+#include <plat/drm.h>
+
 #include "mux.h"
 #include "hsmmc.h"
-#include "timer-gp.h"
+#include "common.h"
 #include "control.h"
+#include "common-board-devices.h"
 #include "pm.h"
 #include "board-ovation.h"
-#include <mach/omap4_ion.h>
 #include "omap_ram_console.h"
+
+#ifdef CONFIG_INPUT_KXTF9
+#include <linux/input/kxtf9.h>
+#endif
+#ifdef CONFIG_CHARGER_BQ2419x
+#include <linux/i2c/bq2419x.h>
+#endif
+#ifdef CONFIG_BATTERY_BQ27x00
+#include <linux/power/bq27x00_battery-bn.h>
+#endif
 
 #define KXTJ9_GPIO_IRQ 152
 
 #define EXT_FET_EN              4
-
-#define  SAMSUNG_SDRAM 0x01
-#define  ELPIDA_SDRAM  0x03
-#define  HYNIX_SDRAM   0x06
 
 #define GPIO_UART_DDC_SWITCH	182
 #define GPIO_LS_DCDC_EN		60
@@ -85,11 +91,8 @@ static void __init omap_ovation_init_early(void)
 		[2] = "gpio5"
 	};
 
-	omap2_init_common_infrastructure();
-	omap2_init_common_devices(NULL, NULL);
-#ifdef CONFIG_OMAP_32K_TIMER
-	omap2_gp_clockevent_set_gptimer(1);
-#endif
+	omap4430_init_early();
+
 	for (i = 0; i < sizeof(hwmods)/sizeof(char*); i++) {
 		oh = omap_hwmod_lookup(hwmods[i]);
 		if (oh) {
@@ -119,6 +122,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp	= -EINVAL,
 		.nonremovable   = true,
 		.ocr_mask	= MMC_VDD_29_30,
+		.built_in	= 1,
 		.no_off_init	= true,
 	},
 	{
@@ -133,6 +137,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195,
+		.built_in	= 1,
 		.nonremovable	= true,
 	},
 	{}	/* Terminator */
@@ -140,32 +145,22 @@ static struct omap2_hsmmc_info mmc[] = {
 
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 {
-	int ret = 0;
+	int irq = 0;
 	struct platform_device *pdev = container_of(dev,
 				struct platform_device, dev);
 	struct omap_mmc_platform_data *pdata = dev->platform_data;
 
 	/* Setting MMC1 Card detect Irq */
 	if (pdev->id == 0) {
-		ret = twl6030_mmc_card_detect_config();
-		if (ret)
+		irq = twl6030_mmc_card_detect_config();
+		if (irq) {
 			pr_err("Failed configuring MMC1 card detect\n");
-		pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
-						MMCDETECT_INTR_OFFSET;
+			return irq;
+		}
+		pdata->slots[0].card_detect_irq = irq;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
-
-	/* Setting MMC3 SDIO card .built-in variable
-	 * This is to make sure that if WiFi driver is not loaded
-	 * at all, then the MMC/SD/SDIO driver does not keep
-	 * turning on/off the voltage to the SDIO card
-	 */
-	if (pdev->id == 2) {
-		ret = 0;
-		pdata->slots[0].mmc_data.built_in = 1;
-	}
-
-	return ret;
+	return 0;
 }
 
 static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
@@ -185,9 +180,9 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
 	struct omap2_hsmmc_info *c;
 
-	omap2_hsmmc_init(controllers);
+	omap_hsmmc_init(controllers);
 	for (c = controllers; c->mmc; c++)
-		omap4_twl6030_hsmmc_set_late_init(c->dev);
+		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
 
 	return 0;
 }
@@ -199,12 +194,21 @@ static void omap4_audio_conf(void)
 		OMAP_PIN_INPUT_PULLUP);
 }
 
+#ifdef CONFIG_BATTERY_BQ27x00
 static struct bq27x00_platform_data __initdata ovation_bq27520_platform_data = {
 	.gpio_ce = 113,
 	.gpio_soc_int = 176,
 	.gpio_bat_low = 42,
 };
 
+static struct i2c_board_info __initdata ovation_i2c_bq27520_boardinfo = {
+	I2C_BOARD_INFO("bq27500", 0x55),
+	.flags = I2C_CLIENT_WAKE,
+	.platform_data = &ovation_bq27520_platform_data,
+};
+#endif
+
+#ifdef CONFIG_CHARGER_BQ2419x
 static struct bq2419x_platform_data __initdata ovation_bqdata = {
 	.max_charger_voltagemV = 4200,
 	.max_charger_currentmA = 1550,
@@ -215,6 +219,13 @@ static struct bq2419x_platform_data __initdata ovation_bqdata = {
 	.stimer_dcp = CHGTIMER_12h,
 };
 
+static struct i2c_board_info __initdata ovation_i2c_bq24196_boardinfo = {
+	I2C_BOARD_INFO("bq24196", 0x6b),
+	.platform_data = &ovation_bqdata,
+};
+#endif
+
+#ifdef CONFIG_INPUT_KXTF9
 static int __init kxtj9_dev_init(void)
 {
 	int ret;
@@ -260,22 +271,12 @@ struct kxtf9_platform_data kxtf9_platform_data_here = {
 	.gpio			= KXTJ9_GPIO_IRQ,
 };
 
-static struct i2c_board_info __initdata ovation_i2c_bq27520_boardinfo = {
-	I2C_BOARD_INFO("bq27500", 0x55),
-	.flags = I2C_CLIENT_WAKE,
-	.platform_data = &ovation_bq27520_platform_data,
-};
-
 static struct i2c_board_info __initdata ovation_i2c_kxtf9_boardinfo = {
 	I2C_BOARD_INFO("kxtf9", 0xf),
 	.platform_data = &kxtf9_platform_data_here,
 	.irq = OMAP_GPIO_IRQ(KXTJ9_GPIO_IRQ),
 };
-
-static struct i2c_board_info __initdata ovation_i2c_bq24196_boardinfo = {
-	I2C_BOARD_INFO("bq24196", 0x6b),
-	.platform_data = &ovation_bqdata,
-};
+#endif
 
 static void __init ovation_pmic_mux_init(void)
 {
@@ -288,9 +289,9 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 	/* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id, USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
@@ -317,23 +318,24 @@ static int __init omap4_i2c_init(void)
 
 	bn_power_init();
 
+#ifdef CONFIG_INPUT_KXTF9
 	//set kxtf9 address
 	if (system_rev >= OVATION_EVT1A) {
 		printk(KERN_INFO "kxtf9 i2c address = 0xe \n");
 		ovation_i2c_kxtf9_boardinfo.addr = 0xe;
 	}
 	i2c_register_board_info(1, &ovation_i2c_kxtf9_boardinfo, 1);
+#endif
 
 	if (system_rev >= OVATION_EVT1B) {
+#ifdef CONFIG_BATTERY_BQ27x00
 		i2c_register_board_info(1, &ovation_i2c_bq27520_boardinfo, 1);
+#endif
+#ifdef CONFIG_CHARGER_BQ2419x
 		i2c_register_board_info(1, &ovation_i2c_bq24196_boardinfo, 1);
+#endif
 	}
 
-	/* Disable i2c2, same pins for uart1 console */
-	//omap_register_i2c_bus(2, 400, NULL, 0);
-
-	//i2c_register_board_info(3, ovation_i2c_3_boardinfo,
-	//			ARRAY_SIZE(ovation_i2c_3_boardinfo));
 	omap_register_i2c_bus(3, 400, NULL, 0);
 
 	// Disable the strong pull-ups on I2C3 and I2C4
@@ -366,50 +368,9 @@ static struct omap_board_mux board_mux[] __initdata = {
 };
 #else
 #define board_mux	NULL
-#define board_wkup_mux	NULL
 #endif
 
-
-/*
- * LPDDR2 Configeration Data:
- * The memory organisation is as below :
- *	EMIF1 - CS0 -	2 Gb
- *		CS1 -	2 Gb
- *	EMIF2 - CS0 -	2 Gb
- *		CS1 -	2 Gb
- *	--------------------
- *	TOTAL -		8 Gb
- *
- * Same devices installed on EMIF1 and EMIF2
- */
-
-static __initdata struct emif_device_details emif_devices_elpida_2x2G_S4 = {
-	.cs0_device = &lpddr2_elpida_2G_S4_dev,
-	.cs1_device = &lpddr2_elpida_2G_S4_dev,
-};
-
-static __initdata struct emif_device_details emif_devices_elpida_4G_S4 = {
-	.cs0_device = &lpddr2_elpida_4G_S4_dev,
-};
-
-static __initdata struct emif_device_details emif_devices_elpida_2x4G_S4 = {
-	.cs0_device = &lpddr2_elpida_4G_S4_dev,
-	.cs1_device = &lpddr2_elpida_4G_S4_dev,
-};
-
-static __initdata struct emif_device_details emif_devices_hynix_4G_S4 = {
-	.cs0_device = &lpddr2_hynix_4G_S4_dev,
-};
-
-static __initdata struct emif_device_details emif_devices_samsung_4G_S4 = {
-	.cs0_device = &lpddr2_samsung_4G_S4_dev,
-};
-
-static __initdata struct emif_device_details emif_devices_samsung_2x4G_S4 = {
-	.cs0_device = &lpddr2_samsung_4G_S4_dev,
-	.cs1_device = &lpddr2_samsung_4G_S4_dev,
-};
-
+#define DEFAULT_UART_AUTOSUSPEND_DELAY	3000	/* Runtime autosuspend (msecs)*/
 
 static struct omap_device_pad ovation_uart1_pads[] __initdata = {
 	{
@@ -450,10 +411,22 @@ static struct omap_device_pad ovation_uart4_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data ovation_uart1_board_data __initdata = {
+	.id = 0,
+	.pads = ovation_uart1_pads,
+	.pads_cnt = ARRAY_SIZE(ovation_uart1_pads),
+};
+
+static struct omap_board_data ovation_uart4_board_data __initdata = {
+	.id = 3,
+	.pads = ovation_uart4_pads,
+	.pads_cnt = ARRAY_SIZE(ovation_uart4_pads),
+};
+
 static struct omap_uart_port_info ovation_uart_info_uncon __initdata = {
-	.use_dma	= 0,
-	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
-        .wer = 0,
+	.dma_enabled = 0,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
+//      .wer = 0,
 };
 
 static inline void __init board_serial_init(void)
@@ -469,52 +442,70 @@ static inline void __init board_serial_init(void)
 	gpio_request(GPIO_LS_OE, "LS_OE");
 	gpio_direction_output(GPIO_LS_OE, 1);
 
-	omap_serial_init_port_pads(0, ovation_uart1_pads,
-		ARRAY_SIZE(ovation_uart1_pads), &ovation_uart_info_uncon);
-	omap_serial_init_port_pads(3, ovation_uart4_pads,
-		ARRAY_SIZE(ovation_uart4_pads), &ovation_uart_info_uncon);
-}
-
-static unsigned long __init get_installed_mem_size()
-{
-	int i;
-	unsigned long mem_size = 0;
-	const struct meminfo* mi = &meminfo;
-
-	for_each_bank(i, mi)
-		mem_size += mi->bank[i].size;
-
-	return mem_size;
+	omap_serial_init_port(&ovation_uart1_board_data, &ovation_uart_info_uncon);
+	omap_serial_init_port(&ovation_uart4_board_data, &ovation_uart_info_uncon);
 }
 
 static void ovation_mem_init(void)
 {
-	struct emif_device_details *emif_dev = NULL;
+	bool supported = 0;
 
-	switch(sdram_vendor()) {
+	switch(omap_sdram_vendor()) {
 		case SAMSUNG_SDRAM:
 			printk(KERN_INFO "Samsung DDR Memory\n");
 			switch(system_rev) {
 				case OVATION_EVT1A:
-					emif_dev = &emif_devices_samsung_4G_S4;
+					omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_info,
+							lpddr2_samsung_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+							&lpddr2_samsung_S4_min_tck, NULL);
+					omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_info,
+							lpddr2_samsung_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+							&lpddr2_samsung_S4_min_tck, NULL);
+					supported = 1;
 				break;
 				case OVATION_EVT1B:
 				case OVATION_EVT2:
-					switch (get_installed_mem_size()) {
+					switch (omap_total_ram_size()) {
 						case SZ_1G:
 							pr_info("\twith size: 1GB\n");
-							emif_dev = &emif_devices_samsung_4G_S4;
+							omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_info,
+									lpddr2_samsung_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+									&lpddr2_samsung_S4_min_tck, NULL);
+							omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_info,
+									lpddr2_samsung_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+									&lpddr2_samsung_S4_min_tck, NULL);
+							supported = 1;
 							break;
 						case SZ_2G - SZ_4K:
 						case SZ_2G:
 							pr_info("\twith size: 2GB\n");
 						default:
-							emif_dev = &emif_devices_samsung_2x4G_S4;
+							omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_x2_info,
+									lpddr2_samsung_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+									&lpddr2_samsung_S4_min_tck, NULL);
+							omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_x2_info,
+									lpddr2_samsung_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+									&lpddr2_samsung_S4_min_tck, NULL);
 
+							supported = 1;
 					}
 				break;
 				default:
-					emif_dev = &emif_devices_samsung_4G_S4;
+					omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_info,
+							lpddr2_samsung_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+							&lpddr2_samsung_S4_min_tck, NULL);
+					omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_info,
+							lpddr2_samsung_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_samsung_4G_S4_timings),
+							&lpddr2_samsung_S4_min_tck, NULL);
+					supported = 1;
 			}
 		break;
 		case ELPIDA_SDRAM:
@@ -522,43 +513,89 @@ static void ovation_mem_init(void)
 			switch(system_rev) {
 				case OVATION_EVT0:
 				case OVATION_EVT0B:
-					emif_dev = &emif_devices_elpida_2x2G_S4;
+					omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
+							lpddr2_elpida_2G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
+							lpddr2_elpida_2G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					supported = 1;
 				break;
 				case OVATION_EVT0C:
 				case OVATION_EVT1A:
-					emif_dev = &emif_devices_elpida_4G_S4;
+					omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
+							lpddr2_elpida_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
+							lpddr2_elpida_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					supported = 1;
 				break;
 				case OVATION_EVT1B:
 				case OVATION_EVT2:
-                                       switch (get_installed_mem_size()) {
+                                       switch (omap_total_ram_size()) {
                                                case SZ_1G:
 							pr_info("\twith size 1G\n");
-							emif_dev = &emif_devices_elpida_4G_S4;
+							omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
+									lpddr2_elpida_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+									&lpddr2_elpida_S4_min_tck, NULL);
+							omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
+									lpddr2_elpida_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+									&lpddr2_elpida_S4_min_tck, NULL);
+							supported = 1;
                                                break;
 					       case SZ_2G - SZ_4K:
                                                case SZ_2G:
 							pr_info("\twith size 2G\n");
                                                default:
-							emif_dev = &emif_devices_elpida_2x4G_S4;
+							omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_x2_info,
+									lpddr2_elpida_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+									&lpddr2_elpida_S4_min_tck, NULL);
+							omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_x2_info,
+									lpddr2_elpida_4G_S4_timings,
+									ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+									&lpddr2_elpida_S4_min_tck, NULL);
+							supported = 1;
                                        }
 				break;
 				default:
-					emif_dev = &emif_devices_elpida_4G_S4;
+					omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
+							lpddr2_elpida_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
+							lpddr2_elpida_4G_S4_timings,
+							ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+							&lpddr2_elpida_S4_min_tck, NULL);
+					supported = 1;
 			}
 		break;
 		case HYNIX_SDRAM:
 			printk(KERN_INFO "Hynix DDR Memory\n");
 			if (system_rev >= OVATION_EVT1A)
-				emif_dev = &emif_devices_hynix_4G_S4;
+				omap_emif_set_device_details(1, &lpddr2_hynix_4G_S4_info,
+						lpddr2_hynix_4G_S4_timings,
+						ARRAY_SIZE(lpddr2_hynix_4G_S4_timings),
+						&lpddr2_hynix_S4_min_tck, NULL);
+				omap_emif_set_device_details(2, &lpddr2_hynix_4G_S4_info,
+						lpddr2_hynix_4G_S4_timings,
+						ARRAY_SIZE(lpddr2_hynix_4G_S4_timings),
+						&lpddr2_hynix_S4_min_tck, NULL);
+				supported = 1;
 		break;
 		default:
 			 pr_err("Memory type does not exist\n");
 	}
 
-	if (emif_dev)
-		omap_emif_setup_device_details(emif_dev, emif_dev);
-	else
-		pr_err("Memory type not supported [VID: 0x%X, SYSTEM_REV: 0x%X]\n", sdram_vendor(), system_rev);
+	if (!supported)
+		pr_err("Memory type not supported [VID: 0x%X, SYSTEM_REV: 0x%X]\n", omap_sdram_vendor(), system_rev);
 }
 
 
@@ -695,7 +732,6 @@ EXPORT_SYMBOL(Vdd_LCD_CT_PEN_request_supply);
 
 int Vdd_LCD_CT_PEN_release_supply(struct device *dev, const char *supply_name)
 {
-	int ret;
 	int iLoop;
 	int index;
 	int n_users;
@@ -744,7 +780,7 @@ EXPORT_SYMBOL(Vdd_LCD_CT_PEN_release_supply);
 
 int Vdd_LCD_CT_PEN_enable(struct device *dev, const char *supply_name)
 {
-	int ret;
+	int ret = 0;
 	int iLoop;
 	int index;
 	int n_users;
@@ -832,7 +868,6 @@ EXPORT_SYMBOL(Vdd_LCD_CT_PEN_enable);
 
 int Vdd_LCD_CT_PEN_disable(struct device *dev, const char *supply_name)
 {
-	int ret;
 	int iLoop;
 	int index;
 	int n_users;
@@ -914,20 +949,25 @@ void __init omap_ovation_init(void)
 	ovation_mem_init();
 	omap_board_config = ovation_config;
 	omap_board_config_size = ARRAY_SIZE(ovation_config);
-	omap4_create_board_props();
+	omap_create_board_props();
 	omap4_audio_conf();
 	omap4_i2c_init();
 	ovation_lcd_touch_init();
 	ovation_touch_init();
-	omap_dmm_init();
 	ovation_panel_init();
 	ovation_pmic_mux_init();
 	ovation_button_init();
+#ifdef CONFIG_INPUT_KXTF9
 	kxtj9_dev_init();
+#endif
+	omap_init_dmm_tiler();
+#ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
+#endif
 	board_serial_init();
 	bn_wilink_init();
 
+	omap_sdrc_init(NULL, NULL);
 	omap4_twl6030_hsmmc_init(mmc);
 	usb_musb_init(&musb_board_data);
 
@@ -939,44 +979,31 @@ void __init omap_ovation_init(void)
 	omap_mux_init_gpio(BQ27500_BAT_LOW_GPIO, OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE);
 }
 
-static void __init omap_ovation_map_io(void)
-{
-	omap2_set_globals_443x();
-	omap44xx_map_common_io();
-}
-
 static void __init omap_ovation_reserve(void)
 {
-
 	omap_init_ram_size();
+
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+
+	ovation_android_display_setup();
 #ifdef CONFIG_ION_OMAP
-	ovation_android_display_setup(get_omap_ion_platform_data());
-	omap_ion_init();
-#else
-	ovation_android_display_setup(NULL);
+	omap4_ion_init();
 #endif
 
-	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
-			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
-
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE +
-					OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
+	omap4_secure_workspace_addr_default();
 
 	omap_reserve();
 }
 
-
 MACHINE_START(OMAP_OVATION, "OMAP4 ovation board")
-	.boot_params	= 0x80000100,
+	.atag_offset	= 0x100,
 	.reserve	= omap_ovation_reserve,
-	.map_io		= omap_ovation_map_io,
+	.map_io		= omap4_map_io,
 	.init_early	= omap_ovation_init_early,
 	.init_irq	= gic_init_irq,
+	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_ovation_init,
-	.timer		= &omap_timer,
+	.timer		= &omap4_timer,
+	.restart	= omap_prcm_restart,
 MACHINE_END
