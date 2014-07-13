@@ -183,7 +183,8 @@ static int hydis_power_on(struct omap_dss_device *dssdev)
 	 * 0x2e - unpacked 18bit
 	 * 0x3e - 24bit
 	 */
-	dsi_video_mode_enable(dssdev, 0x3e);
+	dssdev->panel.dsi_pix_fmt = OMAP_DSS_DSI_FMT_RGB888;
+	dsi_enable_video_output(dssdev, d2d->channel0);
 
 	dev_dbg(&dssdev->dev, "power_on done\n");
 
@@ -199,7 +200,8 @@ err_disp_enable:
 
 static void hydis_power_off(struct omap_dss_device *dssdev)
 {
-	dsi_video_mode_disable(dssdev, false);
+	struct hydis_data *d2d = dev_get_drvdata(&dssdev->dev);
+	dsi_disable_video_output(dssdev, d2d->channel0);
 
 	omapdss_dsi_display_disable(dssdev, false, false);
 
