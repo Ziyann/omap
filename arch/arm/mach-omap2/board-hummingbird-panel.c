@@ -99,12 +99,6 @@ static struct dsscomp_platform_data dsscomp_config_hummingbird = {
 };
 
 
-#ifdef CONFIG_FB_OMAP2_NUM_FBS
-#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
-#else
-#define OMAPLFB_NUM_DEV 1
-#endif
-
 struct lp855x_rom_data bl_rom_data[] = {
 	{
 		.addr = 0xA9,
@@ -125,7 +119,7 @@ static int _request_resources(void)
 
 	if (!hummingbird_bl_i2c_pullup_power) {
 		hummingbird_bl_i2c_pullup_power = regulator_get(NULL, "bl_i2c_pup");
-	} 	
+	}
 
 	if (IS_ERR(hummingbird_bl_i2c_pullup_power)) {
 		pr_err("%s: failed to get regulator bl_i2c_pup", __func__);
@@ -168,7 +162,7 @@ static int hummingbird_bl_power_on(struct device *dev)
 	regulator_enable(hummingbird_bl_i2c_pullup_power);
 	gpio_set_value(LCD_BL_PWR_EN_GPIO, 1);
 	msleep(20);
-	
+
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM1ON);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0XFF, LED_PWM1OFF);
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x06, TWL6030_TOGGLE3);
@@ -187,7 +181,7 @@ static int hummingbird_bl_power_off(struct device *dev)
 
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x01, TWL6030_TOGGLE3);
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x07, TWL6030_TOGGLE3);
-	
+
 	return 0;
 }
 
@@ -282,7 +276,7 @@ static struct maxim9606_platform_data maxim9606_pdata = {
 	.power_on 	= lg_maxim9606_power_on,
 	.power_off 	= lg_maxim9606_power_off,
 	.request_resources	= lg_maxim9606_request_resources,
-	.release_resources	= lg_maxim9606_release_resources,	
+	.release_resources	= lg_maxim9606_release_resources,
 };
 
 static struct i2c_board_info __initdata bl_i2c_boardinfo[] = {
@@ -357,14 +351,14 @@ static void __init hummingbird_hdmi_mux_init(void)
 static int lg_enable_dsi(struct omap_dss_device *dssdev)
 {
 	_enable_supplies(14);
-	
+
 	gpio_direction_output(LCD_DCR_1V8_GPIO_EVT1B, 1);
 	return 0;
 }
 
 static void lg_disable_dsi(struct omap_dss_device *dssdev)
 {
-	gpio_direction_output(LCD_DCR_1V8_GPIO_EVT1B, 0);	
+	gpio_direction_output(LCD_DCR_1V8_GPIO_EVT1B, 0);
 	msleep(100);
 	_disable_supplies();
 }
@@ -397,7 +391,7 @@ static int auo_enable_dsi(struct omap_dss_device *dssdev)
 
 static void auo_disable_dsi(struct omap_dss_device *dssdev)
 {
-	gpio_direction_output(LCD_DCR_1V8_GPIO_EVT1B, 0);	
+	gpio_direction_output(LCD_DCR_1V8_GPIO_EVT1B, 0);
 	msleep(100);
 
 	if (first_boot) {
@@ -717,15 +711,21 @@ static struct omap_dss_board_info hummingbird_dss_data = {
 	.default_device	= &hummingbird_lcd_device_novatek,
 };
 
-static struct sgx_omaplfb_config omaplfb_config_hummingbird[OMAPLFB_NUM_DEV] = {
+static struct sgx_omaplfb_config omaplfb_config_hummingbird[] = {
 	{
-		.vram_buffers = 2,
+		.vram_buffers = 4,
 		.swap_chain_length = 2,
-	}
+	},
+#if defined(CONFIG_OMAP4_DSS_HDMI)
+	{
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	},
+#endif
 };
 
 static struct sgx_omaplfb_platform_data omaplfb_plat_data_hummingbird = {
-	.num_configs = OMAPLFB_NUM_DEV,
+	.num_configs = ARRAY_SIZE(omaplfb_config_hummingbird),
 	.configs = omaplfb_config_hummingbird,
 };
 
@@ -752,7 +752,7 @@ static void hummingbird_lcd_init(void)
 
 static struct omapfb_platform_data hummingbird_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(omaplfb_config_hummingbird),
 	},
 #if 0
 	.boot_fb_addr = 0,
@@ -791,8 +791,8 @@ void hummingbird_android_display_setup(void)
 	}
 
 	omap_android_display_setup(panel_data_hummingbird.board_info,
-				NULL,
-				NULL,
+				panel_data_hummingbird.dsscomp_data,
+				panel_data_hummingbird.omaplfb_data,
 				&hummingbird_fb_pdata);
 }
 
@@ -803,11 +803,11 @@ int __init hummingbird_panel_init(void)
 	hummingbird_lcd_mux_init();
 
 	omapfb_set_platform_data(&hummingbird_fb_pdata);
-		
+
 	omap_display_init(&hummingbird_dss_data);
 
 	if (strncmp(display, "AUO", 3) == 0) {
-		i2c_register_board_info(3, &bl_i2c_boardinfo[1], 
+		i2c_register_board_info(3, &bl_i2c_boardinfo[1],
 					ARRAY_SIZE(bl_i2c_boardinfo) - 1);
 	} else {
 		i2c_register_board_info(3, bl_i2c_boardinfo,

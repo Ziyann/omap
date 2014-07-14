@@ -233,20 +233,21 @@ struct omap_tablet_panel_data {
 };
 
 static struct dsscomp_platform_data dsscomp_config_ovation_wuxga = {
-	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+	.tiler1d_slotsz = (SZ_16M + SZ_16M + SZ_2M),
 };
 
-#ifdef CONFIG_FB_OMAP2_NUM_FBS
-#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
-#else
-#define OMAPLFB_NUM_DEV 1
-#endif
 
-static struct sgx_omaplfb_config omaplfb_config_ovation_wuxga[OMAPLFB_NUM_DEV] = {
+static struct sgx_omaplfb_config omaplfb_config_ovation_wuxga[] = {
 	{
-		.vram_buffers = 2,
+		.vram_buffers = 4,
 		.swap_chain_length = 2,
-	}
+	},
+#if defined(CONFIG_OMAP4_DSS_HDMI)
+	{
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	},
+#endif
 };
 
 
@@ -633,7 +634,7 @@ static struct omap_dss_board_info ovation_dss_data = {
 
 
 static struct sgx_omaplfb_platform_data omaplfb_plat_data_ovation_wuxga = {
-	.num_configs = OMAPLFB_NUM_DEV,
+	.num_configs = ARRAY_SIZE(omaplfb_config_ovation_wuxga),
 	.configs = omaplfb_config_ovation_wuxga,
 };
 
@@ -645,7 +646,7 @@ static struct omap_tablet_panel_data panel_data_ovation_wuxga = {
 
 static struct omapfb_platform_data ovation_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(omaplfb_config_ovation_wuxga),
 	},
 #if 0
 	.boot_fb_addr = 0,
