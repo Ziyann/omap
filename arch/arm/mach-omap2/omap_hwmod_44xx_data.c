@@ -2252,7 +2252,7 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
-#if defined(CONFIG_MACH_OMAP4_BOWSER)
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
 #else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
@@ -5616,6 +5616,9 @@ static struct omap_hwmod omap44xx_uart1_hwmod = {
 	.name		= "uart1",
 	.class		= &omap44xx_uart_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
+#if defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
+	.flags          = HWMOD_SWSUP_SIDLE | HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_uart1_irqs,
 	.sdma_reqs	= omap44xx_uart1_sdma_reqs,
 	.main_clk	= "uart1_fck",
@@ -5727,10 +5730,12 @@ static struct omap_hwmod omap44xx_uart3_hwmod = {
 	.name		= "uart3",
 	.class		= &omap44xx_uart_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
+#if !defined(CONFIG_MACH_OMAP_OVATION) && !defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
 #ifdef CONFIG_MACH_TUNA
 	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
 #else
 	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 #endif
 	.mpu_irqs	= omap44xx_uart3_irqs,
 	.sdma_reqs	= omap44xx_uart3_sdma_reqs,
@@ -5786,6 +5791,9 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
 	.name		= "uart4",
 	.class		= &omap44xx_uart_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
+#if defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
+        .flags          = HWMOD_SWSUP_SIDLE,
+#endif
 	.mpu_irqs	= omap44xx_uart4_irqs,
 	.sdma_reqs	= omap44xx_uart4_sdma_reqs,
 	.main_clk	= "uart4_fck",
