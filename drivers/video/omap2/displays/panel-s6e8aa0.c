@@ -135,8 +135,6 @@ struct s6e8aa0_data {
 
 	bool enabled;
 	u8 rotate;
-	bool mirror;
-	bool use_dsi_bl;
 	unsigned int bl;
 	const struct s6e8aa0_gamma_adj_points *gamma_adj_points;
 	const u32 *dyi_to_b;
@@ -144,23 +142,9 @@ struct s6e8aa0_data {
 	struct s6e8aa0_gamma_entry *brightness_table;
 	int brightness_table_size;
 	u32 brightness_limit[3];
-	unsigned long hw_guard_end;	/* next value of jiffies when we can
-					 * issue the next sleep in/out command
-					 */
-	unsigned long hw_guard_wait;	/* max guard time in jiffies */
 
 	atomic_t do_update;
-	struct {
-		u16 x;
-		u16 y;
-		u16 w;
-		u16 h;
-	} update_region;
 
-	bool cabc_broken;
-	unsigned cabc_mode;
-
-	bool force_update;
 	struct omap_video_timings *timings;
 
 	struct panel_s6e8aa0_data *pdata;
@@ -1635,9 +1619,6 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 		goto err_backlight_device_register;
 	}
 
-	if (cpu_is_omap44xx())
-		s6->force_update = true;
-
 	dev_dbg(&dssdev->dev, "s6e8aa0_probe\n");
 	return ret;
 
@@ -1846,36 +1827,6 @@ static int s6e8aa0_sync(struct omap_dss_device *dssdev)
 	/* TODO? */
 	return 0;
 }
-
-// HASH: set/get update_mode was removed
-#if 0
-static int s6e8aa0_set_update_mode(struct omap_dss_device *dssdev,
-			       enum omap_dss_update_mode mode)
-{
-	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
-
-	if (s6->force_update) {
-		if (mode != OMAP_DSS_UPDATE_AUTO)
-			return -EINVAL;
-	} else {
-		if (mode != OMAP_DSS_UPDATE_MANUAL)
-			return -EINVAL;
-	}
-
-	return 0;
-}
-
-static enum omap_dss_update_mode s6e8aa0_get_update_mode(struct omap_dss_device
-						     *dssdev)
-{
-	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
-
-	if (s6->force_update)
-		return OMAP_DSS_UPDATE_AUTO;
-	else
-		return OMAP_DSS_UPDATE_MANUAL;
-}
-#endif
 
 #ifdef CONFIG_PM
 static int s6e8aa0_resume(struct omap_dss_device *dssdev)
