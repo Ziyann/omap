@@ -1963,7 +1963,7 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_rfbi_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
-	{ .role = "ick", .clk = "l3_div_ck" },
+	{ .role = "ick", .clk = "dss_fck" },
 };
 
 static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
