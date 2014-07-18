@@ -270,11 +270,9 @@ enum cyttsp4_ic_ebid {
 enum cyttsp4_flags {
 	CY_FLAG_NONE = 0x00,
 	CY_FLAG_HOVER = 0x04,
-#ifdef CY_USE_DEBUG_TOOLS
 	CY_FLAG_FLIP = 0x08,
 	CY_FLAG_INV_X = 0x10,
 	CY_FLAG_INV_Y = 0x20,
-#endif /* --CY_USE_DEBUG_TOOLS */
 };
 
 enum cyttsp4_event_id {
@@ -2719,10 +2717,8 @@ static void _cyttsp4_get_touch(struct cyttsp4 *ts,
 	struct cyttsp4_touch *touch, u8 *xy_data)
 {
 	enum cyttsp4_tch_abs abs = 0;
-#ifdef CY_USE_DEBUG_TOOLS
 	int tmp = 0;
 	bool flipped = false;
-#endif /* --CY_USE_DEBUG_TOOLS */
 
 	for (abs = CY_TCH_X; abs < CY_TCH_NUM_ABS; abs++) {
 		_cyttsp4_get_touch_axis(ts, abs, &touch->abs[abs],
@@ -2742,7 +2738,6 @@ static void _cyttsp4_get_touch(struct cyttsp4 *ts,
 			ts->si_ofs.tch_abs[abs].bofs);
 	}
 
-#ifdef CY_USE_DEBUG_TOOLS
 	if (ts->flags & CY_FLAG_FLIP) {
 		tmp = touch->abs[CY_TCH_X];
 		touch->abs[CY_TCH_X] =
@@ -2776,7 +2771,6 @@ static void _cyttsp4_get_touch(struct cyttsp4 *ts,
 				touch->abs[CY_TCH_Y];
 		}
 	}
-#endif /* --CY_USE_DEBUG_TOOLS */
 }
 
 static void _cyttsp4_get_mt_touches(struct cyttsp4 *ts, int num_cur_tch)
@@ -3065,7 +3059,6 @@ static int _cyttsp4_xy_worker(struct cyttsp4 *ts)
 			__func__, cur_record_count);
 		retval = 0;
 		goto _cyttsp4_xy_worker_exit;
-
 	} else if (IS_BOOTLOADERMODE(rep_stat)) {
 		dev_info(ts->dev,
 			"%s: BL mode found in ACTIVE state\n",
@@ -8029,7 +8022,6 @@ void *cyttsp4_core_init(struct cyttsp4_bus_ops *bus_ops,
 		}
 	}
 
-#ifdef CY_USE_DEBUG_TOOLS
 	if (ts->flags & CY_FLAG_FLIP) {
 		input_set_abs_params(input_device,
 			ABS_MT_POSITION_X,
@@ -8053,7 +8045,6 @@ void *cyttsp4_core_init(struct cyttsp4_bus_ops *bus_ops,
 			ts->platform_data->frmwrk->abs
 			[(CY_ABS_X_OST * CY_NUM_ABS_SET) + CY_FLAT_OST]);
 	}
-#endif /* --CY_USE_DEBUG_TOOLS */
 
 	input_set_events_per_packet(input_device, 6 * CY_NUM_TCH_ID);
 

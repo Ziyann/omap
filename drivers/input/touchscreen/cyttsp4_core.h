@@ -96,10 +96,6 @@
  */
 #define CY_USE_REG_ACCESS
 
-/* use the following define to enable special debug tools for test only
-#define CY_USE_DEBUG_TOOLS
- */
-
 /*
  * use the following define to use level interrupt method (else falling edge)
  * this method should only be used if the host processor misses edge interrupts
@@ -136,7 +132,6 @@
 */
 #define CY_DBG_LVL_3                    3
 
-#ifdef CY_USE_DEBUG_TOOLS
 #define CY_DBG_SUSPEND                  4
 #define CY_DBG_RESUME                   5
 #define CY_DBG_PUT_ALL_PARAMS           6
@@ -151,7 +146,6 @@
 #define CY_DBG_GET_MDDATA               15
 #define CY_DBG_SOFT_RESET               97
 #define CY_DBG_RESET                    98
-#endif
 
 #define CY_PR_TRUNCATED                 " truncated..."
 
