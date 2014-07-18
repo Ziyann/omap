@@ -1488,6 +1488,7 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
 	disable_and_clear_all_interrupts(emif);
 	setup_interrupts(emif, irq);
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	/* One-time actions taken on probing the first device */
 	if (!emif1) {
 		emif1 = emif;
@@ -1499,6 +1500,7 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
 		 * available
 		 */
 	}
+#endif
 
 	dev_info(&pdev->dev, "%s: device configured with addr = %p and IRQ%d\n",
 		__func__, emif->base, irq);
