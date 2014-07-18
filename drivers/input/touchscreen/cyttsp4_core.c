@@ -2807,16 +2807,6 @@ static void _cyttsp4_get_mt_touches(struct cyttsp4 *ts, int num_cur_tch)
 					ts->platform_data->frmwrk->abs
 					[(CY_ABS_ID_OST * CY_NUM_ABS_SET) +
 					CY_MIN_OST];
-			#ifdef CY_90_DEG_ROTATION
-			{
-				int swap = 0;
-
-				swap = touch.abs[CY_TCH_X];
-				touch.abs[CY_TCH_X] = touch.abs[CY_TCH_Y];
-				touch.abs[CY_TCH_Y] = CY_MAXY - swap;
-			}
-			#endif
-
 				if (touch.abs[CY_TCH_E] == CY_EV_LIFTOFF) {
 					/* if lift-off, then skip the touch */
 					dev_dbg(ts->dev,

@@ -174,7 +174,9 @@ struct touch_platform_data cyttsp4_i2c_touch_platform_data = {
 	.fw = &cyttsp4_firmware,
 	.frmwrk = &cyttsp4_framework,
 	.addr = {CY_I2C_TCH_ADR, CY_I2C_LDR_ADR},
-	.flags = /*0x01 | 0x02 | */0x20 | 0x40,
+#if 1
+	.flags = /*0x01 | 0x02 | */ 0x40, /* ? */
+#endif
 	.hw_reset = cyttsp4_hw_reset,
 	.hw_recov = cyttsp4_hw_recov,
 	.irq_stat = cyttsp4_irq_stat,
