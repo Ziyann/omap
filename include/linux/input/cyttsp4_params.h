@@ -14,13 +14,6 @@
 #ifndef _CYTTSP4_PARAMS_H_
 #define _CYTTSP4_PARAMS_H_
 
-/*
- * use the following define for 90 degree rotation
-*/
-#ifndef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
-#define CY_90_DEG_ROTATION
-#endif
-
 #if defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
 #define CY_MAXX 800
 #define CY_MAXY 1280
@@ -36,13 +29,8 @@ uint8_t cyttsp4_param_regs[] = {
 	0x23,       /* 01	EDGE AREA (DEBOUNCE DISABLED), pixels */
 	0x17,       /* 02	NUM_ROWS */
 	0x24,       /* 03	NUM_COLS */
-#ifndef CY_90_DEG_ROTATION
 	0x05, 0x10, /* 04	TOUCH_RES_X */
 	0x03, 0x25, /* 05	TOUCH_RES_Y */
-#else
-	0x03, 0x25, /* 04	TOUCH_RES_X */
-	0x05, 0x10, /* 05	TOUCH_RES_Y */
-#endif
 	0x4C, 0x10, /* 06	SCREEN_SIZE_X */
 	0x30, 0x02, /* 07	SCREEN_SIZE_Y */
 	0x00, 0x05, /* 08	CENTROID_THRESHOLD */
