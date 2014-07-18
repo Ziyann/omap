@@ -121,6 +121,31 @@ config TOUCHSCREEN_CYPRESS_TTSP
                 If unsure, say N.
 
                 To compile this driver as a module, choose M here
+
+config TOUCHSCREEN_CYPRESS_TTSP_SWAP_XY
+	default n
+	bool "swap X and Y values"
+	depends on TOUCHSCREEN_CYPRESS_TTSP
+	help
+	  Say Y here if you want to swap the X and Y values
+	  read from the touchscreen controller.
+
+config TOUCHSCREEN_CYPRESS_TTSP_FLIP_X
+	default n
+	bool "flip X values"
+	depends on TOUCHSCREEN_CYPRESS_TTSP
+	help
+	  Say Y here if you want to reverse the X values read
+	  from the touchscreen controller.
+
+config TOUCHSCREEN_CYPRESS_TTSP_FLIP_Y
+	default n
+	bool "flip Y values"
+	depends on TOUCHSCREEN_CYPRESS_TTSP
+	help
+	  Say Y here if you want to reverse the Y values read
+	  from the touchscreen controller.
+
 config TOUCHSCREEN_BITSY
 	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen"
 	depends on SA1100_BITSY
