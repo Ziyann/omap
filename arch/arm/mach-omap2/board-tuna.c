@@ -78,6 +78,9 @@
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
 
+/* TPS GPIO */
+#define TPS62361_GPIO		7
+
 /* For LTE(CMC221) */
 #define OMAP_GPIO_LTE_ACTIVE	47
 #define OMAP_GPIO_CMC2AP_INT1	61
@@ -1183,12 +1186,18 @@ static int __init tuna_print_last_turnon_sts(void)
 }
 device_initcall(tuna_print_last_turnon_sts);
 
+static void __init tuna_init_early(void)
+{
+	omap4430_init_early();
+	omap_tps6236x_gpio_no_reset_wa(TPS62361_GPIO, -1, 32);
+}
+
 MACHINE_START(TUNA, "Tuna")
 	/* Maintainer: Google, Inc */
 	.atag_offset	= 0x100,
 	.reserve	= tuna_reserve,
 	.map_io		= omap4_map_io,
-	.init_early	= omap4430_init_early,
+	.init_early	= tuna_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= tuna_init,
