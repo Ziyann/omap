@@ -2738,38 +2738,24 @@ static void _cyttsp4_get_touch(struct cyttsp4 *ts,
 			ts->si_ofs.tch_abs[abs].bofs);
 	}
 
+	if (ts->flags & CY_FLAG_INV_X) {
+		touch->abs[CY_TCH_X] =
+			ts->platform_data->frmwrk->abs
+			[(CY_ABS_X_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
+			touch->abs[CY_TCH_X];
+	}
+	if (ts->flags & CY_FLAG_INV_Y) {
+		touch->abs[CY_TCH_Y] =
+			ts->platform_data->frmwrk->abs
+			[(CY_ABS_Y_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
+			touch->abs[CY_TCH_Y];
+	}
 	if (ts->flags & CY_FLAG_FLIP) {
 		tmp = touch->abs[CY_TCH_X];
 		touch->abs[CY_TCH_X] =
 			touch->abs[CY_TCH_Y];
 		touch->abs[CY_TCH_Y] = tmp;
 		flipped = true;
-	}
-	if (ts->flags & CY_FLAG_INV_X) {
-		if (!flipped) {
-			touch->abs[CY_TCH_X] =
-				ts->platform_data->frmwrk->abs
-				[(CY_ABS_X_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
-				touch->abs[CY_TCH_X];
-		} else {
-			touch->abs[CY_TCH_X] =
-				ts->platform_data->frmwrk->abs
-				[(CY_ABS_Y_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
-				touch->abs[CY_TCH_X];
-		}
-	}
-	if (ts->flags & CY_FLAG_INV_Y) {
-		if (!flipped) {
-			touch->abs[CY_TCH_Y] =
-				ts->platform_data->frmwrk->abs
-				[(CY_ABS_Y_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
-				touch->abs[CY_TCH_Y];
-		} else {
-			touch->abs[CY_TCH_Y] =
-				ts->platform_data->frmwrk->abs
-				[(CY_ABS_X_OST * CY_NUM_ABS_SET) + CY_MAX_OST] -
-				touch->abs[CY_TCH_Y];
-		}
 	}
 }
 
@@ -7913,6 +7899,16 @@ void *cyttsp4_core_init(struct cyttsp4_bus_ops *bus_ops,
 	init_completion(&ts->si_int_running);
 	init_completion(&ts->ready_int_running);
 	ts->flags = ts->platform_data->flags;
+	/* HASH: Set Touchscreen Flags */
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP_SWAP_XY
+	ts->flags |= CY_FLAG_FLIP;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP_FLIP_X
+	ts->flags |= CY_FLAG_INV_X;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP_FLIP_Y
+	ts->flags |= CY_FLAG_INV_Y;
+#endif
 #if defined(CY_USE_FORCE_LOAD) || defined(CONFIG_TOUCHSCREEN_DEBUG)
 	ts->waiting_for_fw = false;
 #endif
