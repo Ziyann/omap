@@ -165,9 +165,10 @@ extern int omap_board_config_size;
 /* for TI reference platforms sharing the same debug card */
 extern int debug_card_init(u32 addr, unsigned gpio);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 u8 quanta_get_mbid(void);
-u8 quanta_get_touchid(void);
 u8 quanta_get_panelid(void);
+#endif
 
 /* OMAP3EVM revision */
 #if defined(CONFIG_MACH_OMAP3EVM)

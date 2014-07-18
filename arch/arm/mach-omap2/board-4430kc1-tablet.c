@@ -126,19 +126,12 @@
 
 /* Board IDs */
 static u8 quanta_mbid;
-static u8 quanta_touchid;
 static u8 quanta_panelid;
 u8 quanta_get_mbid(void)
 {
 	return quanta_mbid;
 }
 EXPORT_SYMBOL(quanta_get_mbid);
-
-u8 quanta_get_touchid(void)
-{
-	return quanta_touchid;
-}
-EXPORT_SYMBOL(quanta_get_touchid);
 
 u8 quanta_get_panelid(void)
 {
@@ -166,7 +159,6 @@ static void __init quanta_boardids(void)
     gpio_direction_input(TOUCHID1_GPIO);
     quanta_mbid=gpio_get_value(MBID0_GPIO) | ( gpio_get_value(MBID1_GPIO)<<1)
         | ( gpio_get_value(MBID2_GPIO)<<2) | ( gpio_get_value(MBID3_GPIO)<<3);
-    quanta_touchid = gpio_get_value(TOUCHID0_GPIO) | ( gpio_get_value(TOUCHID1_GPIO)<<1);
     quanta_panelid = gpio_get_value(PANELID0_GPIO) | ( gpio_get_value(PANELID1_GPIO)<<1);
 }
 
