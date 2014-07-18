@@ -551,6 +551,11 @@ static void __init hummingbird_lcd_touch_init(void)
                                 ARRAY_SIZE(hummingbird_lcd_touch_devices));
 }
 
+static void set_osc_timings(void)
+{
+        omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_hummingbird_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -558,6 +563,7 @@ static void __init omap_hummingbird_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
+	set_osc_timings();
 
 	// For EVT1 Bring-up
 	gpio_request(CHG_LEVEL,"CHG-LEVEL");

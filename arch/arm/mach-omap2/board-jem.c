@@ -645,6 +645,11 @@ static void jem_platform_init(void)
 
 int __init bowser_bt_init(void);
 
+static void set_osc_timings(void)
+{
+        omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_jem_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -652,6 +657,7 @@ static void __init omap_jem_init(void)
 	lpddr2_init();
 
 	omap4_mux_init(board_mux, NULL, package);
+	set_osc_timings();
 	omap_create_board_props();
 	touch_gpio_init();
 	omap4_i2c_init();

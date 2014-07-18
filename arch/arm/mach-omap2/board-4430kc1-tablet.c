@@ -1238,6 +1238,11 @@ static void __init omap4_ehci_ohci_init(void){}
  * Same devices installed on EMIF1 and EMIF2
  */
 
+static void set_osc_timings(void)
+{
+        omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_kc1_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -1258,6 +1263,7 @@ static void __init omap_kc1_init(void)
 #endif
 
 	omap4_mux_init(board_mux, board_mux_wkup, package);
+	set_osc_timings();
 	omap_create_board_props();
 
 	omap4_i2c_init();

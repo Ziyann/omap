@@ -897,6 +897,11 @@ static void acclaim_mem_init(void)
 
 }
 
+static void set_osc_timings(void)
+{
+        omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_tablet_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -905,6 +910,7 @@ static void __init omap_tablet_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
+	set_osc_timings();
 	acclaim_mem_init();
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);

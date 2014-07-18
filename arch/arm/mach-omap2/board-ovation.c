@@ -927,6 +927,11 @@ int Vdd_LCD_CT_PEN_disable(struct device *dev, const char *supply_name)
 }
 EXPORT_SYMBOL(Vdd_LCD_CT_PEN_disable);
 
+static void set_osc_timings(void)
+{
+        omap_pm_setup_oscillator(4000, 1);
+}
+
 void __init omap_ovation_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -934,6 +939,7 @@ void __init omap_ovation_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
+	set_osc_timings();
 
 	/* Turn off the external FET for twl6032 charger */
 	gpio_request ( EXT_FET_EN , "EXT-FET-EN" );

@@ -1056,6 +1056,11 @@ static void tuna_power_off(void)
 	arm_pm_restart('c', NULL);
 }
 
+static void set_osc_timings(void)
+{
+	omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init tuna_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -1063,6 +1068,7 @@ static void __init tuna_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, board_wkup_mux, package);
+	set_osc_timings();
 
 	omap4_tuna_init_hw_rev();
 
