@@ -1591,11 +1591,24 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_dispc_slaves[] = {
 	&omap44xx_l4_per__dss_dispc,
 };
 
+static struct omap_hwmod_opt_clk dispc_opt_clks[] = {
+	{ .role = "dss_clk", .clk = "dss_dss_clk" },
+	/*
+	 * The rest of the clocks are not needed by the driver,
+	 * but are needed by the hwmod to reset DSS properly.
+	 */
+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+	{ .role = "tv_clk", .clk = "dss_tv_clk" },
+	{ .role = "hdmi_clk", .clk = "dss_48mhz_clk" },
+};
+
 static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap44xx_dispc_hwmod_class,
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
-	.flags		= HWMOD_INIT_NO_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
+#else
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 #endif
 	.clkdm_name	= "l3_dss_clkdm",
 	.mpu_irqs	= omap44xx_dss_dispc_irqs,
@@ -1607,6 +1620,8 @@ static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
 		},
 	},
+	.opt_clks	= dispc_opt_clks,
+	.opt_clks_cnt	= ARRAY_SIZE(dispc_opt_clks),
 	.slaves		= omap44xx_dss_dispc_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_slaves),
 	.dev_attr	= &omap44xx_dss_dispc_dev_attr
@@ -2195,7 +2210,7 @@ static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio1_hwmod = {
 	.name		= "gpio1",
 	.class		= &omap44xx_gpio_hwmod_class,
-#if defined(CONFIG_MACH_OMAP4_BOWSER)
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA) ||  defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.clkdm_name	= "l4_wkup_clkdm",
@@ -2252,7 +2267,7 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
-#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_OVATION) || defined(CONFIG_MACH_OMAP_HUMMINGBIRD)
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
 #else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
