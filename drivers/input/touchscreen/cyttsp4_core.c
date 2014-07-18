@@ -3043,12 +3043,15 @@ static int _cyttsp4_xy_worker(struct cyttsp4 *ts)
 		retval = 0;
 		goto _cyttsp4_xy_worker_exit;
 
+// HASH: Removing this check due to missed 2nd-touch events.  Needs research.
+#if 0
 	} else if (cur_record_count == ts->prev_record_count) {
 		dev_vdbg(ts->dev,
 			"%s: Duplicate record count=%02X; ignore\n",
 			__func__, cur_record_count);
 		retval = 0;
 		goto _cyttsp4_xy_worker_exit;
+#endif
 	} else if (IS_BOOTLOADERMODE(rep_stat)) {
 		dev_info(ts->dev,
 			"%s: BL mode found in ACTIVE state\n",
