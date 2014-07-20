@@ -39,6 +39,10 @@ struct mxt_platform_data {
 	unsigned int voltage;
 	unsigned char orient;
 	unsigned long irqflags;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	u8(*read_chg) (void);
+	int reset_gpio;
+#endif
 };
 
 #endif /* __LINUX_ATMEL_MXT_TS_H */
