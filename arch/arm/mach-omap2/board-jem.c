@@ -57,6 +57,10 @@
 #include <sound/wm8962.h>
 #endif
 
+#ifdef CONFIG_INPUT_MAX44007
+#include <linux/input/max44007.h>
+#endif
+
 #ifdef CONFIG_INPUT_BU52061_HALLSENSOR
 #include <linux/input/bu52061.h>
 #endif
@@ -79,6 +83,9 @@
 #include <linux/mpu_iio.h>
 #include <linux/irq.h>
 #define GPIO_GRYO               4
+#endif
+#ifdef CONFIG_INPUT_MAX44007
+#define GPIO_MAX44007_IRQ       36
 #endif
 
 #define GPIO_HALL_EFFECT	0
@@ -449,6 +456,12 @@ static struct tmp103_platform_data tmp103_case_info = {
 };
 #endif
 
+#ifdef CONFIG_INPUT_MAX44007
+static struct MAX44007PlatformData max44007_pdata = {
+        .placeHolder = 0x1234,
+};
+#endif
+
 static struct i2c_board_info __initdata jem_i2c_2_boardinfo[] = {
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP
 	{ I2C_BOARD_INFO(CY_I2C_NAME, CY_I2C_TCH_ADR), .irq = GPIO_TOUCH_IRQ, .platform_data = &cyttsp4_i2c_touch_platform_data, },
@@ -473,7 +486,10 @@ static struct i2c_board_info __initdata jem_i2c_3_boardinfo[] = {
 static struct i2c_board_info __initdata jem_i2c_4_boardinfo[] = {
 #ifdef CONFIG_INV_MPU_IIO
 	{ I2C_BOARD_INFO("mpu6xxx", 0x68), .irq = GPIO_GRYO, .platform_data = &mpu_gyro_data, },
-//	{I2C_BOARD_INFO("ami306", 0x0F), .irq = OMAP_GPIO_IRQ(GPIO_GRYO), .platform_data = &mpu_compass_data, },
+//	{ I2C_BOARD_INFO("ami306", 0x0F), .irq = OMAP_GPIO_IRQ(GPIO_GRYO), .platform_data = &mpu_compass_data, },
+#endif
+#ifdef CONFIG_INPUT_MAX44007
+	{ I2C_BOARD_INFO(MAX44007_NAME, 0x5A), .irq = GPIO_MAX44007_IRQ, .platform_data = &max44007_pdata, },
 #endif
 };
 
