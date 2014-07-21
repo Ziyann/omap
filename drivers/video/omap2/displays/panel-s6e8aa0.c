@@ -190,7 +190,7 @@ static int s6e8aa0_write_block_nosync(struct s6e8aa0_data *s6, const u8 *data, i
 
 static int s6e8aa0_read_block(struct s6e8aa0_data *s6, u8 cmd, u8 *data, int len)
 {
-	return dsi_vc_dcs_read(s6->dssdev, s6->channel1, cmd, data, len);
+	return dsi_vc_generic_read_1(s6->dssdev, s6->channel1, cmd, data, len);
 }
 
 static void s6e8aa0_write_sequence(struct s6e8aa0_data *s6, const struct s6e8aa0_sequence_entry *seq, int seq_len)
@@ -1582,7 +1582,7 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 	if (ret)
 		dev_err(&dssdev->dev, "failed to get virtual channel 1\n");
 
-	ret = omap_dsi_set_vc_id(dssdev, s6->channel1, 1);
+	ret = omap_dsi_set_vc_id(dssdev, s6->channel1, 0);
 	if (ret)
 		dev_err(&dssdev->dev, "failed to set VC_ID1\n");
 
