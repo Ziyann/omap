@@ -74,6 +74,7 @@
 #include "board-tuna.h"
 #include "omap_ram_console.h"
 //#include "resetreason.h"
+#include "pm.h"
 
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
@@ -1066,6 +1067,7 @@ static void set_osc_timings(void)
 
 static void __init tuna_init(void)
 {
+	int status = 0;
 	int package = OMAP_PACKAGE_CBS;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
@@ -1154,14 +1156,25 @@ static void __init tuna_init(void)
 		omap4_ehci_init();
 	}
 #endif
+	if (cpu_is_omap446x()) {
+		/* Vsel0 = gpio, vsel1 = gnd */
+		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
+					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
+		if (status)
+			pr_err("TPS62361 initialization failed: %d\n", status);
+	}
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init tuna_reserve(void)
 {
-    omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
-            OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	omap_init_ram_size();
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	tuna_android_display_setup();
+#ifdef CONFIG_ION_OMAP
 	omap4_ion_init();
+#endif
 	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
