@@ -57,4 +57,6 @@ void tuna_otg_set_dock_switch(int enable);
 
 extern struct class *sec_class;
 
+void tuna_android_display_setup(void);
+
 #endif

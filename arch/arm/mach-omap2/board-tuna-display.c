@@ -20,6 +20,7 @@
 
 #include <linux/platform_data/panel-s6e8aa0.h>
 
+#include <plat/android-display.h>
 #include <plat/vram.h>
 
 #include <video/omapdss.h>
@@ -28,8 +29,6 @@
 #include "board-tuna.h"
 #include "control.h"
 #include "mux.h"
-
-#define TUNA_FB_RAM_SIZE		SZ_16M /* ~1280*720*4 * 2 */
 
 #define TUNA_GPIO_MLCD_RST		23
 
@@ -997,7 +996,18 @@ static struct omap_dss_device tuna_oled_device = {
 
 			.ddr_clk_always_on		= 0,
 			.window_sync			= 4,
-		}
+		},
+		.dsi_cio_data = {
+			.ths_prepare			= 19,
+			.ths_prepare_ths_zero		= 44,
+			.ths_trail			= 20,
+			.ths_exit			= 35,
+			.tlpx_half			= 6,
+			.tclk_trail			= 17,
+			.tclk_zero			= 62,
+			.tclk_prepare			= 16,
+			.reg_ttaget			= 2,
+		},
 	},
 	.clocks = {
 		.dispc		= {
@@ -1025,6 +1035,11 @@ static struct omap_dss_device tuna_oled_device = {
 	},
 
 	.channel		= OMAP_DSS_CHANNEL_LCD,
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	.skip_init              = true,
+#else
+	.skip_init              = false,
+#endif
 };
 
 static void tuna_hdmi_mux_init(void)
@@ -1083,16 +1098,41 @@ static struct omap_dss_board_info tuna_dss_data = {
 	.default_device	= &tuna_oled_device,
 };
 
+static struct dsscomp_platform_data dsscomp_config_tuna = {
+	.tiler1d_slotsz = ( 16 * SZ_1M ),
+};
+
+static struct sgx_omaplfb_config omaplfb_config_tuna[] = {
+	{
+	.vram_buffers = 4,
+	.swap_chain_length = 2,
+	},
+#if defined(CONFIG_OMAP4_DSS_HDMI)
+	{
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	},
+#endif
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_tuna = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_tuna),
+	.configs = omaplfb_config_tuna,
+};
+
 static struct omapfb_platform_data tuna_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = TUNA_FB_RAM_SIZE,
-			},
-		},
+		.region_cnt = ARRAY_SIZE(omaplfb_config_tuna),
 	},
 };
+
+void __init tuna_android_display_setup(void)
+{
+	omap_android_display_setup(&tuna_dss_data,
+				   &dsscomp_config_tuna,
+				   &omaplfb_plat_data_tuna,
+				   &tuna_fb_pdata);
+}
 
 void __init omap4_tuna_display_init(void)
 {
@@ -1132,7 +1172,6 @@ void __init omap4_tuna_display_init(void)
 
 	pr_info("Using %ps\n", panel->factory_info);
 
-	omap_vram_set_sdram_vram(TUNA_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&tuna_fb_pdata);
 	tuna_hdmi_mux_init();
 	omap_display_init(&tuna_dss_data);
