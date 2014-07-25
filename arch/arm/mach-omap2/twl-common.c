@@ -414,7 +414,11 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		.always_on		= false,
+#else
 		.always_on		= true,
+#endif
 		.state_mem = {
 			.disabled	= true,
 		},
