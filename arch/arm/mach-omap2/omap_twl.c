@@ -281,7 +281,7 @@ static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
 	.volt_reg_addr		= TWL6030_VCORE1_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6030_VCORE1_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
@@ -309,7 +309,7 @@ static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
 	.volt_reg_addr		= TWL6030_VCORE2_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6030_VCORE2_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
@@ -337,7 +337,7 @@ static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
 	.volt_reg_addr		= TWL6030_VCORE3_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6030_VCORE3_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
@@ -365,7 +365,7 @@ static struct omap_voltdm_pmic twl6032_smps1_pmic = {
 	.volt_reg_addr		= TWL6032_SMPS1_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6032_SMPS1_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
@@ -393,7 +393,7 @@ static struct omap_voltdm_pmic twl6032_smps2_pmic = {
 	.volt_reg_addr		= TWL6032_SMPS2_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6032_SMPS2_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
@@ -421,7 +421,7 @@ static struct omap_voltdm_pmic twl6032_smps5_pmic = {
 	.volt_reg_addr		= TWL6032_SMPS5_SR_VOLT_REG,
 	.cmd_reg_addr		= TWL6032_SMPS5_SR_CMD_REG,
 	.i2c_high_speed		= true,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	.i2c_scll_low		= 0x2B,
 	.i2c_scll_high		= 0x29,
 	.i2c_hscll_low		= 0x0F,
