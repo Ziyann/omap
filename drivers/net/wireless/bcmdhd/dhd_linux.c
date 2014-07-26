@@ -5071,7 +5071,6 @@ int dhd_os_send_hang_message(dhd_pub_t *dhdp)
 	}
 	return ret;
 }
-#endif
 
 int net_os_send_hang_message(struct net_device *dev)
 {
