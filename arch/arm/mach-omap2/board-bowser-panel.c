@@ -501,7 +501,7 @@ static struct dsscomp_platform_data dsscomp_config_bowser = {
 #if defined (CONFIG_PANEL_NT51012_LG)
 	.tiler1d_slotsz = ( 24 * SZ_1M ),
 #elif defined (CONFIG_PANEL_NT71391_HYDIS)
-    .tiler1d_slotsz = ( 36 * SZ_1M ),
+    .tiler1d_slotsz = ( 34 * SZ_1M ),
 #else
 	.tiler1d_slotsz = ( 16 * SZ_1M ),
 #endif
