@@ -48,7 +48,7 @@
 #ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
 static unsigned char first_suspend = 0;
 #else
-static unsigned char first_suspend = 1;
+static unsigned char first_suspend = 0;
 #endif
 
 #define GPIO_BACKLIGHT_EN_O2M         25  /* Backlight GPIO */
@@ -354,35 +354,34 @@ static int nt71391_power_on(struct omap_dss_device *dssdev)
 	msleep(120);
 	nt71391_set_clk_153(dssdev);
 	if(!dssdev->skip_init) {
-	/* Wait till TCON gets ready */
-	//msleep(120);
+		/* Wait till TCON gets ready */
+		//msleep(120);
 
-	/* do extra job to match kozio registers (???) */
-	dsi_videomode_panel_preinit(dssdev);
+		/* do extra job to match kozio registers (???) */
+		dsi_videomode_panel_preinit(dssdev);
 
-	/* Read vendor id */
+		/* Read vendor id */
 #if defined (READ_VENDOR_ID)
-	nt71391_read_vendor_id(dssdev);
+		nt71391_read_vendor_id(dssdev);
 #endif
 
-	/* Send turn on peripheral command to NT TCON */
-	dsi_vc_dcs_write(dssdev, d2d->channel0, &dcs_cmd, 1);
+		/* Send turn on peripheral command to NT TCON */
+		dsi_vc_dcs_write(dssdev, d2d->channel0, &dcs_cmd, 1);
 
-	omapdss_dsi_vc_enable_hs(dssdev, d2d->channel0, true);
-	omapdss_dsi_vc_enable_hs(dssdev, d2d->channel1, true);
+		omapdss_dsi_vc_enable_hs(dssdev, d2d->channel0, true);
+		omapdss_dsi_vc_enable_hs(dssdev, d2d->channel1, true);
 
-	/* 0x0e - 16bit
-	* 0x1e - packed 18bit
-	* 0x2e - unpacked 18bit
-	* 0x3e - 24bit
-	*/
-	dsi_enable_video_output(dssdev, d2d->channel0);
+		/* 0x0e - 16bit
+		* 0x1e - packed 18bit
+		* 0x2e - unpacked 18bit
+		* 0x3e - 24bit
+		*/
+		dsi_enable_video_output(dssdev, d2d->channel0);
 	}
-	else
+	else {
 		r = dss_mgr_enable(dssdev->manager);
-
-	if(dssdev->skip_init)
 		dssdev->skip_init = false;
+	}
 
 	dev_dbg(&dssdev->dev, "power_on done\n");
 
