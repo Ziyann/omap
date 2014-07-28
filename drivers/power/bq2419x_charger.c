@@ -60,6 +60,7 @@ static struct omap_dm_timer *wdt_timer_ptr;
 static bool threshold_voltage_checked = true;
 static unsigned long time_previous;
 static bool stopdmtimershutdown = false;
+static bool first_active = true;
 
 extern bool bq27x00_is_battery_present(void);
 extern int bq27x00_get_battery_temperature(void);
@@ -1331,7 +1332,10 @@ static void bq2419x_start_dmtimer(struct bq2419x_device_info *di, bool active)
 		dev_dbg(di->dev, "bq2419x_start_dmtimer: %d\n", active);
 
 		if (active) {
-			omap_dm_timer_stop(wdt_timer_ptr);
+			if (!first_active)
+				omap_dm_timer_stop(wdt_timer_ptr);
+			else
+				first_active = false;
 			omap_dm_timer_set_prescaler(wdt_timer_ptr, 0);
 			omap_dm_timer_set_int_enable(wdt_timer_ptr,
 					OMAP_TIMER_INT_MATCH | OMAP_TIMER_INT_OVERFLOW);
