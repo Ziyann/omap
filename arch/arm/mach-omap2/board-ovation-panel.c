@@ -453,17 +453,6 @@ static struct panel_dsi_fps_data *dsi_fps_data[] = {
 	NULL,
 };
 
-static struct omap_video_timings dispc_timings_samsung = {
-	.x_res		= 1920,
-	.y_res		= 1280,
-	.hfp		= 4,
-	.hsw		= 5,
-	.hbp		= 39,
-	.vfp		= 9,
-	.vsw		= 1,
-	.vbp		= 10,
- };
-
 static struct omap_dss_device ovation_evt1b_lcd_device = {
 	.name                   = "lcd",
 	.driver_name            = "novatek-panel",
@@ -527,7 +516,7 @@ static struct omap_dss_device ovation_evt1b_lcd_device = {
 			.vfp		= 10,
 
 			/* DSI blanking modes */
-			.blanking_mode		= 1,
+			.blanking_mode		= 0,
 			.hsa_blanking_mode	= 1,
 			.hbp_blanking_mode	= 1,
 			.hfp_blanking_mode	= 1,
@@ -543,12 +532,12 @@ static struct omap_dss_device ovation_evt1b_lcd_device = {
 		},
 		.dsi_cio_data = {
 			.ths_prepare		= 26,
-			.ths_prepare_ths_zero	= 35,
+			.ths_prepare_ths_zero	= 61,
 			.ths_trail		= 26,
 			.ths_exit		= 49,
 			.tlpx_half		= 8,
 			.tclk_trail		= 23,
-			.tclk_zero		= 89, //enlarge to around 330ns
+			.tclk_zero		= 89,
 			.tclk_prepare		= 22,
 			.reg_ttaget		= 4,
 		},
@@ -576,8 +565,6 @@ static struct omap_dss_device ovation_evt1b_lcd_device = {
 
 	.set_backlight = ovation_set_pwm_bl,
 	.get_backlight = ovation_get_pwm_bl,
-
-	.dispc_timings = &dispc_timings_samsung,
 };
 
 static struct omap_dss_device ovation_lcd_device = {
