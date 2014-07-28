@@ -522,11 +522,7 @@ static struct regulator_consumer_supply omap4_vmmc_supply[] = {
 static struct regulator_init_data omap4_vmmc_idata = {
 	.constraints = {
 		.min_uV			= 1200000,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-		.max_uV			= 3300000,
-#else
 		.max_uV			= 3000000,
-#endif
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
