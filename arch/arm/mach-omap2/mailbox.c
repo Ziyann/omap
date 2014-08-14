@@ -84,7 +84,7 @@ static inline void mbox_write_reg(u32 val, size_t ofs)
 
 static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	int i;
 #else
 	int i, max_iter = 100;
@@ -105,7 +105,7 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 	}
 
 	context_saved = true;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 }
 
 static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
@@ -130,7 +130,7 @@ static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 			break;
 		udelay(1);
 	}
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 }
 
 static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)

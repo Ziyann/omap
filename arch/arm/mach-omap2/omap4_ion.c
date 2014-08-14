@@ -105,7 +105,7 @@ void __init omap4_ion_init(void)
 		omap4_ion_heap_tiler_mem_size = 0;
 		omap4_ion_heap_nonsec_tiler_mem_size = 0;
 	} else {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 		omap4_ion_heap_secure_input_size = (SZ_1M * 10);
 		omap4_ion_heap_tiler_mem_size = (SZ_1M * 51);
 		omap4_ion_heap_nonsec_tiler_mem_size = SZ_4K;

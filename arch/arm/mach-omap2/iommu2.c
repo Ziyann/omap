@@ -114,7 +114,7 @@ static void omap2_iommu_disable(struct omap_iommu *obj)
 	oh = omap_hwmod_lookup(obj->name);
 	if (!oh)
 		return;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	clkdm_deny_idle(oh->clkdm);
 #endif
 	/*
@@ -182,7 +182,7 @@ static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	clkdm_deny_idle(oh->clkdm);
 #endif
 
