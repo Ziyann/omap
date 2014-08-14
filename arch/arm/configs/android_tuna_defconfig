@@ -1,4 +1,5 @@
 CONFIG_MACH_TUNA=y
+CONFIG_USE_AMAZON_DUCATI=y
 # CONFIG_OMAP_SO_MAP_FORCE is not set
 CONFIG_OMAP_TPS6236X=y
 CONFIG_CMDLINE="console=ttyFIQ0 androidboot.console=ttyFIQ0 mem=1G omap_wdt.timer_margin=30 vmalloc=496M androidboot.selinux=permissive omapfb.fb_opt=-1,-1,-1,1,720,1280"
