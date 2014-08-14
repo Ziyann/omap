@@ -52,7 +52,7 @@
 #include <sound/max97236.h>
 
 #ifdef CONFIG_MPU_SENSORS_MPU6050B1
-#include <linux/mpu_iio.h>
+#include <linux/mpu.h>
 #define GPIO_GRYO               4
 #endif
 #ifdef CONFIG_INPUT_BU52061_HALLSENSOR

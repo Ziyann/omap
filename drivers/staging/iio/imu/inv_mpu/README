@@ -77,7 +77,7 @@ The following files are included in this package:
 Integrating the Driver in the Linux Kernel
 ==========================================
 Please add the files as follows:
-- Add mpu_iio.h to "kernel/include/linux".
+- Add mpu.h to "kernel/include/linux".
 - Add all other files to drivers/staging/iio/imu/inv_mpu
 (another directory is acceptable, but this is the recommended destination)
 

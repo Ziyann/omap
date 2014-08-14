@@ -91,7 +91,7 @@
 #endif
 
 #ifdef CONFIG_INV_MPU_IIO
-#include <linux/mpu_iio.h>
+#include <linux/mpu.h>
 #include <linux/irq.h>
 #define GPIO_GRYO               4
 #endif

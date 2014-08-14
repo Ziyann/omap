@@ -28,7 +28,7 @@
 #include <linux/kfifo.h>
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
-#include <linux/mpu_iio.h>
+#include <linux/mpu.h>
 
 #include "iio.h"
 #include "buffer.h"
