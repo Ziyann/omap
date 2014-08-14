@@ -40,7 +40,7 @@
 
 #define AIC31XX_VERSION "0.8"
 
-#define AIC31x_CODEC_DEBUG 1
+//#define AIC31x_CODEC_DEBUG 1
 
 #ifdef AIC31x_CODEC_DEBUG
 	#define dprintk(x...)   printk(x)
@@ -51,7 +51,7 @@
 #endif
 
 /* Macro to enable AIC3100 codec support */
-//#define AIC3110_CODEC_SUPPORT
+//#define AIC3100_CODEC_SUPPORT
 
 /*
  ****************************************************************************
