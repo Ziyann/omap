@@ -28,7 +28,7 @@
 #include <linux/rproc_drm.h>
 #include <linux/slab.h>
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 #include <linux/delay.h>
 
 #ifdef CONFIG_ION_OMAP
@@ -58,7 +58,7 @@ enum rproc_secure_state {
 static DECLARE_COMPLETION(secure_reload_complete);
 static DEFINE_MUTEX(secure_lock);
 static enum rproc_secure_state secure_state;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 static enum rproc_secure_state prev_secure_state;
 #endif
 static int secure_request;
@@ -92,7 +92,7 @@ void rproc_secure_init(struct rproc *rproc)
 	secure_state = RPROC_SECURE_OFF;
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 static int rproc_exit_secure_playback(struct rproc *rproc)
 {
 	const int max_retries = 20;
@@ -127,7 +127,7 @@ static int rproc_exit_secure_playback(struct rproc *rproc)
  */
 void rproc_secure_reset(struct rproc *rproc)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	const bool rproc_has_crashed = (rproc->state == RPROC_CRASHED);
 #endif
 	int ret;
@@ -137,7 +137,7 @@ void rproc_secure_reset(struct rproc *rproc)
 	if (strcmp(rproc->name, "ipu_c0"))
 		return;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/*
 	 * Reset firewalls when we're either:
 	 *   - exiting from secure playback mode
@@ -254,7 +254,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	struct elf32_shdr *shdr = (struct elf32_shdr *)
 					(elf_data + ehdr->e_shoff);
 	const char *name_sect = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 #ifdef CONFIG_ION_OMAP
 	struct ion_platform_heap *tiler_2d_heap;
 #endif
@@ -340,7 +340,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 		}
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 #ifdef CONFIG_ION_OMAP
 	tiler_2d_heap = omap_ion_get2d_heap();
 	if (!tiler_2d_heap)
@@ -451,7 +451,7 @@ out:
  */
 int rproc_set_secure(const char *name, bool enable)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	unsigned long timeout = msecs_to_jiffies(RPROC_RELOAD_TIMEOUT_MS);
 #endif
 	int ret = 0;
@@ -471,7 +471,7 @@ int rproc_set_secure(const char *name, bool enable)
 	ret = rproc_reload(name);
 	if (ret)
 		goto out;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	if (wait_for_completion_timeout(&secure_reload_complete, timeout) == 0)
 		pr_err("Timeout waiting for rproc to boot.\n");
 #else
@@ -489,7 +489,7 @@ out:
 }
 EXPORT_SYMBOL(rproc_set_secure);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 void rproc_secure_complete(struct rproc *rproc)
 {
 	if (strcmp(rproc->name, "ipu_c0"))

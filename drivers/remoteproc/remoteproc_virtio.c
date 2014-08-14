@@ -403,7 +403,7 @@ out:
  */
 void rproc_remove_virtio_dev(struct rproc_vdev *rvdev)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	struct virtio_device *vdev = &rvdev->vdev;
 	struct rproc *rproc = vdev_to_rproc(vdev);
 	struct virtqueue *vq, *n;

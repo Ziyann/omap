@@ -43,7 +43,7 @@
 /* 1 sec is fair enough time for suspending an OMAP device */
 #define DEF_SUSPEND_TIMEOUT 1000
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 /* How many pending messages/requests we can buffer. */
 #define QUEUE_SIZE	256
 #endif
@@ -96,7 +96,7 @@ struct omap_rproc {
 	void __iomem *boot_reg;
 	union oproc_pm_qos lat_req;
 	struct pm_qos_request bw_req;
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	atomic_t thrd_cnt;
 #endif
 	struct completion pm_comp;
@@ -108,7 +108,7 @@ struct omap_rproc {
 	bool need_kick;
 	struct hwspinlock_info hwlock_info;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	spinlock_t queue_lock;
 	DECLARE_KFIFO_PTR(queue_kfifo, uint32_t);
 	struct task_struct *queue_thread;
@@ -116,7 +116,7 @@ struct omap_rproc {
 #endif
 };
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 static int _vq_interrupt_thread(void *d)
 {
 	struct rproc *rproc = d;
@@ -195,7 +195,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 	struct omap_rproc *oproc = container_of(this, struct omap_rproc, nb);
 	struct device *dev = oproc->rproc->dev.parent;
 	const char *name = oproc->rproc->name;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	unsigned long flags;
 	int ret;
 #else
@@ -205,7 +205,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 	dev_dbg(dev, "mbox msg: 0x%x\n", msg);
 
 	switch (msg) {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	case RP_MBOX_BOOTINIT_DONE:
 		break;
 #endif
@@ -229,7 +229,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 			return NOTIFY_DONE;
 		}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 		spin_lock_irqsave(&oproc->queue_lock, flags);
 		ret = kfifo_in(&oproc->queue_kfifo, &msg, 1);
 		spin_unlock_irqrestore(&oproc->queue_lock, flags);
@@ -262,7 +262,7 @@ static void omap_rproc_kick(struct rproc *rproc, int vqid)
 		oproc->need_kick = true;
 		return;
 	}
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	if (oproc->mbox == NULL) {
 		dev_warn(dev, "mbox not initialised yet. Skipping kick.\n");
 		return;
@@ -371,14 +371,14 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	/* init thread counter for mbox messages */
 	atomic_set(&oproc->thrd_cnt, 0);
 #endif
 	/* load remote processor boot address if needed. */
 	if (oproc->boot_reg)
 		writel(rproc->bootaddr, oproc->boot_reg);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	spin_lock_init(&oproc->queue_lock);
 
 	ret = kfifo_alloc(&oproc->queue_kfifo, QUEUE_SIZE, GFP_KERNEL);
@@ -521,7 +521,7 @@ static int omap_rproc_stop(struct rproc *rproc)
 
 	omap_mbox_put(oproc->mbox, &oproc->nb);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	oproc->mbox = NULL;
 
 	kthread_stop(oproc->queue_thread);
@@ -535,7 +535,7 @@ static int omap_rproc_stop(struct rproc *rproc)
 	return 0;
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 static int omap_rproc_cb_barrier(struct rproc *rproc)
 {
 	struct omap_rproc *oproc = rproc->priv;
@@ -635,7 +635,7 @@ static int omap_rproc_resume(struct rproc *rproc)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	oproc->suspended = false;
 #endif
 	/* boot address could be lost after suspend, so restore it */
@@ -663,7 +663,7 @@ static int omap_rproc_resume(struct rproc *rproc)
 		for (i = 0; i < pdata->timers_cnt; i++)
 			omap_dm_timer_stop(timers[i].odt);
 		omap_mbox_disable(oproc->mbox);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 		return ret;
 	}
 	oproc->suspended = false;
@@ -715,7 +715,7 @@ static struct rproc_ops omap_rproc_ops = {
 	.start			= omap_rproc_start,
 	.stop			= omap_rproc_stop,
 	.kick			= omap_rproc_kick,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	.cb_barrier		= omap_rproc_cb_barrier,
 #endif
 	.suspend		= omap_rproc_suspend,

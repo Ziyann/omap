@@ -51,7 +51,7 @@ int rproc_secure_boot(struct rproc *rproc);
 int rproc_secure_get_mode(struct rproc *rproc);
 int rproc_secure_get_ttb(struct rproc *rproc);
 bool rproc_is_secure(struct rproc *rproc);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 void rproc_secure_complete(struct rproc *rproc);
 int rproc_secure_recover(struct rproc *rproc);
 #endif

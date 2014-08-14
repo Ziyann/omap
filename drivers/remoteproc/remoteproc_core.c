@@ -1690,7 +1690,7 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/*
 	 * If we've managed to get here, then the one and only rproc->fw
 	 * must have been loaded. It will stay loaded until reboot (i.e.
@@ -1833,7 +1833,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* check and validate secure certificate */
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	ret = rproc_secure_boot(rproc);
 	if (ret) {
 		dev_err(dev, "Failed to process secure mode: %d\n", ret);
@@ -1905,7 +1905,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 		goto out;
 
 out:
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	kref_put(&rproc->refcount, rproc_release);
 #else
 	if (fw)
@@ -1928,7 +1928,7 @@ out:
  */
 int rproc_boot(struct rproc *rproc)
 {
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	const struct firmware *firmware_p;
 #endif
 	struct device *dev;
@@ -1977,7 +1977,7 @@ int rproc_boot(struct rproc *rproc)
 
 	dev_info(dev, "powering up %s\n", rproc->name);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/*
 	 * virtio actually causes rproc to boot, so if we're here then
 	 * firmware has been loaded by rproc_loader_thread.
@@ -2178,7 +2178,7 @@ static int _reset_all_vdev(struct rproc *rproc)
 		rproc_remove_virtio_dev(rvdev);
 
 	/* run rproc_fw_config_virtio to create vdevs again */
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	BUG_ON(!rproc->fw);
 	rproc_fw_config_virtio(rproc->fw, rproc);
 	return 0;
@@ -2217,7 +2217,7 @@ static void rproc_error_handler_work(struct work_struct *work)
 	 */
 	if (!rproc->recovery_disabled) {
 		dev_err(dev, "trying to recover %s\n", rproc->name);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 		rproc_secure_recover(rproc);
 #else
 		_reset_all_vdev(rproc);
@@ -2237,7 +2237,7 @@ void rproc_recover(struct rproc *rproc)
 {
 	if (rproc->recovery_disabled && rproc->state == RPROC_CRASHED) {
 		dev_info(&rproc->dev, "rproc recovering....\n");
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 		rproc_secure_recover(rproc);
 #else
 		_reset_all_vdev(rproc);
@@ -2272,7 +2272,7 @@ int rproc_reload(const char *name)
 	}
 
 	dev_info(&rproc->dev, "rproc reloading....\n");
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	ret = _reset_all_vdev(rproc);
 #else
 	_reset_all_vdev(rproc);
@@ -2400,7 +2400,7 @@ EXPORT_SYMBOL(rproc_set_constraints);
 
 static int rproc_loader_thread(struct rproc *rproc)
 {
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	const struct firmware *fw;
 #endif
 	struct device *dev = &rproc->dev;
@@ -2422,7 +2422,7 @@ static int rproc_loader_thread(struct rproc *rproc)
 	}
 
 	/* make some retries in case FS is not up yet */
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	while (!rproc->fw
 			&& request_firmware(&rproc->fw, rproc->firmware, dev)
 			&& time_after(to, jiffies))
@@ -2432,7 +2432,7 @@ static int rproc_loader_thread(struct rproc *rproc)
 #endif
 		msleep(1000);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	if (!rproc->fw) {
 #else
 	if (!fw) {
@@ -2443,7 +2443,7 @@ static int rproc_loader_thread(struct rproc *rproc)
 		return ret;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	rproc_fw_config_virtio(rproc->fw, rproc);
 #else
 	rproc_fw_config_virtio(fw, rproc);
@@ -2481,7 +2481,7 @@ int rproc_register(struct rproc *rproc)
 	if (ret < 0)
 		return ret;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	kref_get(&rproc->refcount);
 #endif
 
@@ -2692,7 +2692,7 @@ int rproc_unregister(struct rproc *rproc)
 	/* if rproc is just being registered, wait */
 	wait_for_completion(&rproc->firmware_loading_complete);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	if (rproc->fw)
 		release_firmware(rproc->fw);
 	rproc->fw = NULL;
