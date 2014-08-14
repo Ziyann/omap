@@ -35,11 +35,7 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_CARVEOUT,
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	ION_NUM_HEAPS = 16,   /* take into account custom heaps */
-#else
-	ION_NUM_HEAPS,
-#endif
 };
 
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
@@ -152,7 +148,6 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len);
 
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 /**
  * ion_phys_frm_dev - returns the physical address and len of a handle
  * @dev:	ion_dev
@@ -171,7 +166,6 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
  */
 int ion_phys_frm_dev(struct ion_device *dev, struct ion_handle *handle,
 			ion_phys_addr_t *addr, size_t *len);
-#endif
 
 int ion_handle_phys(struct ion_handle *handle,
 		    ion_phys_addr_t *addr, size_t *len);
