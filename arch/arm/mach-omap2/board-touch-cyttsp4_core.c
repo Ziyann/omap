@@ -183,7 +183,7 @@ struct touch_platform_data cyttsp4_i2c_touch_platform_data = {
 	.is_good_panel = idme_is_good_panel,
 };
 
-void touch_gpio_init(void)
+void __init touch_gpio_init(void)
 {
 	int error;
 

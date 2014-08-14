@@ -63,6 +63,6 @@ struct touch_platform_data {
 
 extern struct touch_platform_data cyttsp4_i2c_touch_platform_data;
 
-void touch_gpio_init(void);
+void __init touch_gpio_init(void);
 
 #endif /* _LINUX_TOUCH_PLATFORM_H */
