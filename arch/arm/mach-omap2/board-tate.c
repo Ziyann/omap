@@ -361,6 +361,98 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+static struct regulator_consumer_supply sdp4430_vaux_supply[] = {
+        REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+static struct regulator_init_data sdp4430_vaux1 = {
+        .constraints = {
+                .min_uV                 = 1000000,
+                .max_uV                 = 3000000,
+                .apply_uV               = true,
+                .valid_modes_mask       = REGULATOR_MODE_NORMAL
+                                        | REGULATOR_MODE_STANDBY,
+                .valid_ops_mask  = REGULATOR_CHANGE_VOLTAGE
+                                        | REGULATOR_CHANGE_MODE
+                                        | REGULATOR_CHANGE_STATUS,
+        },
+        .num_consumer_supplies  = ARRAY_SIZE(sdp4430_vaux_supply),
+        .consumer_supplies      = sdp4430_vaux_supply,
+};
+
+static struct regulator_consumer_supply sdp4430_vaux2_supply[] = {
+        REGULATOR_SUPPLY("av-switch", "omap-abe-twl6040"),
+	{
+		.supply = "ldo4",
+	}
+};
+
+static struct regulator_init_data sdp4430_vaux2 = {
+        .constraints = {
+                .min_uV                 = 1200000,
+                .max_uV                 = 2800000,
+                .apply_uV               = true,
+                .valid_modes_mask       = REGULATOR_MODE_NORMAL
+                                        | REGULATOR_MODE_STANDBY,
+                .valid_ops_mask         = REGULATOR_CHANGE_VOLTAGE
+                                        | REGULATOR_CHANGE_MODE
+                                        | REGULATOR_CHANGE_STATUS,
+        },
+        .num_consumer_supplies  = ARRAY_SIZE(sdp4430_vaux2_supply),
+        .consumer_supplies      = sdp4430_vaux2_supply,
+};
+
+static struct regulator_consumer_supply sdp4430_vmmc_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+};
+
+static struct regulator_consumer_supply sdp4430_cam2_supply[] = {
+	REGULATOR_SUPPLY("cam2pwr", NULL),
+};
+
+static struct regulator_init_data sdp4430_vaux3 = {
+	.constraints = {
+		.min_uV			= 2800000,
+		.max_uV			= 2800000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_cam2_supply),
+	.consumer_supplies      = sdp4430_cam2_supply,
+};
+
+static struct regulator_init_data sdp4430_vmmc = {
+	.constraints = {
+		.min_uV			= 1200000,
+		.max_uV			= 3000000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_vmmc_supply),
+	.consumer_supplies      = sdp4430_vmmc_supply,
+};
+
+static struct regulator_init_data sdp4430_vpp = {
+	.constraints = {
+		.min_uV			= 1800000,
+		.max_uV			= 2500000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+};
+
 #ifdef CONFIG_CHARGER_SMB347
 static struct regulator_consumer_supply tate_ldo7_supply[] = {
 	{
@@ -382,10 +474,6 @@ static struct regulator_init_data sdp4430_vusim = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-				.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
 	},
 #ifdef CONFIG_CHARGER_SMB347
 	.num_consumer_supplies  = ARRAY_SIZE(tate_ldo7_supply),
@@ -413,36 +501,54 @@ static struct regulator_init_data sdp4430_vcxio = {
 	.consumer_supplies      = sdp4430_vcxio_supply,
 };
 
-static struct regulator_consumer_supply sdp4430_cam2_supply[] = {
-	REGULATOR_SUPPLY("cam2pwr", NULL),
+static struct regulator_init_data sdp4430_vana = {
+        .constraints = {
+                .min_uV                 = 2100000,
+                .max_uV                 = 2100000,
+                .valid_modes_mask       = REGULATOR_MODE_NORMAL
+                                        | REGULATOR_MODE_STANDBY,
+                .valid_ops_mask         = REGULATOR_CHANGE_MODE
+                                        | REGULATOR_CHANGE_STATUS,
+                .always_on              = true,
+        },
 };
 
-static struct regulator_init_data sdp4430_vaux3_idata = {
-	.constraints = {
-		.min_uV			= 2800000,
-		.max_uV			= 2800000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_cam2_supply),
-	.consumer_supplies      = sdp4430_cam2_supply,
+#if 0
+static struct regulator_consumer_supply sdp4430_vusb_supply[] = {
+                REGULATOR_SUPPLY("vusb", "twl6030_usb"),
 };
+
+static struct regulator_init_data sdp4430_vusb = {
+        .constraints = {
+                .min_uV                 = 3300000,
+                .max_uV                 = 3300000,
+                .valid_modes_mask       = REGULATOR_MODE_NORMAL
+                                        | REGULATOR_MODE_STANDBY,
+                .valid_ops_mask         = REGULATOR_CHANGE_MODE
+                                        | REGULATOR_CHANGE_STATUS,
+        },
+        .num_consumer_supplies  = ARRAY_SIZE(sdp4430_vusb_supply),
+        .consumer_supplies      = sdp4430_vusb_supply,
+};
+#endif
 
 static struct twl4030_platform_data tate_twldata = {
 	/* TWL6030 regulators at OMAP443X/446X based SOMs */
-	.vaux3		= &sdp4430_vaux3_idata,
+	.vaux1		= &sdp4430_vaux1,
+	.vaux2		= &sdp4430_vaux2,
+	.vaux3		= &sdp4430_vaux3,
 	.vusim		= &sdp4430_vusim,
+	.vmmc		= &sdp4430_vmmc,
+	.vpp		= &sdp4430_vpp,
 	.vcxio		= &sdp4430_vcxio,
+	.vana		= &sdp4430_vana,
+//	.vusb		= &sdp4430_vusb,
 	/* TWL6032 regulators at OMAP447X based SOMs */
-	.ldo3		= &sdp4430_vaux3_idata,
+	.ldo1		= &sdp4430_vpp,
+	.ldo2		= &sdp4430_vaux1,
+	.ldo3		= &sdp4430_vaux3,
+	.ldo4		= &sdp4430_vaux2,
+	.ldo5		= &sdp4430_vmmc,
 	.ldo6		= &sdp4430_vcxio,
 	.ldo7		= &sdp4430_vusim,
 };
@@ -568,8 +674,7 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
 		pdata->hwspin_unlock = hwspin_unlock;
 	} else {
-		pr_err("I2C hwspinlock request failed for bus %d\n", \
-								bus_id);
+		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
 	}
 }
 
@@ -590,11 +695,10 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_VDAC |
 			TWL_COMMON_REGULATOR_VAUX1 |
 			TWL_COMMON_REGULATOR_VAUX2 |
+			TWL_COMMON_REGULATOR_VAUX3 |
 			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
-			TWL_COMMON_REGULATOR_VUSIM |
 			TWL_COMMON_REGULATOR_VANA |
-			TWL_COMMON_REGULATOR_VCXIO |
 			TWL_COMMON_REGULATOR_VUSB |
 			TWL_COMMON_REGULATOR_CLK32KG |
 			TWL_COMMON_REGULATOR_V1V8 |
@@ -602,7 +706,7 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_SYSEN |
 			TWL_COMMON_REGULATOR_CLK32KAUDIO |
 			TWL_COMMON_REGULATOR_REGEN1);
-	omap4_pmic_init("twl6030", &tate_twldata,
+	omap4_pmic_init("twl6032", &tate_twldata,
 			NULL, OMAP44XX_IRQ_SYS_2N);
 
 	for(i=0, inf = &tate_i2c_info[0]; i < ARRAY_SIZE(tate_i2c_info); ++i, ++inf)
@@ -802,7 +906,9 @@ static void __init omap_tate_init(void)
 	init_duty_governor();
 	omap_die_governor_register_pdata(&omap_gov_pdata);
 
+#ifdef CONFIG_POWER_AVS_OMAP
 	omap_enable_smartreflex_on_init();
+#endif
 
 	bowser_init_idme();
 
