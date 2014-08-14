@@ -160,7 +160,7 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 	/* Setting MMC1 Card detect Irq */
 	if (pdev->id == 0) {
 		irq = twl6030_mmc_card_detect_config();
-		if (irq) {
+		if (irq < 0) {
 			pr_err("Failed configuring MMC1 card detect\n");
 			return irq;
 		}
