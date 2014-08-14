@@ -410,7 +410,7 @@ static struct regulator_consumer_supply sdp4430_cam2_supply[] = {
 	REGULATOR_SUPPLY("cam2pwr", NULL),
 };
 
-static struct regulator_init_data sdp4430_vaux3_idata = {
+static struct regulator_init_data sdp4430_vaux3 = {
 	.constraints = {
 		.min_uV			= 2800000,
 		.max_uV			= 2800000,
@@ -431,11 +431,11 @@ static struct regulator_init_data sdp4430_vaux3_idata = {
 
 static struct twl4030_platform_data jem_twldata = {
 	/* TWL6030 regulators at OMAP443X/446X based SOMs */
-	.vaux3		= &sdp4430_vaux3_idata,
+	.vaux3		= &sdp4430_vaux3,
 	.vusim		= &sdp4430_vusim,
 	.vcxio		= &sdp4430_vcxio,
 	/* TWL6032 regulators at OMAP447X based SOMs */
-	.ldo3		= &sdp4430_vaux3_idata,
+	.ldo3		= &sdp4430_vaux3,
 	.ldo6		= &sdp4430_vcxio,
 	.ldo7		= &sdp4430_vusim,
 };
@@ -564,9 +564,7 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_VAUX2 |
 			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
-			TWL_COMMON_REGULATOR_VUSIM |
 			TWL_COMMON_REGULATOR_VANA |
-			TWL_COMMON_REGULATOR_VCXIO |
 			TWL_COMMON_REGULATOR_VUSB |
 			TWL_COMMON_REGULATOR_CLK32KG |
 			TWL_COMMON_REGULATOR_V1V8 |
