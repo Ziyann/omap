@@ -30,7 +30,7 @@
 
 #include "mltypes.h"
 #include "mlsl.h"
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 #  include "mpu3050.h"
 
 #include "log.h"

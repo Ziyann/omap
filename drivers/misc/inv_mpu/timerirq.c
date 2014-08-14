@@ -38,7 +38,7 @@
 #include <linux/timer.h>
 #include <linux/slab.h>
 
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 #include "mltypes.h"
 #include "timerirq.h"
 
