@@ -289,10 +289,10 @@ static u32 ref_tuning[16] = { 0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
 				0xFDFFFDFF, 0xFFBFFFDF, 0xFFF7FFBB, 0xDE7B7FF7,
 				};
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 static int
 omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
 {
 	struct omap_hsmmc_host *host = (struct omap_hsmmc_host *)dev_id;
@@ -1002,11 +1002,7 @@ static DEVICE_ATTR(slot_name, S_IRUGO, omap_hsmmc_show_slot_name, NULL);
  */
 static void
 omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	struct mmc_data *data, bool no_auto_cmd12)
-#else
-	struct mmc_data *data)
-#endif
 {
 	int cmdreg = 0, resptype = 0, cmdtype = 0;
 #ifdef CONFIG_MACH_OMAP4_BOWSER
@@ -1042,12 +1038,8 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		cmdtype = 0x3;
 
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if ((host->flags & AUTO_CMD12) &&
 			mmc_op_multi(cmd->opcode) && !no_auto_cmd12)
-#else
-	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode))
-#endif
 		cmdreg |= ACEN_ACMD12;
 
 	if (data) {
@@ -1197,11 +1189,7 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 		data->bytes_xfered = 0;
 
 	if (data->stop && ((!(host->flags & AUTO_CMD12)) || data->error)) {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		omap_hsmmc_start_command(host, data->stop, NULL, 0);
-#else
-		omap_hsmmc_start_command(host, data->stop, NULL);
-#endif
 	} else {
 		if (data->stop)
 			data->stop->resp[0] = OMAP_HSMMC_READ(host->base,
@@ -1235,14 +1223,11 @@ omap_hsmmc_errata_i761(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 static void
 omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	struct mmc_request *req = host->mrq;
-#endif
 
 	if (host->cmd->opcode == MMC_SEND_TUNING_BLOCK)
 		return;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (req->sbc && (host->cmd == req->sbc)) {
 		int err;
 		host->cmd = NULL;
@@ -1258,7 +1243,6 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 			host->mrq->data, 1);
 		return;
 	}
-#endif
 
 	host->cmd = NULL;
 
@@ -2168,12 +2152,12 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+#endif
 
 	if (req->sbc) {
 		omap_hsmmc_start_command(host, req->sbc, NULL, 0);
 		return;
 	}
-#endif
 
 	err = omap_hsmmc_prepare_data(host, req);
 	if (err) {
@@ -2189,11 +2173,7 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 		return;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	omap_hsmmc_start_command(host, req->cmd, req->data, 0);
-#else
-	omap_hsmmc_start_command(host, req->cmd, req->data);
-#endif
 }
 
 /* Routine to configure clock values. Exposed API to core */
@@ -2427,10 +2407,8 @@ static int omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		set_data_timeout(host, 50000000, 0);
 #ifdef CONFIG_MACH_OMAP4_BOWSER
 		OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-		omap_hsmmc_start_command(host, &cmd, NULL, 0);
-#else
-		omap_hsmmc_start_command(host, &cmd, NULL);
 #endif
+		omap_hsmmc_start_command(host, &cmd, NULL, 0);
 
 		host->cmd = NULL;
 		host->mrq = NULL;
