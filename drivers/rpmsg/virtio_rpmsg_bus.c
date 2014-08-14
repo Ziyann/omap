@@ -786,7 +786,7 @@ out:
 }
 EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
 			     struct rpmsg_hdr *msg, unsigned int len)
 {
@@ -1099,7 +1099,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		return -ENOMEM;
 
 	vrp->vdev = vdev;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	vdev->priv = vrp;
 #endif
 
@@ -1162,7 +1162,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 
 	/* and half is dedicated for TX */
 	vrp->sbufs = bufs_va + RPMSG_TOTAL_BUF_SPACE / 2;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/* disable "rx-complete" interrupts */
 	virtqueue_disable_cb(vrp->rvq);
 #endif
@@ -1189,7 +1189,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	/* suppress "tx-complete" interrupts */
 	virtqueue_disable_cb(vrp->svq);
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	vdev->priv = vrp;
 #endif
 
@@ -1205,7 +1205,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		}
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/* re-enable "rx-complete" interrupts */
 	virtqueue_enable_cb(vrp->rvq);
 

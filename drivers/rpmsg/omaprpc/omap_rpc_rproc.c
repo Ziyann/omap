@@ -61,7 +61,7 @@ struct remote_mmu_region_t {
 };
 
 static struct remote_mmu_region_t regions[OMAPRPC_CORE_REMOTE_MAX] = {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	/* Tesla */
 	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
 	/* SIMCOP */

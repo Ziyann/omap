@@ -167,7 +167,7 @@ static int rprm_rproc_release(void *handle)
 {
 	struct rprm_rproc_depot *rprocd = handle;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_USE_AMAZON_DUCATI
 	rproc_put(rprocd->rp);
 #else
 	rproc_shutdown(rprocd->rp);
