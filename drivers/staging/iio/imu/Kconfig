@@ -1,8 +1,6 @@
 #
 # IIO imu drivers configuration
 #
-source "drivers/staging/iio/imu/inv_mpu/Kconfig"
-
 menu "Inertial measurement units"
 
 config ADIS16400
