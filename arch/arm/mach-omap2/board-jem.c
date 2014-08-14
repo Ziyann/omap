@@ -275,6 +275,11 @@ static struct mpu_platform_data mpu_gyro_data = {
 	.int_config  = 0x10,
 	.level_shifter = 0,
 	.orientation = {
+		 1,  0,  0,
+		 0, -1,  0,
+		 0,  0,  1,
+	},
+	.accel = {
 		 0, -1,  0,
 		 1,  0,  0,
 		 0,  0,  1,
