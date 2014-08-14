@@ -48,7 +48,7 @@ Programming the chip using /dev/mpu
 ----------------------------------
 Programming of MPU3050 or MPU6000 is done by first opening the /dev/mpu file and
 then performing a series of IOCTLS on the handle returned.  The IOCTL codes can
-be found in mpu.h.  Typically this is done by the mllite library in user
+be found in inv_mpu.h.  Typically this is done by the mllite library in user
 space.
 
 Adding to a Kernel
@@ -59,7 +59,7 @@ kernel.  Extracting the tarball from the root kernel dir will place the
 contents of the tarball here:
 
     <kernel root dir>/drivers/misc/inv_mpu
-    <kernel root dir>/include/linux/mpu.h
+    <kernel root dir>/include/linux/inv_mpu.h
     <kernel root dir>/include/linux/mpu3050.h
     <kernel root dir>/include/linux/mpu6000.h
 
@@ -103,10 +103,10 @@ Board and Platform Data
 In order for the driver to work, board and platform data specific to the device
 needs to be added to the board file.  A mpu_platform_data structure must
 be created and populated and set in the i2c_board_info_structure.  For details
-of each structure member see mpu.h.  All values below are simply an example and
+of each structure member see inv_mpu.h.  All values below are simply an example and
 should be modified for your platform.
 
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 
 #if defined(CONFIG_MPU_SENSORS_MPU3050)
 

@@ -15,7 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 #include <linux/gp2a.h>
 
 #if defined(CONFIG_TWL6030_GPADC)

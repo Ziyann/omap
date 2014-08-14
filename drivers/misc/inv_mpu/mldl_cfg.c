@@ -31,7 +31,7 @@
 #include <stddef.h>
 
 #include "mldl_cfg.h"
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 #  include "mpu3050.h"
 
 #include "mlsl.h"

@@ -47,7 +47,7 @@
 #include "slaveirq.h"
 #include "mlsl.h"
 #include "mldl_cfg.h"
-#include <linux/mpu.h>
+#include <linux/inv_mpu.h>
 
 
 /* Platform data for the MPU */
