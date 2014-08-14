@@ -121,6 +121,10 @@ sdio_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return 0;
 }
 
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+extern void bn_wilink_set_power(bool);
+#endif
+
 static int sdio_bus_probe(struct device *dev)
 {
 	struct sdio_driver *drv = to_sdio_driver(dev->driver);
@@ -139,6 +143,9 @@ static int sdio_bus_probe(struct device *dev)
 	 * pm_runtime_get_noresume() in its remove routine.
 	 */
 	if (func->card->host->caps & MMC_CAP_POWER_OFF_CARD) {
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+		bn_wilink_set_power(1);
+#endif
 		ret = pm_runtime_get_sync(dev);
 		if (ret < 0)
 			goto out;
@@ -190,8 +197,12 @@ static int sdio_bus_remove(struct device *dev)
 		pm_runtime_put_noidle(dev);
 
 	/* Then undo the runtime PM settings in sdio_bus_probe() */
-	if (func->card->host->caps & MMC_CAP_POWER_OFF_CARD)
+	if (func->card->host->caps & MMC_CAP_POWER_OFF_CARD) {
 		pm_runtime_put_sync(dev);
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+                bn_wilink_set_power(0);
+#endif
+	}
 
 	return ret;
 }
