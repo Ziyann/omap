@@ -4,6 +4,7 @@ CONFIG_RD_XZ=y
 CONFIG_CC_OPTIMIZE_FOR_SIZE=y
 CONFIG_MACH_OMAP_BN=y
 CONFIG_MACH_OMAP_OVATION=y
+CONFIG_USE_AMAZON_DUCATI=y
 CONFIG_CMDLINE="androidboot.serialno=3024440170004302 vmalloc=496M androidboot.hardware=ovation androidboot.selinux=permissive omapfb.fb_opt=-1,-1,-1,1,1920,1280"
 # CONFIG_CMDLINE_EXTEND is not set
 CONFIG_CMDLINE_FORCE=y
