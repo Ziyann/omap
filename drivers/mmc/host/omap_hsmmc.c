@@ -3132,7 +3132,7 @@ static void omap_hsmmc_shutdown(struct platform_device *pdev)
 		msleep(delay);
 	}
 }
-#elif CONFIG_MACH_OMAP_4430_KC1
+#elif defined(CONFIG_MACH_OMAP_4430_KC1)
 static void omap_hsmmc_shutdown(struct platform_device *pdev)
 {
 	struct omap_hsmmc_host *host;
