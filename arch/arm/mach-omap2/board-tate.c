@@ -281,18 +281,14 @@ static struct platform_device *bowser_devices[] __initdata = {
 static struct mpu_platform_data mpu_gyro_data = {
 	.int_config  = 0x10,
 	.level_shifter = 0,
-	.orientation = {   1,  0,  0,
-			   0,  1,  0,
-			   0,  0,  1 },
+	.orientation = {
+		 1,  0,  0,
+		 0, -1,  0,
+		 0,  0,  1,
+	},
 	.key = {0x85, 0x45, 0xf4, 0x9a, 0xfd, 0x77, 0x9a, 0xd2, 0xbc,
 		0xe7, 0x64, 0xb7, 0x63, 0xc3, 0x6f, 0x96},
 };
-/*static struct ext_slave_platform_data mpu_compass_data = {
-	.bus         = EXT_SLAVE_BUS_SECONDARY,
-	.orientation = { 1, 0, 0,
-			 0, 1, 0,
-			 0, 0, -1 },
-};*/
 
 static void mpu6050b1_init(void)
 {
@@ -620,8 +616,7 @@ static struct i2c_board_info __initdata tate_i2c_3_boardinfo[] = {
 
 static struct i2c_board_info __initdata tate_i2c_4_boardinfo[] = {
 #ifdef CONFIG_INV_MPU_IIO
-	{ I2C_BOARD_INFO("mpu6xxx", 0x68), .irq = GPIO_GRYO, .platform_data = &mpu_gyro_data, },
-//	{ I2C_BOARD_INFO("ami306", 0x0F), .irq = OMAP_GPIO_IRQ(GPIO_GRYO), .platform_data = &mpu_compass_data, },
+	{ I2C_BOARD_INFO("mpu6050", 0x68), .irq = GPIO_GRYO, .platform_data = &mpu_gyro_data, },
 #endif
 #ifdef CONFIG_INPUT_MAX44007
 	{ I2C_BOARD_INFO(MAX44007_NAME, 0x5A), .irq = GPIO_MAX44007_IRQ, .platform_data = &max44007_pdata, },
