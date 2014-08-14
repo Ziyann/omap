@@ -2928,9 +2928,7 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	mmc->max_seg_size = mmc->max_req_size;
 
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-		     MMC_CAP_WAIT_WHILE_BUSY;
-#elif CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE | MMC_CAP_CMD23;
 #else
 		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
