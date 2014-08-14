@@ -1401,7 +1401,7 @@ static int inv_accel_dmp_cal(struct inv_mpu_iio_s *st)
 	u8 regs[3];
 	const u8 tmp[3] = { DINA0C, DINAC9, DINA2C };
 	inv_accel_orient =
-		inv_orientation_matrix_to_scaler(st->plat_data.orientation);
+		inv_orientation_matrix_to_scaler(st->plat_data.accel);
 
 	regs[0] = tmp[inv_accel_orient & 3];
 	regs[1] = tmp[(inv_accel_orient >> 3) & 3];

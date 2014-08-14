@@ -901,7 +901,7 @@ static ssize_t inv_attr_show(struct device *dev,
 		if (st->plat_data.sec_slave_type == SECONDARY_SLAVE_TYPE_ACCEL)
 			m = st->plat_data.secondary_orientation;
 		else
-			m = st->plat_data.orientation;
+			m = st->plat_data.accel;
 		return sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 			m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
 	case ATTR_COMPASS_MATRIX:

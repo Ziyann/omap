@@ -98,6 +98,7 @@ struct mpu_platform_data {
 	__u8 int_config;
 	__u8 level_shifter;
 	__s8 orientation[9];
+	__s8 accel[9];
 	enum secondary_slave_type sec_slave_type;
 	enum ext_slave_id sec_slave_id;
 	__u16 secondary_i2c_addr;
