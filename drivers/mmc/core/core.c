@@ -2071,6 +2071,10 @@ int mmc_detect_card_removed(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_detect_card_removed);
 
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+extern void bn_wilink_set_power(bool);
+#endif
+
 void mmc_rescan(struct work_struct *work)
 {
 	static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
@@ -2081,6 +2085,11 @@ void mmc_rescan(struct work_struct *work)
 
 	if (host->rescan_disable)
 		return;
+
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		bn_wilink_set_power(1);
+#endif
 
 	mmc_bus_get(host);
 
@@ -2134,6 +2143,10 @@ void mmc_rescan(struct work_struct *work)
 	mmc_release_host(host);
 
  out:
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		bn_wilink_set_power(0);
+#endif
 	if (extend_wakelock)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
 	else
@@ -2208,6 +2221,12 @@ int mmc_power_save_host(struct mmc_host *host)
 
 	mmc_power_off(host);
 
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+	if (host->index == 1) {
+	   mdelay(10); /* sd specs states power should stay off for 1ms so 10 should be more than enough */
+	}
+#endif
+
 	return ret;
 }
 EXPORT_SYMBOL(mmc_power_save_host);
@@ -2262,10 +2281,16 @@ int mmc_card_sleep(struct mmc_host *host)
 		return 0;
 
 	mmc_bus_get(host);
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+	mmc_claim_host(host);
+#endif
 
 	if (host->bus_ops && !host->bus_dead && host->bus_ops->sleep)
 		err = host->bus_ops->sleep(host);
 
+#if (defined(CONFIG_MACH_OMAP_HUMMINGBIRD) || defined(CONFIG_MACH_OMAP_OVATION))
+	mmc_release_host(host);
+#endif
 	mmc_bus_put(host);
 
 	return err;
