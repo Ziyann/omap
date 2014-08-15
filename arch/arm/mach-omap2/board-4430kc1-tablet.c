@@ -163,17 +163,8 @@ static void __init quanta_boardids(void)
 }
 
 #ifdef CONFIG_SND_SOC_TLV320AIC31XX
-static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
-	{
-		.reg = AIC31XX_MAKE_REG(0, 0, 51),
-		.value = 0x14,
-	},
-};
-
 static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.audio_mclk1 = 19200000,
-	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
-	.gpio_defaults = aic3xxx_gpio,
 	.irq_base = TWL6040_CODEC_IRQ_BASE,
 	.regulator_name = "audio-pwr",
 	.regulator_min_uV = 3000000,
