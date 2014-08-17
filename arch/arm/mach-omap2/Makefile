@@ -266,6 +266,33 @@ obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
+obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
+					   board-blaze-touch.o \
+					   board-blaze-panel.o \
+					   board-blaze-keypad.o \
+					   board-blaze-sensors.o \
+					   board-blaze-modem.o \
+					   board-44xx-identity.o \
+					   board-44xx-power.o \
+					   board-44xx-serial.o \
+					   hsmmc.o \
+					   omap_phy_internal.o \
+					   omap4_apps_brd_id.o
+obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
+					   board-44xx-identity.o \
+					   board-44xx-power.o \
+					   board-44xx-serial.o \
+					   board-44xx-tablet-touch.o \
+					   board-44xx-tablet-sensors.o \
+					   board-44xx-tablet-panel.o \
+					   board-44xx-tablet-buttons.o \
+					   omap4_apps_brd_id.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_TTSP)  += board-touch-cyttsp4_core.o
+obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
+					   hsmmc.o \
+					   board-44xx-identity.o \
+					   omap4_apps_brd_id.o \
+					   omap_phy_internal.o
 obj-$(CONFIG_MACH_TUNA)			+= board-tuna.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
@@ -321,6 +348,7 @@ obj-y					+= common-board-devices.o
 obj-$(CONFIG_OMAP_REMOTE_PROC)		+= remoteproc.o
 
 obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
+obj-$(CONFIG_ION_OMAP)			+= omap4_ion.o
 obj-$(CONFIG_SEC_MODEM)			+= board-tuna-modems.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_dmm.o
 obj-$(CONFIG_OMAP_FIQ_DEBUGGER)		+= omap_fiq_debugger.o
@@ -330,5 +358,4 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
 endif
 
 obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
-
-obj-$(CONFIG_ION_OMAP)			+= omap4_ion.o
+obj-$(CONFIG_ARCH_OMAP4)		+= omap_gcxxx.o
