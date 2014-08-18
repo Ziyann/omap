@@ -96,6 +96,7 @@ retry:
 
 		/* Try Error Recovery: for failing usbdpll locking */
 		if (!strcmp(clk->name, "dpll_usb_ck")) {
+
 			reg = __raw_readl(dd->mult_div1_reg);
 
 			/* Put in MN bypass */
@@ -131,17 +132,6 @@ retry:
 				first_time = false;
 				goto retry;
 			}
-
-			pr_info("\n========== USB DPLL DUMP ===========\n");
-			pr_info("CM_CLKMODE_DPLL_USB         :%08x\n", omap_readl(0x4A008180));
-			pr_info("CM_IDLEST_DPLL_USB          :%08x\n", omap_readl(0x4A008184));
-			pr_info("CM_AUTOIDLE_DPLL_USB        :%08x\n", omap_readl(0x4A008188));
-			pr_info("CM_CLKSEL_DPLL_USB          :%08x\n", omap_readl(0x4A00818C));
-			pr_info("CM_DIV_M2_DPLL_USB          :%08x\n", omap_readl(0x4A008190));
-			pr_info("CM_SSC_DELTAMSTEP_DPLL_USB  :%08x\n", omap_readl(0x4A0081A8));
-			pr_info("CM_SSC_MODFREQDIV_DPLL_USB  :%08x\n", omap_readl(0x4A0081AC));
-			pr_info("CM_CLKDCOLDO_DPLL_USB       :%08x\n", omap_readl(0x4A0081B4));
-			pr_info("========== USB DPLL DUMP: End ===========\n");
 		}
 	} else {
 		pr_debug("clock: %s transition to '%s' in %d loops\n",

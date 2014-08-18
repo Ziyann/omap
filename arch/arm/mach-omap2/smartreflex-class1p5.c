@@ -293,7 +293,7 @@ done_calib:
 
 		u_volt_safe += u_volt_margin;
 	}
-
+	/* just warn, dont clamp down on voltage */
 	if (u_volt_safe > volt_data->volt_nominal) {
 		pr_warning("%s: %s Vsafe %ld > Vnom %d. %ld[%d] margin on"
 			"vnom %d curr_v=%ld\n", __func__, voltdm->name,
@@ -316,8 +316,8 @@ done_calib:
 		voltdm_scale(voltdm, volt_data);
 	}
 
-	pr_info("%s: %s: Calibration complete: Voltage:Nominal=%d,"
-		"Calib=%d,margin=%d\n",
+	pr_info("%s: %s: Calibration complete: Voltage:Nominal=%d "
+		"Calib=%d margin=%d\n",
 		 __func__, voltdm->name, volt_data->volt_nominal,
 		 volt_data->volt_calibrated, volt_data->volt_margin);
 	/*
