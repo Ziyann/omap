@@ -25,6 +25,8 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 
+#define VERBOSE_ENABLED	false
+
 #define MAX17040_VCELL_MSB	0x02
 #define MAX17040_VCELL_LSB	0x03
 #define MAX17040_SOC_MSB	0x04
@@ -368,11 +370,13 @@ static void max17040_update(struct max17040_chip *chip)
 	if ((chip->soc != prev_soc) || (chip->status != prev_status))
 		power_supply_changed(&chip->battery);
 
-	dev_info(&chip->client->dev, "online = %d vcell = %d soc = %d "
-		"status = %d health = %d temp = %d "
-		"charger status = %d\n", chip->online, chip->vcell,
-		chip->soc, chip->status, chip->bat_health, chip->bat_temp,
-		chip->charger_status);
+	if (VERBOSE_ENABLED) {
+		dev_info(&chip->client->dev, "online = %d vcell = %d soc = %d "
+			"status = %d health = %d temp = %d "
+			"charger status = %d\n", chip->online, chip->vcell,
+			chip->soc, chip->status, chip->bat_health, chip->bat_temp,
+			chip->charger_status);
+	}
 }
 
 static void max17040_program_alarm(struct max17040_chip *chip, int seconds)
