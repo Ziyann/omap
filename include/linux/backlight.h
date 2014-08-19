@@ -13,7 +13,7 @@
 #include <linux/notifier.h>
 #include <linux/thermal_framework.h>
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -114,7 +114,7 @@ struct backlight_device {
 
 	struct device dev;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
 #endif

@@ -253,7 +253,7 @@ static int backlight_resume(struct device *dev)
 	return 0;
 }
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void backlight_early_suspend(struct early_suspend *es)
 {
@@ -423,7 +423,7 @@ struct backlight_device *backlight_device_register(const char *name,
 		return ERR_PTR(rc);
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	new_bd->early_suspend.suspend = backlight_early_suspend;
 	new_bd->early_suspend.resume = backlight_late_resume;
@@ -472,7 +472,7 @@ void backlight_device_unregister(struct backlight_device *bd)
 		pmac_backlight = NULL;
 	mutex_unlock(&pmac_backlight_mutex);
 #endif
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&bd->early_suspend);
 #endif
@@ -502,7 +502,7 @@ static int __init backlight_class_init(void)
 	}
 
 	backlight_class->dev_attrs = bl_device_attributes;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_OMAP_4430_KC1)
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	backlight_class->suspend = backlight_suspend;
 	backlight_class->resume = backlight_resume;
