@@ -72,8 +72,6 @@
 #include "omap-abe-priv.h"
 #include "../codecs/tlv320aic31xx.h"
 
-// static struct snd_soc_codec *aic31xx_codec;
-
 /* Forward Declaration */
 static int Qoo_headset_jack_status_check(void);
 
@@ -93,50 +91,48 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	void __iomem *phymux_base = NULL;
 #endif
 
+	pr_debug("\naic31xx: AIC31xx  MCBSP slave & master\n");
+	/* Set codec DAI configuration */
+	err = snd_soc_dai_set_fmt(codec_dai,
+					SND_SOC_DAIFMT_I2S |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBM_CFM);
+	if (err < 0) {
+		pr_err("can't set codec DAI configuration\n");
+		return err;
+	}
+	/* Set cpu DAI configuration */
+	err = snd_soc_dai_set_fmt(cpu_dai,
+					SND_SOC_DAIFMT_I2S |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBM_CFM);
+	if (err < 0) {
+		pr_err("can't set cpu DAI configuration\n");
+		return ret;
+	}
 
-		pr_debug("\naic31xx: AIC31xx  MCBSP slave & master\n");
-		/* Set codec DAI configuration */
-		err = snd_soc_dai_set_fmt(codec_dai,
-						SND_SOC_DAIFMT_I2S |
-						SND_SOC_DAIFMT_NB_NF |
-						SND_SOC_DAIFMT_CBM_CFM);
-		if (err < 0) {
-			pr_debug(KERN_ERR
-				 "can't set codec DAI configuration\n");
-			return err;
-		}
-		/* Set cpu DAI configuration */
-		err = snd_soc_dai_set_fmt(cpu_dai,
-						SND_SOC_DAIFMT_I2S |
-						SND_SOC_DAIFMT_NB_NF |
-						SND_SOC_DAIFMT_CBM_CFM);
-		if (err < 0) {
-			pr_debug(KERN_ERR "can't set cpu DAI configuration\n");
-			return ret;
-		}
-		
 #ifdef CONFIG_MACH_OMAP_4430_KC1
-		/* Enabling the 19.2 Mhz Master Clock Output from OMAP4 for KC1 Board */
-		phymux_base = ioremap(0x4a30a000, 0x1000);
-		__raw_writel(0x00010100, phymux_base + 0x318);
+	/* Enabling the 19.2 Mhz Master Clock Output from OMAP4 for KC1 Board */
+	phymux_base = ioremap(0x4a30a000, 0x1000);
+	__raw_writel(0x00010100, phymux_base + 0x318);
 
-		/* Added the test code to configure the McBSP4 CONTROL_MCBSP_LP
-		 * register. This register ensures that the FSX and FSR on McBSP4 are
-		 * internally short and both of them see the same signal from the
-		 * External Audio Codec.
-		 */
-		phymux_base = ioremap(0x4a100000, 0x1000);
-		__raw_writel(0xC0000000, phymux_base + 0x61c);
+	/* Added the test code to configure the McBSP4 CONTROL_MCBSP_LP
+	 * register. This register ensures that the FSX and FSR on McBSP4 are
+	 * internally short and both of them see the same signal from the
+	 * External Audio Codec.
+	 */
+	phymux_base = ioremap(0x4a100000, 0x1000);
+	__raw_writel(0xC0000000, phymux_base + 0x61c);
 #endif
 
-        	/* Set the codec system clock for DAC and ADC */
+	/* Set the codec system clock for DAC and ADC. The
+	 * third argument is specific to the board being used.
+	 */
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, AIC31XX_FREQ_19200000, SND_SOC_CLOCK_IN);
+	if (ret < 0) {
+		pr_err("can't set cpu system clock\n");
+	}
 
-		ret = snd_soc_dai_set_pll(codec_dai, 0, AIC31XX_PLL_CLKIN_MCLK , 19200000, params_rate(params));
-        	if (ret < 0) {
-                	pr_debug(KERN_ERR "Can't set codec pll clock\n");
-                	return ret;
-        }
-	
 	if (params != NULL) {
 		struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 		/* Configure McBSP internal buffer usage */
@@ -149,9 +145,6 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 			omap_mcbsp_set_rx_threshold(mcbsp, channels);
 	} else
 		pr_debug(" params in else statement is %p\n", params);
-
-	if (ret < 0)
-		pr_debug(KERN_ERR "can't set cpu system clock\n");
 
 	return ret;
 }
@@ -171,28 +164,39 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 {
 	struct snd_interval *channels = hw_param_interval(params,
 						SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval *rate = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_RATE);
 	unsigned int be_id = rtd->dai_link->be_id;
+	unsigned int threshold;
+	unsigned int min_mask;
 
 	switch (be_id) {
 	case OMAP_ABE_DAI_BT_VX:
-		channels->min = 2;
-		rate->min = rate->max = 8000;
+		channels->min = 1;
+		threshold = 1;
 		break;
 	case OMAP_ABE_DAI_MM_FM:
 		channels->min = 2;
-		rate->min = rate->max = 48000;
-		break;
-	case OMAP_ABE_DAI_MODEM:
+		threshold = 2;
 		break;
 	default:
+		threshold = 1;
 		return -EINVAL;
 	}
 
+	min_mask = snd_mask_min(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
+					       SNDRV_PCM_HW_PARAM_FIRST_MASK]);
+
+	DBG("%s: Returned min_mask 0x%x\n", __func__, min_mask);
+
+	snd_mask_reset(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
+				      SNDRV_PCM_HW_PARAM_FIRST_MASK],
+				      min_mask);
+
+	DBG("%s: Returned min_mask 0x%x\n", __func__, min_mask);
+
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
-				SNDRV_PCM_HW_PARAM_FIRST_MASK],
-				SNDRV_PCM_FORMAT_S16_LE);
+				    SNDRV_PCM_HW_PARAM_FIRST_MASK],
+				    SNDRV_PCM_FORMAT_S16_LE);
+
 	return 0;
 }
 
@@ -292,8 +296,8 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 	/* Connections between aic31xx and ABE */
 	/* FM <--> ABE */
-	{"omap-mcbsp.2 Playback", NULL, "MM_EXT_DL"},
-	{"MM_EXT_UL", NULL, "omap-mcbsp.2 Capture"},
+	{"omap-mcbsp.3 Playback", NULL, "MM_EXT_DL"},
+	{"MM_EXT_UL", NULL, "omap-mcbsp.3 Capture"},
 };
 
 /*
@@ -304,21 +308,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_codec *codec = rtd->codec;
-//	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	int ret;
-
-	/* Adding aic31xx specific widgets */
-
-// FIXME-HASH: We handle this in the jack-detect
-#if 0
-	ret = snd_soc_add_codec_controls(codec, omap4_aic31xx_controls, ARRAY_SIZE(omap4_aic31xx_controls));
-	if (ret)
-		return ret;
-
-	ret = snd_soc_dapm_sync(dapm);
-	if (ret)
-		return ret;
-#endif
 
 	/* Headset jack detection */
 	ret = snd_soc_jack_new(codec, "Headset Jack", SND_JACK_HEADSET, &hs_jack);
@@ -331,7 +321,6 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 	if (ret)
 		return ret;
 
-	Qoo_headset_jack_status_check();
 	return ret;
 }
 
@@ -341,7 +330,7 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
  */
 static int Qoo_headset_jack_status_check(void)
 {
-	int gpio_status, ret = 0, hs_status = 0;
+	int gpio_status, ret = 0;
 	struct snd_soc_codec *codec = hs_jack.codec;
 	struct aic31xx_priv *priv = snd_soc_codec_get_drvdata(codec);
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
@@ -355,24 +344,19 @@ static int Qoo_headset_jack_status_check(void)
 			snd_soc_dapm_disable_pin(dapm, "Speaker Jack");
 			snd_soc_dapm_enable_pin(dapm, "Headphone Jack");
 			if (aic31xx_mic_check(codec)) {
-				if (hs_status) {
-					dev_info(codec->dev, "Headset without"
-						"MIC Detected Recording"
-						"not possible.\n");
-					hs_status = 1;
-				}
-				 else {
-					dev_info(codec->dev, "Headset with MIC"
-						"Inserted Recording possible\n");
-					hs_status = (1<<1);
-				}
+				dev_info(codec->dev, "Headset with MIC Inserted Recording possible\n");
+				snd_soc_dapm_enable_pin(dapm, "HSMIC");
 			}
+			else {
+				dev_info(codec->dev, "Headset without MIC Detected Recording not possible.\n");
+			}
+			ret = snd_soc_dapm_sync(dapm);
 		} else {
 			dev_info(codec->dev, "headset not connected\n");
 			snd_soc_dapm_enable_pin(dapm,  "Speaker Jack");
 			snd_soc_dapm_disable_pin(dapm, "HSMIC");
 			snd_soc_dapm_disable_pin(dapm, "Headphone Jack");
-			hs_status = 0;
+			ret = snd_soc_dapm_sync(dapm);
 		}
 		priv->headset_connected = !gpio_status;
 		dev_info(codec->dev, "##%s : switch state = %d\n",
@@ -422,7 +406,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.name = "Legacy McBSP3",
 		.stream_name = "MultiMedia",
 		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp.2",
+		.cpu_dai_name = "omap-mcbsp.3",
 		.codec_dai_name = "tlv320aic31xx-MM_EXT",
 		.platform_name = "omap-pcm-audio",
 		.codec_name = "tlv320aic31xx-codec",
@@ -439,7 +423,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.stream_name = "FM Playback",
 
 		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp.2",
+		.cpu_dai_name = "omap-mcbsp.3",
 		.platform_name = "aess",
 
 		/* FM */
@@ -458,7 +442,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.stream_name = "FM Capture",
 
 		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp.2",
+		.cpu_dai_name = "omap-mcbsp.3",
 		.platform_name = "aess",
 
 		/* FM */
