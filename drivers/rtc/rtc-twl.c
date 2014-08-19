@@ -611,6 +611,7 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 		goto out4;
 	}
 
+	device_init_wakeup(&pdev->dev, 1);
 	return 0;
 
 out4:
