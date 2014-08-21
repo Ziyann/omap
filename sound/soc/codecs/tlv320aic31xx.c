@@ -2018,7 +2018,7 @@ static int aic31xx_codec_probe(struct snd_soc_codec *codec)
 		return -ENOMEM;
 
 	snd_soc_codec_set_drvdata(codec, priv);
-	priv->pdata = dev_get_platdata(codec->dev->parent);
+	priv->pdata = &control->pdata;
 	priv->codec = codec;
 	priv->playback_status = 0;
 	priv->power_status = 0;
@@ -2146,8 +2146,9 @@ static int aic31xx_resume(struct snd_soc_codec *codec)
         DBG("###aic31xx_resume\n");
         DBG("%s: Entered\n", __func__);
 
-	if (regulator_set_voltage(audio_regulator, aic31xx->pdata->regulator_min_uV, aic31xx->pdata->regulator_max_uV))
-		printk(KERN_INFO "%s: regulator_set 3V error\n", __func__);
+	if (aic31xx->pdata->regulator_min_uV > 0 && aic31xx->pdata->regulator_max_uV > 0)
+		if (regulator_set_voltage(audio_regulator, aic31xx->pdata->regulator_min_uV, aic31xx->pdata->regulator_max_uV))
+			printk(KERN_INFO "%s: regulator_set 3V error\n", __func__);
 
 	regulator_enable(audio_regulator);
 
