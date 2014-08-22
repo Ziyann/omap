@@ -152,7 +152,7 @@ static int bq27541_battery_cyct = 0;
 static int temp_error_counter = 0;
 static int volt_error_counter = 0;
 
-static int bq27541_i2c_read(struct bq27541_info *bat, u8 reg_num, void *value, int size) {
+static int bq27541_i2c_read(struct bq27541_info *bat, u8 reg_num, void *value, int size, int is_signed) {
 	s32 error;
 	if (size == 1) {
 		error = i2c_smbus_read_byte_data(bat->client, reg_num);
@@ -160,7 +160,10 @@ static int bq27541_i2c_read(struct bq27541_info *bat, u8 reg_num, void *value, i
 			dev_warn(bat->dev, "i2c read retry\n");
 			return -EIO;
 		}
-		*((u8 *)value) = (u8)(error & 0xff);
+		if (is_signed)
+			*((s8 *)value) = (s8)(error & 0xff);
+		else
+			*((u8 *)value) = (u8)(error & 0xff);
 		return 0;
 	}
 	else if (size == 2) {
@@ -169,7 +172,10 @@ static int bq27541_i2c_read(struct bq27541_info *bat, u8 reg_num, void *value, i
 			dev_warn(bat->dev, "i2c read retry\n");
 			return -EIO;
 		}
-		*((u16 *)value) = (u16)(le16_to_cpu(error) & 0xffff);
+		if (is_signed)
+			*((s16 *)value) = (s16)(le16_to_cpu(error) & 0xffff);
+		else
+			*((u16 *)value) = (u16)(le16_to_cpu(error) & 0xffff);
 		return 0;
 	}
 	else {
@@ -180,7 +186,15 @@ static int bq27541_i2c_read(struct bq27541_info *bat, u8 reg_num, void *value, i
 
 static int bq27541_battery_read_u16(struct bq27541_info *bat, u8 reg_num, int *value) {
 	u16 data = 0;
-	int error = bq27541_i2c_read(bat, reg_num, &data, sizeof(data));
+	int error = bq27541_i2c_read(bat, reg_num, &data, sizeof(data), 0);
+	if (!error)
+		*value = data;
+	return error;
+}
+
+static int bq27541_battery_read_s16(struct bq27541_info *bat, u8 reg_num, int *value) {
+	s16 data = 0;
+	int error = bq27541_i2c_read(bat, reg_num, &data, sizeof(data), 1);
 	if (!error)
 		*value = data;
 	return error;
@@ -190,7 +204,7 @@ static int bq27541_battery_read_voltage(struct bq27541_info *bat, int *voltage) 
 	return bq27541_battery_read_u16(bat, BQ27541_VOLTAGE_LOW, voltage);
 }
 static int bq27541_battery_read_current(struct bq27541_info *bat, int *curr) {
-	return bq27541_battery_read_u16(bat, BQ27541_AI_LO, curr);
+	return bq27541_battery_read_s16(bat, BQ27541_AI_LO, curr);
 }
 static int bq27541_battery_read_capacity(struct bq27541_info *bat, int *capacity) {
 	return bq27541_battery_read_u16(bat, BQ27541_CSOC_L, capacity);
@@ -218,7 +232,7 @@ static int bq27541_battery_read_tte(struct bq27541_info *bat, int *tte) {
 }
 static void bq27541_battery_read_lmd_cyc(struct bq27541_info *bat, int *lmd, int *cycl, int *cyct) {
 	u16 value = 0;
-	int error = bq27541_i2c_read(bat, BQ27541_CYCL_L, &value, sizeof(value));
+	int error = bq27541_i2c_read(bat, BQ27541_CYCL_L, &value, sizeof(value), 0);
 	if (!error)
 		*cycl = value;
 }
@@ -228,7 +242,7 @@ static int bq27541_battery_read_fac(struct bq27541_info *bat, int *fac) {
 static int bq27541_battery_read_temperature(struct bq27541_info *bat, int *temperature) {
 	s16 temp = 0;
 	int celsius = 0;
-	int error = bq27541_i2c_read(bat, BQ27541_TEMP_LOW, &temp, sizeof(temp));
+	int error = bq27541_i2c_read(bat, BQ27541_TEMP_LOW, &temp, sizeof(temp), 0);
 	if (!error) {
 		/* Convert 0.1 K to 0.1 C */
 		celsius = temp - 2732;
