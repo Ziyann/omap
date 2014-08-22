@@ -6,7 +6,7 @@ CONFIG_FORCE_SILICON_PERFORMANCE=y
 CONFIG_WIFI_CONTROL_FUNC=y
 # CONFIG_OMAP_SO_MAP_FORCE is not set
 CONFIG_OMAP4_HS_SECURE_SRAM_SIZE=56
-CONFIG_CMDLINE="mem=512M omapfb.fb_opt=-1,-1,-1,1,1024,600 androidboot.selinux=permissive newbootargs"
+CONFIG_CMDLINE="mem=512M omapfb.fb_opt=-1,-1,-1,1,1024,600 cma=8M androidboot.selinux=permissive newbootargs"
 CONFIG_CMDLINE_FROM_BOOTLOADER=y
 # CONFIG_CMDLINE_EXTEND is not set
 CONFIG_WIRELESS_EXT=y
