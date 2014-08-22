@@ -2131,7 +2131,9 @@ static int aic31xx_suspend(struct snd_soc_codec *codec)
 		/* Disable Audio clock from FREF_CLK2_OUT */
 		omap_writew(omap_readw(0x4a30a318) & 0xFEFF, 0x4a30a318);
 
+#ifndef AIC31XX_IGNORE_REGULATOR_MGMT
 		regulator_disable(audio_regulator);
+#endif
         }
         DBG("%s: Exiting\n", __func__);
         return 0;
@@ -2146,11 +2148,13 @@ static int aic31xx_resume(struct snd_soc_codec *codec)
         DBG("###aic31xx_resume\n");
         DBG("%s: Entered\n", __func__);
 
+#ifndef AIC31XX_IGNORE_REGULATOR_MGMT
 	if (aic31xx->pdata->regulator_min_uV > 0 && aic31xx->pdata->regulator_max_uV > 0)
 		if (regulator_set_voltage(audio_regulator, aic31xx->pdata->regulator_min_uV, aic31xx->pdata->regulator_max_uV))
 			printk(KERN_INFO "%s: regulator_set 3V error\n", __func__);
 
 	regulator_enable(audio_regulator);
+#endif
 
 	/* Enable Audio clock from FREF_CLK2_OUT */
 	omap_writew(omap_readw(0x4a30a318) | ~0xFEFF, 0x4a30a318);

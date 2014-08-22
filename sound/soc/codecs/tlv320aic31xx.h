@@ -53,6 +53,9 @@
 /* Macro to enable AIC3100 codec support */
 //#define AIC3100_CODEC_SUPPORT
 
+/* Macro to ignore regulator management during suspend/resume */
+#define AIC31XX_IGNORE_REGULATOR_MGMT 0
+
 /*
  ****************************************************************************
  * BOARD SPECIFIC DEFINES
