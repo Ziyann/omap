@@ -1,0 +1,60 @@
+#
+# Copyright (c) 2011-2012 Trusted Logic S.A.
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of
+# the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA 02111-1307 USA
+#
+
+ifdef CONFIG_ARCH_OMAP5
+ccflags-y += -DSUPPORT_LARGE_PHYSICAL_ADDRESS_EXTENSION
+endif
+
+ccflags-y += -Iarch/arm/mach-omap2
+ccflags-y += -DCONFIG_TF_TEEC
+
+ccflags-y += -DCONFIG_TF_ION
+ccflags-y += -DCONFIG_TF_ZEBRA
+ccflags-y += -DCONFIG_SECURE_TRACE
+
+tf_driver-objs += tf_util.o
+tf_driver-objs += tf_conn.o
+tf_driver-objs += tf_device.o
+tf_driver-objs += tf_comm.o
+tf_driver-objs += tf_crypto.o
+tf_driver-objs += tf_comm_mshield.o
+tf_driver-objs += tf_device_mshield.o
+tf_driver-objs += bridge_pub2sec.o
+tf_driver-objs += tf_teec.o
+
+plus_sec := $(call as-instr,.arch_extension sec,+sec)
+AFLAGS_bridge_pub2sec.o := -Wa,-march=armv7-a$(plus_sec)
+
+ifeq ($(CONFIG_SMC_KERNEL_CRYPTO),y)
+tf_driver-objs += tf_crypto_aes.o
+tf_driver-objs += tf_crypto_digest.o
+tf_driver-objs += tf_dma.o
+endif
+
+ifeq ($(CONFIG_TF_DRIVER_CRYPTO_FIPS),y)
+tf_driver-objs += tf_crypto_hmac.o
+tf_driver-objs += tf_self_test_device.o
+tf_driver-objs += tf_self_test_post.o
+endif
+
+obj-$(CONFIG_SECURITY_MIDDLEWARE_COMPONENT) += tf_driver.o
+obj-$(CONFIG_SECURITY_MIDDLEWARE_COMPONENT) += rproc_drm.o
+
+obj-$(CONFIG_TF_CRYPTO_RNG) += tf_crypto_rng.o
