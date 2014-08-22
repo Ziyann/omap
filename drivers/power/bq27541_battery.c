@@ -615,6 +615,9 @@ static int bq27541_get_property(struct power_supply *ps,
 		/* Convert mV to uV */
 		val->intval = bat->battery_voltage * 1000;
 		break;
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = (bat->battery_voltage <= 0) ? 0 : 1;
+		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		/* Convert mA to uA */
 		val->intval = bat->battery_current * 1000;
@@ -664,6 +667,7 @@ static int bq27541_get_property(struct power_supply *ps,
 static enum power_supply_property bq27541_battery_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TEMP,
