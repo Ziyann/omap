@@ -959,39 +959,6 @@ static void __init omap_ilitek_init(void)
 }
 #endif //CONFIG_TOUCHSCREEN_ILITEK
 
-/* BEGIN SERIAL */
-static struct omap_device_pad tablet_uart3_pads[] __initdata = {
-	{
-		.name	= "uart3_cts_rctx.uart3_cts_rctx",
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
-	},
-	{
-		.name	= "uart3_rts_sd.uart3_rts_sd",
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
-	},
-	{
-		.name	= "uart3_tx_irtx.uart3_tx_irtx",
-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-	},
-	{
-		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-	},
-};
-
-static struct omap_uart_port_info tablet_uart_info __initdata = {
-	.dma_enabled = 0,
-	.autosuspend_timeout = -1,
-};
-
-void __init board_serial_init(void)
-{
-//	omap_serial_init_port(&uart3_board_data, &tablet_uart_info);
-}
-/* END SERIAL */
-
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
     OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE7 | OMAP_PIN_OUTPUT),
