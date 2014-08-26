@@ -2045,6 +2045,9 @@ int smb347_twl6030_callback(int vbus_state, int prev_status, void *data) {
 		omap_musb_mailbox(OMAP_MUSB_ID_FLOAT);
 	/* VUSB OFF */
 	default:
+		// make sure usb_online and ac_online are set to 0
+		atomic_set(&di->ac_online, 0);
+		atomic_set(&di->usb_online, 0);
 		if ((prev_status == OMAP_MUSB_VBUS_OFF) && (di->usb_vusb_on == 0)) {
 			status = -1;
 			goto exit;
