@@ -1217,6 +1217,7 @@ static void __init omap_kc1_init(void)
 	omap_create_board_props();
 
 	omap4_i2c_init();
+	omap4_board_serial_init();
 	enable_rtc_gpio();
 
 	omap_sdrc_init(NULL, NULL);
