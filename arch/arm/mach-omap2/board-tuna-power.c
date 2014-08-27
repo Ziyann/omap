@@ -22,7 +22,15 @@
 #include <linux/moduleparam.h>
 #include <linux/pda_power.h>
 #include <linux/platform_device.h>
+
+#if defined(CONFIG_TWL6030_GPADC)
 #include <linux/i2c/twl6030-gpadc.h>
+#elif defined(CONFIG_TWL4030_MADC)
+#include <linux/i2c/twl4030-madc.h>
+#else /* CONFIG_TWL6030_MADC */
+#include <linux/i2c/twl6030-madc.h>
+#endif
+
 #include <linux/delay.h>
 
 #include <plat/cpu.h>
@@ -263,11 +271,23 @@ static int twl6030_get_adc_data(int ch)
 	int i, j;
 
 	for (i = 0; i < ADC_NUM_SAMPLES; i++) {
+#if defined(CONFIG_TWL6030_GPADC)
 		adc_data = twl6030_get_gpadc_conversion(ch);
+#elif defined(CONFIG_TWL4030_MADC)
+		adc_data = twl4030_get_madc_conversion(ch);
+#else /* CONFIG_TWL6030_MADC */
+		adc_data = twl6030_get_madc_conversion(ch);
+#endif
 		if (adc_data == -EAGAIN) {
 			for (j = 0; j < ADC_LIMIT_ERR_COUNT; j++) {
 				msleep(20);
+#if defined(CONFIG_TWL6030_GPADC)
 				adc_data = twl6030_get_gpadc_conversion(ch);
+#elif defined(CONFIG_TWL4030_MADC)
+				adc_data = twl4030_get_madc_conversion(ch);
+#else /* CONFIG_TWL6030_MADC */
+				adc_data = twl6030_get_madc_conversion(ch);
+#endif
 				if (adc_data > 0)
 					break;
 			}

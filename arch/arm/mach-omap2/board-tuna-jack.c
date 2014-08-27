@@ -20,7 +20,15 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
+
+#if defined(CONFIG_TWL6030_GPADC)
 #include <linux/i2c/twl6030-gpadc.h>
+#elif defined(CONFIG_TWL4030_MADC)
+#include <linux/i2c/twl4030-madc.h>
+#else /* CONFIG_TWL6030_MADC */
+#include <linux/i2c/twl6030-madc.h>
+#endif
+
 #include <linux/sec_jack.h>
 
 #include "mux.h"
@@ -111,7 +119,13 @@ static int sec_jack_get_adc_value(void)
 {
 	int value;
 
-	value =  twl6030_get_gpadc_conversion(ADC_CHANNEL_JACK);
+#if defined(CONFIG_TWL6030_GPADC)
+	value = twl6030_get_gpadc_conversion(ADC_CHANNEL_JACK);
+#elif defined(CONFIG_TWL4030_MADC)
+	value = twl4030_get_madc_conversion(ADC_CHANNEL_JACK);
+#else /* CONFIG_TWL6030_MADC */
+	value = twl6030_get_madc_conversion(ADC_CHANNEL_JACK);
+#endif
 	return (int)(1800*value) / 1024;
 }
 
