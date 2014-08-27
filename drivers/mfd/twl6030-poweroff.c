@@ -29,13 +29,20 @@
 #define CON_DEVOFF	(1<<1)
 #define MOD_DEVOFF	(1<<2)
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+#define TWL6030_POWEROFF_MODULE TWL6030_MODULE_ID0
+#else
+#define TWL6030_POWEROFF_MODULE TWL_MODULE_PM_MASTER
+#endif
+
 void twl6030_poweroff(void)
 {
 	u8 val = 0;
 	int err = 0;
 
-	err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
+	err = twl_i2c_read_u8(TWL6030_POWEROFF_MODULE, &val,
 				  TWL6030_PHOENIX_DEV_ON);
+
 	if (err) {
 		pr_warning("I2C error %d reading PHOENIX_DEV_ON\n", err);
 		return;
@@ -43,7 +50,7 @@ void twl6030_poweroff(void)
 
 	val |= APP_DEVOFF | CON_DEVOFF | MOD_DEVOFF;
 
-	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
+	err = twl_i2c_write_u8(TWL6030_POWEROFF_MODULE, val,
 				   TWL6030_PHOENIX_DEV_ON);
 
 	if (err) {
