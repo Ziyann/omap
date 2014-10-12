@@ -1343,6 +1343,10 @@ static void __init tuna_init(void)
 	omap4_tuna_led_init();
 	omap4_tuna_connector_init();
 	omap4_tuna_pogo_init();
+#ifdef CONFIG_OMAP_HSI_DEVICE
+	if (TUNA_TYPE_MAGURO == omap4_tuna_get_type())
+		omap_hsi_init();
+#endif
 #ifdef CONFIG_USB_EHCI_HCD_OMAP
 	if (TUNA_TYPE_TORO == omap4_tuna_get_type()) {
 #ifdef CONFIG_SEC_MODEM
