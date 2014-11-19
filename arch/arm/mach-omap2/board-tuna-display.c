@@ -1117,7 +1117,6 @@ void __init omap4_tuna_display_init(void)
 
 	pr_info("Using %ps\n", panel->factory_info);
 
-	omapfb_set_platform_data(&tuna_fb_pdata);
 	tuna_hdmi_mux_init();
 	omap_display_init(&tuna_dss_data);
 }
