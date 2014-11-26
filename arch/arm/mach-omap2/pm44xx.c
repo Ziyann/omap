@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/regulator/machine.h>
+#include <linux/wakeup_reason.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
@@ -683,6 +684,8 @@ static void omap4_print_wakeirq(void)
 		pr_info("GIC returns spurious interrupt for resume IRQ\n");
 		return;
 	}
+
+	log_wakeup_reason(irq);
 
 	if (irq >= OMAP44XX_IRQ_GPIO1 &&
 	    irq <= OMAP44XX_IRQ_GPIO1 + GPIO_BANKS - 1)
