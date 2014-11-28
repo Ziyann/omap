@@ -1990,6 +1990,14 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	if (oh->_state != _HWMOD_STATE_CLKS_INITED)
 		return 0;
 
+	if (oh->parent_hwmod) {
+		int r;
+
+		r = _enable(oh->parent_hwmod);
+		WARN(r, "hwmod: %s: setup: failed to enable parent hwmod %s\n",
+		     oh->name, oh->parent_hwmod->name);
+	}
+
 	/* Set iclk autoidle mode */
 	if (oh->slaves_cnt > 0) {
 		for (i = 0; i < oh->slaves_cnt; i++) {
@@ -2059,6 +2067,20 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	else if (postsetup_state != _HWMOD_STATE_ENABLED)
 		WARN(1, "hwmod: %s: unknown postsetup state %d! defaulting to enabled\n",
 		     oh->name, postsetup_state);
+
+	if (oh->parent_hwmod) {
+		u8 postsetup_state;
+
+		postsetup_state = oh->parent_hwmod->_postsetup_state;
+
+		if (postsetup_state == _HWMOD_STATE_IDLE)
+			_idle(oh->parent_hwmod);
+		else if (postsetup_state == _HWMOD_STATE_DISABLED)
+			_shutdown(oh->parent_hwmod);
+		else if (postsetup_state != _HWMOD_STATE_ENABLED)
+			WARN(1, "hwmod: %s: unknown postsetup state %d! defaulting to enabled\n",
+			     oh->parent_hwmod->name, postsetup_state);
+	}
 
 	return 0;
 }

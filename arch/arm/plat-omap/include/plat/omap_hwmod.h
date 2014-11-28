@@ -534,6 +534,12 @@ struct omap_hwmod_class {
  *
  * Parameter names beginning with an underscore are managed internally by
  * the omap_hwmod code and should not be set during initialization.
+ *
+ * @parent_hwmod is temporary; there should be no need for it, as this
+ * information should already be expressed in the OCP interface
+ * structures.  @parent_hwmod is present as a workaround until we improve
+ * handling for hwmods with multiple parents (e.g., OMAP4+ DSS with
+ * multiple register targets across different interconnects).
  */
 struct omap_hwmod {
 	const char			*name;
@@ -570,6 +576,7 @@ struct omap_hwmod {
 	u8				_int_flags;
 	u8				_state;
 	u8				_postsetup_state;
+	struct omap_hwmod		*parent_hwmod;
 };
 
 int omap_hwmod_register(struct omap_hwmod **ohs);
