@@ -113,7 +113,9 @@ config SND_OMAP_SOC_SDP3430
 
 config SND_OMAP_SOC_SDP4430
 	tristate "SoC Audio support for Texas Instruments SDP4430 or PandaBoard"
-	depends on TWL4030_CORE && (MACH_TUNA || MACH_OMAP_4430SDP || MACH_OMAP4_PANDA)
+	depends on TWL4030_CORE && \
+		(MACH_OMAP_4430SDP || MACH_OMAP4_PANDA || MACH_OMAP4_TABLET)
+	select SND_OMAP_SOC
 	select SND_OMAP_SOC_MCPDM
 	select SND_SOC_TWL6040
 	select SND_OMAP_SOC_ABE
@@ -121,9 +123,8 @@ config SND_OMAP_SOC_SDP4430
 	select SND_SOC_DMIC
 	select SND_OMAP_SOC_DMIC
 	select SND_OMAP_SOC_ABE_DSP
-	select SND_OMAP_SOC_MCASP
-	select SND_OMAP_SOC_SPDIF
 	select SND_OMAP_SOC_VXREC
+	select CDC_TCXO if (MACH_OMAP_4430SDP || MACH_OMAP4_TABLET)
 	help
 	  Say Y if you want to add support for SoC audio on Texas Instruments
 	  SDP4430 or PandaBoard.
@@ -195,6 +196,7 @@ config SND_OMAP_SOC_IGEP0020
 config SND_OMAP_SOC_TUNA
 	tristate "SoC Audio support for Tuna"
 	depends on TWL4030_CORE && MACH_TUNA
+	select SND_OMAP_SOC
 	select SND_OMAP_SOC_MCPDM
 	select SND_SOC_TWL6040
 	select SND_OMAP_SOC_ABE
