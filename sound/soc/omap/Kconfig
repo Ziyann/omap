@@ -191,3 +191,20 @@ config SND_OMAP_SOC_IGEP0020
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for Soc audio on IGEP v2 board.
+
+config SND_OMAP_SOC_TUNA
+	tristate "SoC Audio support for Tuna"
+	depends on TWL4030_CORE && MACH_TUNA
+	select SND_OMAP_SOC_MCPDM
+	select SND_SOC_TWL6040
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_DMIC
+	select SND_OMAP_SOC_DMIC
+	select SND_OMAP_SOC_ABE_DSP
+	select SND_OMAP_SOC_MCASP
+	select SND_OMAP_SOC_SPDIF
+	select SND_OMAP_SOC_VXREC
+	help
+	  Say Y if you want to add support for SoC audio on Samsung
+	  Galaxy Nexus.
