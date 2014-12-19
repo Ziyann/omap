@@ -171,6 +171,12 @@ extern u32 omap_get_arm_rev(void);
  */
 static inline unsigned int omap4_get_diagctrl0_errata_flags(void)
 {
+/* If we don't have any erratas enabled, return 0 right away */
+#if !defined(CONFIG_OMAP4_ARM_ERRATA_742230) && \
+	!defined(CONFIG_OMAP4_ARM_ERRATA_751472) && \
+	!defined(CONFIG_OMAP4_ARM_ERRATA_743622)
+	return 0;
+#else
 	unsigned int ret  = 0;
 	u32 arm_rev = omap_get_arm_rev();
 #ifdef CONFIG_OMAP4_ARM_ERRATA_742230
@@ -186,6 +192,7 @@ static inline unsigned int omap4_get_diagctrl0_errata_flags(void)
 		ret |= (1 << 6);
 #endif
 	return ret;
+#endif
 }
 
 extern int omap4_prcm_freq_update(void);
