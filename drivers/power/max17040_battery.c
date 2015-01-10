@@ -119,6 +119,9 @@ static int max17040_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
+	case POWER_SUPPLY_PROP_CHARGE_ENABLED:
+		val->intval = chip->pdata->charger_enable();
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -437,6 +440,7 @@ static enum power_supply_property max17040_battery_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
+	POWER_SUPPLY_PROP_CHARGE_ENABLED,
 	/* must be last */
 	POWER_SUPPLY_PROP_TEMP,
 };
