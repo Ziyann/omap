@@ -84,8 +84,6 @@ void mmc_fixup_device(struct mmc_card *card, const struct mmc_fixup *table)
 }
 EXPORT_SYMBOL(mmc_fixup_device);
 
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
 /*
  * Quirk code to fix bug in wear leveling firmware for certain Samsung emmc
  * chips
@@ -323,7 +321,6 @@ void mmc_fixup_samsung_fw(struct mmc_card *card)
 		pr_err("%s : Failed to fixup Samsung emmc firmware(%d)\n",
 			mmc_hostname(card->host), err);
 }
-#pragma GCC pop_options
 
 #ifdef CONFIG_MMC_SAMSUNG_SMART
 static int mmc_samsung_smart_read(struct mmc_card *card, u8 *rdblock)
