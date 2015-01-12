@@ -102,6 +102,8 @@ static int max17040_get_property(struct power_supply *psy,
 		val->intval = chip->bat_health;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
+	        val->intval = chip->online;
+	        break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = chip->online;
 		break;
