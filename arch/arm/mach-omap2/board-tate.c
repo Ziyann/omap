@@ -84,7 +84,7 @@
 #define GPIO_WM8962_IRQ		26
 #endif
 #ifdef CONFIG_INV_MPU_IIO
-#include <linux/mpu_iio.h>
+#include <linux/mpu.h>
 #include <linux/irq.h>
 #define GPIO_GRYO               4
 #endif
@@ -290,7 +290,7 @@ static struct mpu_platform_data mpu_gyro_data = {
 		-1,  0,  0,
 		 0, -1,  0,
 		 0,  0,  1,
-	}
+	},
 	.key = {0x85, 0x45, 0xf4, 0x9a, 0xfd, 0x77, 0x9a, 0xd2, 0xbc,
 		0xe7, 0x64, 0xb7, 0x63, 0xc3, 0x6f, 0x96},
 };
