@@ -175,10 +175,8 @@ static void dispc_save_context(void)
 		}
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (dss_has_feature(FEAT_MFLAG))
 		SR(GLOBAL_MFLAG);
-#endif
 
 	for (i = 0; i < dss_feat_get_num_ovls(); i++) {
 		SR(OVL_BA0(i));
@@ -194,10 +192,8 @@ static void dispc_save_context(void)
 		if (i == OMAP_DSS_GFX) {
 			SR(OVL_WINDOW_SKIP(i));
 			SR(OVL_TABLE_BA(i));
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		if (dss_has_feature(FEAT_MFLAG))
 			SR(OVL_MFLAG_THRESHOLD(i));
-#endif
 			continue;
 		}
 		SR(OVL_FIR(i));
@@ -275,10 +271,8 @@ static void dispc_restore_context(void)
 	if (dss_has_feature(FEAT_MGR_LCD2))
 		RR(CONFIG2);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (dss_has_feature(FEAT_MFLAG))
 		RR(GLOBAL_MFLAG);
-#endif
 
 	for (i = 0; i < dss_feat_get_num_mgrs(); i++) {
 		RR(DEFAULT_COLOR(i));
@@ -355,10 +349,8 @@ static void dispc_restore_context(void)
 		}
 		if (dss_has_feature(FEAT_ATTR2))
 			RR(OVL_ATTRIBUTES2(i));
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		if (dss_has_feature(FEAT_MFLAG))
 			RR(OVL_MFLAG_THRESHOLD(i));
-#endif
 	}
 
 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
@@ -1105,9 +1097,7 @@ static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
 void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 {
 	u32 fifosize;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	u32 unit;
-#endif
 	u8 bit;
 
 	/* Set the ARBITRATION bit to give
@@ -1127,26 +1117,17 @@ void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 	  * frame even if the DMA buffer is empty */
 	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	 if (dss_has_feature(FEAT_MFLAG)) {
-#endif
 	 fifosize = dispc_ovl_get_fifo_size(plane);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	 unit = dss_feat_get_buffer_size_unit();
-#endif
 	 /* As per the simultaion team suggestion, below thesholds are set:
 	  * HT = fifosize * 5/8;
 	  * LT = fifosize * 4/8;
 	  */
 	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 			FLD_VAL((fifosize * 5) / (8 * unit), 31, 16) |
 			FLD_VAL((fifosize * 4) / (8 * unit), 15, 0));
 	 }
-#else
-		FLD_VAL((fifosize*5)/8, 31, 16) |
-		FLD_VAL((fifosize*4)/8, 15, 0));
-#endif
 }
 
 void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
@@ -1187,10 +1168,8 @@ void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (plane == OMAP_DSS_GFX)
 		dispc_ovl_set_global_mflag(OMAP_DSS_GFX, true);
-#endif
 }
 
 void dispc_enable_fifomerge(bool enable)
@@ -2395,9 +2374,7 @@ skip_errata:
 		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
 	if (dss_has_feature(FEAT_MFLAG)) {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		oi->mflag_en = true;
-#endif
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
 	} else if (plane == OMAP_DSS_GFX) {
 		dispc_enable_arbitration(plane,
@@ -2450,7 +2427,6 @@ skip_errata:
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (plane == OMAP_DSS_GFX) {
 		if (channel == OMAP_DSS_CHANNEL_DIGIT ||
 			omap_rev() == OMAP5430_REV_ES1_0 ||
@@ -2459,7 +2435,6 @@ skip_errata:
 		else
 			dispc_enable_arbitration(plane, false);
 	}
-#endif
 
 	return 0;
 }
@@ -2764,13 +2739,8 @@ static void dispc_mgr_enable_lcd_out(enum omap_channel channel, bool enable)
 					msecs_to_jiffies(100)))
 			DSSERR("timeout waiting for FRAME DONE\n");
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 		r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
 				&frame_done_completion, irq);
-#else
-		r = omap_dispc_unregister_isr(dispc_disable_isr,
-				&frame_done_completion, irq);
-#endif
 
 		if (r)
 			DSSERR("failed to unregister FRAMEDONE isr\n");
@@ -2838,13 +2808,8 @@ static void dispc_mgr_enable_digit_out(bool enable)
 					enable ? "start" : "stop");
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
 			&frame_done_completion, irq_mask);
-#else
-	r = omap_dispc_unregister_isr(dispc_disable_isr, &frame_done_completion,
-			irq_mask);
-#endif
 	if (r)
 		DSSERR("failed to unregister %x isr\n", irq_mask);
 
@@ -3810,7 +3775,6 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 
 	return ret;
 }
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 EXPORT_SYMBOL(omap_dispc_unregister_isr);
 
 /*
@@ -3845,7 +3809,6 @@ int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask)
 	return ret;
 }
 EXPORT_SYMBOL(omap_dispc_unregister_isr_sync);
-#endif
 
 #ifdef DEBUG
 static void print_irq_status(u32 status)
@@ -4082,12 +4045,8 @@ int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout)
 
 	timeout = wait_for_completion_timeout(&completion, timeout);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
 		&completion, irqmask);
-#else
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
-#endif
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
@@ -4118,12 +4077,8 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 	timeout = wait_for_completion_interruptible_timeout(&completion,
 			timeout);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
 	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
 		&completion, irqmask);
-#else
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
-#endif
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
