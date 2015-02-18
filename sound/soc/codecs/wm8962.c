@@ -4399,8 +4399,15 @@ static __devinit int wm8962_i2c_probe(struct i2c_client *i2c,
 
 	ret = snd_soc_register_codec(&i2c->dev,
 				     &soc_codec_dev_wm8962, &wm8962_dai, 1);
+	if (ret < 0)
+		return ret;
 
-	return ret;
+	regcache_cache_only(wm8962->regmap, true);
+
+	/* The drivers should power up as needed */
+	regulator_bulk_disable(ARRAY_SIZE(wm8962->supplies), wm8962->supplies);
+
+	return 0;
 }
 
 static __devexit int wm8962_i2c_remove(struct i2c_client *client)
