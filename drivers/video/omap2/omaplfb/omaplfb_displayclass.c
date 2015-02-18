@@ -1250,7 +1250,7 @@ static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
 
 	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
 	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
-	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
 	if (res < 0)
 	{
 		printk(KERN_ERR DRIVER_PREFIX

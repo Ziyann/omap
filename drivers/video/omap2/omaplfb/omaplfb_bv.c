@@ -354,7 +354,7 @@ static OMAPLFB_ERROR InitBltFBsTiler2D(OMAPLFB_DEVINFO *psDevInfo)
 	printk(KERN_INFO DRIVER_PREFIX
 		":BltFBs alloc %d x (%d x %d) [stride %d]\n",
 		psPVRFBInfo->psBltFBsNo, w, h, psPVRFBInfo->uiBltFBsByteStride);
-	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
 	if (res < 0)
 	{
 		printk(KERN_ERR DRIVER_PREFIX
