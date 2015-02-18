@@ -1390,7 +1390,7 @@ int tf_invoke_client_command(
 			struct tf_command_invoke_client_command *invoke;
 			ion_phys_addr_t ion_addr;
 			size_t ion_len;
-			struct ion_buffer *buffer;
+			int buffer_fd;
 
 			if (connection->ion_client == NULL) {
 				connection->ion_client = ion_client_create(
@@ -1410,9 +1410,9 @@ int tf_invoke_client_command(
 
 			dprintk(KERN_INFO "ion_handle %x",
 				invoke->params[i].value.a);
-			buffer = ion_share(connection->ion_client,
+			buffer_fd = ion_share_dma_buf_fd(connection->ion_client,
 				(struct ion_handle *)invoke->params[i].value.a);
-			if (buffer == NULL) {
+			if (IS_ERR_VALUE(buffer_fd)) {
 				dprintk(KERN_ERR "%s(%p): "
 					"unable to share ion handle\n",
 					__func__, connection);
@@ -1420,8 +1420,8 @@ int tf_invoke_client_command(
 				goto error;
 			}
 
-			dprintk(KERN_INFO "ion_buffer %p", buffer);
-			new_handle = ion_import(connection->ion_client, buffer);
+			dprintk(KERN_INFO "ion_buffer_fd %d", buffer_fd);
+			new_handle = ion_import_dma_buf(connection->ion_client, buffer_fd);
 			if (new_handle == NULL) {
 				dprintk(KERN_ERR "%s(%p): "
 					"unable to import ion buffer\n",
