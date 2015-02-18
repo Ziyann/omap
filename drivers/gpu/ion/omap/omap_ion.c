@@ -32,6 +32,7 @@ static int num_heaps;
 static struct ion_heap **heaps;
 static struct ion_heap *tiler_heap;
 static struct ion_heap *nonsecure_tiler_heap;
+static struct ion_platform_data *pdata;
 
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
@@ -74,6 +75,20 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 			return -EFAULT;
 		break;
 	}
+	case OMAP_ION_PHYS_ADDR:
+	{
+		struct omap_ion_phys_addr_data data;
+		int ret;
+		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+			return -EFAULT;
+		ret = ion_phys(client, data.handle, &data.phys_addr, &data.size);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data,
+				 sizeof(data)))
+			return -EFAULT;
+		break;
+	}
 	default:
 		pr_err("%s: Unknown custom ioctl\n", __func__);
 		return -ENOTTY;
@@ -83,9 +98,10 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 
 static int omap_ion_probe(struct platform_device *pdev)
 {
-	struct ion_platform_data *pdata = pdev->dev.platform_data;
 	int err;
 	int i;
+
+	pdata = pdev->dev.platform_data;
 
 	num_heaps = pdata->nr;
 
@@ -238,6 +254,20 @@ err:
 }
 EXPORT_SYMBOL(omap_ion_share_fd_to_handles);
 
+struct ion_platform_heap *omap_ion_get2d_heap(void)
+{
+	int i;
+	if (!pdata)
+		return NULL;
+	for (i = 0; i < num_heaps; i++) {
+		struct ion_platform_heap *heap_data = &pdata->heaps[i];
+		if (!strcmp(heap_data->name,"tiler")) {
+				return heap_data;
+		}
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(omap_ion_get2d_heap);
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
