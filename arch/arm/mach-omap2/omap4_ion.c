@@ -17,43 +17,45 @@
 
 #include "omap4_ion.h"
 
+static struct ion_platform_heap omap4_ion_heaps[] = {
+	{
+		.type = ION_HEAP_TYPE_CARVEOUT,
+		.id = OMAP_ION_HEAP_SECURE_INPUT,
+		.name = "secure_input",
+		.base = PHYS_ADDR_SMC_MEM -
+				OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+		.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+	},
+	{	.type = OMAP_ION_HEAP_TYPE_TILER,
+		.id = OMAP_ION_HEAP_TILER,
+		.name = "tiler",
+		.base = PHYS_ADDR_SMC_MEM -
+				OMAP4_ION_HEAP_SECURE_INPUT_SIZE -
+				OMAP4_ION_HEAP_TILER_SIZE,
+		.size = OMAP4_ION_HEAP_TILER_SIZE,
+	},
+	{
+		.type = OMAP_ION_HEAP_TYPE_TILER,
+		.id = OMAP_ION_HEAP_NONSECURE_TILER,
+		.name = "nonsecure_tiler",
+		.base = 0x80000000 + SZ_512M + SZ_2M,
+		.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
+	},
+	{
+		.type = ION_HEAP_TYPE_SYSTEM,
+		.id = OMAP_ION_HEAP_SYSTEM,
+		.name = "system",
+	},
+	{
+		.type = OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
+		.id = OMAP_ION_HEAP_TILER_RESERVATION,
+		.name = "tiler_reservation",
+	},
+};
+
 static struct ion_platform_data omap4_ion_data = {
 	.nr = 5,
-	.heaps = {
-		{
-			.type = ION_HEAP_TYPE_CARVEOUT,
-			.id = OMAP_ION_HEAP_SECURE_INPUT,
-			.name = "secure_input",
-			.base = PHYS_ADDR_SMC_MEM -
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
-			.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
-		},
-		{	.type = OMAP_ION_HEAP_TYPE_TILER,
-			.id = OMAP_ION_HEAP_TILER,
-			.name = "tiler",
-			.base = PHYS_ADDR_SMC_MEM -
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE -
-					OMAP4_ION_HEAP_TILER_SIZE,
-			.size = OMAP4_ION_HEAP_TILER_SIZE,
-		},
-		{
-			.type = OMAP_ION_HEAP_TYPE_TILER,
-			.id = OMAP_ION_HEAP_NONSECURE_TILER,
-			.name = "nonsecure_tiler",
-			.base = 0x80000000 + SZ_512M + SZ_2M,
-			.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
-		},
-		{
-			.type = ION_HEAP_TYPE_SYSTEM,
-			.id = OMAP_ION_HEAP_SYSTEM,
-			.name = "system",
-		},
-		{
-			.type = OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
-			.id = OMAP_ION_HEAP_TILER_RESERVATION,
-			.name = "tiler_reservation",
-		},
-	},
+	.heaps = omap4_ion_heaps,
 };
 
 static struct platform_device omap4_ion_device = {
