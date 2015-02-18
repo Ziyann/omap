@@ -43,6 +43,7 @@ struct omap_ion_tiler_alloc_data {
 	u32 token;
 };
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 /**
  * struct omap_ion_phys_data - metadata passed from userspace to
  * get physical address
@@ -58,6 +59,7 @@ struct omap_ion_phys_addr_data {
 	unsigned long phys_addr;
 	size_t size;
 };
+#endif
 
 #ifdef __KERNEL__
 int omap_ion_tiler_alloc(struct ion_client *client,
@@ -70,7 +72,9 @@ int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 struct ion_platform_heap * omap_ion_get2d_heap(void);
+#endif
 int omap_tiler_vinfo(struct ion_client *client,
 			struct ion_handle *handle, unsigned int *vstride,
 			unsigned int *vsize);
@@ -93,7 +97,9 @@ enum {
 
 enum {
 	OMAP_ION_TILER_ALLOC,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	OMAP_ION_PHYS_ADDR,
+#endif
 };
 
 /**

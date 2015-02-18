@@ -31,7 +31,9 @@ static int num_heaps;
 static struct ion_heap **heaps;
 static struct ion_heap *tiler_heap;
 static struct ion_heap *nonsecure_tiler_heap;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 static struct ion_platform_data *pdata;
+#endif
 
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
@@ -73,6 +75,7 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 			return -EFAULT;
 		break;
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	case OMAP_ION_PHYS_ADDR:
 	{
 		struct omap_ion_phys_addr_data data;
@@ -87,6 +90,7 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 			return -EFAULT;
 		break;
 	}
+#endif
 	default:
 		pr_err("%s: Unknown custom ioctl\n", __func__);
 		return -ENOTTY;
@@ -96,10 +100,15 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 
 static int omap_ion_probe(struct platform_device *pdev)
 {
+#ifndef CONFIG_MACH_OMAP4_BOWSER
+	struct ion_platform_data *pdata = pdev->dev.platform_data;
+#endif
 	int err;
 	int i;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	pdata = pdev->dev.platform_data;
+#endif
 	num_heaps = pdata->nr;
 
 	heaps = kzalloc(sizeof(struct ion_heap *)*pdata->nr, GFP_KERNEL);
@@ -231,6 +240,7 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 }
 EXPORT_SYMBOL(omap_ion_fd_to_handles);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 struct ion_platform_heap *omap_ion_get2d_heap(void)
 {
 	int i;
@@ -245,6 +255,7 @@ struct ion_platform_heap *omap_ion_get2d_heap(void)
 	return NULL;
 }
 EXPORT_SYMBOL(omap_ion_get2d_heap);
+#endif
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
