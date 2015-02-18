@@ -145,14 +145,14 @@ static struct sg_table *omap_tiler_map_dma(struct omap_tiler_info *info,
 	}
 
 	if (info->lump) {
-		sg_set_page(table->sgl, virt_to_page(info->tiler_addrs[0]),
-			info->n_tiler_pages * PAGE_SIZE, 0);
+		sg_set_page(table->sgl, phys_to_page(info->tiler_addrs[0]),
+			    info->n_tiler_pages * PAGE_SIZE, 0);
 		return table;
 	}
 
 	for (i = 0; i < info->n_tiler_pages; i++) {
-		sg_set_page(table->sgl, virt_to_page(info->tiler_addrs[i]),
-			PAGE_SIZE, 0);
+		sg_set_page(table->sgl, phys_to_page(info->tiler_addrs[i]),
+			    PAGE_SIZE, 0);
 	}
 	return table;
 }
