@@ -68,6 +68,7 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 		ret = omap_ion_tiler_alloc(client, &data);
 		if (ret)
 			return ret;
+		data.handle = (struct ion_handle *)data.handle->id;
 		if (copy_to_user((void __user *)arg, &data,
 				 sizeof(data)))
 			return -EFAULT;
