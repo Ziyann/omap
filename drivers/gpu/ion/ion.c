@@ -333,7 +333,6 @@ end:
 	ion_buffer_put(buffer);
 	return handle;
 }
-EXPORT_SYMBOL(ion_alloc);
 
 void ion_free(struct ion_client *client, struct ion_handle *handle)
 {
@@ -445,7 +444,6 @@ void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
 	mutex_unlock(&client->lock);
 	return vaddr;
 }
-EXPORT_SYMBOL(ion_map_kernel);
 
 struct scatterlist *ion_map_dma(struct ion_client *client,
 				struct ion_handle *handle)
@@ -482,7 +480,6 @@ struct scatterlist *ion_map_dma(struct ion_client *client,
 	mutex_unlock(&client->lock);
 	return sglist;
 }
-EXPORT_SYMBOL(ion_map_dma);
 
 void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
 {
@@ -498,7 +495,6 @@ void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
 	mutex_unlock(&buffer->lock);
 	mutex_unlock(&client->lock);
 }
-EXPORT_SYMBOL(ion_unmap_kernel);
 
 void ion_unmap_dma(struct ion_client *client, struct ion_handle *handle)
 {
@@ -514,7 +510,7 @@ void ion_unmap_dma(struct ion_client *client, struct ion_handle *handle)
 	mutex_unlock(&buffer->lock);
 	mutex_unlock(&client->lock);
 }
-EXPORT_SYMBOL(ion_unmap_dma);
+
 
 struct ion_buffer *ion_share(struct ion_client *client,
 				 struct ion_handle *handle)
@@ -536,7 +532,6 @@ struct ion_buffer *ion_share(struct ion_client *client,
 	 */
 	return handle->buffer;
 }
-EXPORT_SYMBOL(ion_share);
 
 struct ion_handle *ion_import(struct ion_client *client,
 			      struct ion_buffer *buffer)
@@ -558,7 +553,6 @@ end:
 	mutex_unlock(&client->lock);
 	return handle;
 }
-EXPORT_SYMBOL(ion_import);
 
 static const struct file_operations ion_share_fops;
 
