@@ -23,6 +23,7 @@
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <linux/module.h>
+#include <linux/syscalls.h>
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -151,6 +152,91 @@ static int omap_ion_remove(struct platform_device *pdev)
 	kfree(heaps);
 	return 0;
 }
+
+static int (*export_fd_to_ion_handles)(int fd,
+		struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
+
+void omap_ion_register_pvr_export(void *pvr_export_fd)
+{
+	export_fd_to_ion_handles = pvr_export_fd;
+}
+EXPORT_SYMBOL(omap_ion_register_pvr_export);
+
+int omap_ion_share_fd_to_handles(int fd, struct ion_client *client,
+				 struct ion_handle **handles, int *num_handles)
+{
+	struct ion_handle **export_handles;
+	struct ion_client *export_client;
+	int i = 0, ret = 0, shared_fd = 0;
+
+	export_handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+			  GFP_KERNEL);
+	if (!export_handles)
+		return -ENOMEM;
+
+	if (export_fd_to_ion_handles) {
+		ret = export_fd_to_ion_handles(fd,
+				&export_client,
+				export_handles,
+				num_handles);
+		if (ret) {
+			pr_err("%s: export_fd_to_ion_handles failed\n",
+			       __func__);
+			goto exit;
+		}
+	} else {
+		pr_err("%s: export_fd_to_ion_handles not initialized\n",
+				__func__);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	for (i = 0; i < *num_handles; i++) {
+		handles[i] = NULL;
+		if (export_handles[i]) {
+			shared_fd = ion_share_dma_buf_fd(export_client,
+							 export_handles[i]);
+			if (shared_fd < 0) {
+				pr_err("%s: Failed to get buf fd, err = %d\n",
+				       __func__, shared_fd);
+				ret = shared_fd;
+				goto err;
+			}
+
+			handles[i] = ion_import_dma_buf(client, shared_fd);
+			if (IS_ERR(handles[i])) {
+				ret = PTR_ERR(handles[i]);
+				pr_err("%s: Failed to import buf, err = %d\n",
+				       __func__, ret);
+				sys_close(shared_fd);
+				handles[i] = NULL;
+				goto err;
+			}
+			sys_close(shared_fd);
+		}
+	}
+
+exit:
+	kfree(export_handles);
+	return ret;
+
+err:
+	/* Clear allocated handles on error */
+	while (i) {
+		if (handles[--i]) {
+			ion_free(client, handles[i]);
+			handles[i] = NULL;
+		}
+	}
+
+	kfree(export_handles);
+	return ret;
+
+}
+EXPORT_SYMBOL(omap_ion_share_fd_to_handles);
+
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
