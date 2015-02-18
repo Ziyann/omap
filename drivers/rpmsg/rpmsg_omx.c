@@ -135,14 +135,15 @@ static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 					   struct rpmsg_buffer *buffer)
 {
-	struct scatterlist *sglist, *sg;
+	struct scatterlist *sg;
+	struct sg_table *sglist;
 	int n_pages;
 	int i;
 
 	if (buffer->page_list)
 		return;
 
-	sglist = ion_map_dma(omx->ion_client, buffer->ion_handle);
+	sglist = ion_sg_table(omx->ion_client, buffer->ion_handle);
 	if (sglist == NULL) {
 		dev_warn(omx->omxserv->dev,
 			 "%s: failed to get scatter/gather list for ion "
@@ -151,7 +152,7 @@ static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 	}
 
 	/* get number of pages */
-	for_each_sg(sglist, sg, INT_MAX, n_pages) {
+	for_each_sg(sglist->sgl, sg, INT_MAX, n_pages) {
 		if (!sg)
 			break;
 	}
@@ -164,13 +165,12 @@ static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 	if (buffer->page_list == NULL) {
 		dev_warn(omx->omxserv->dev,
 			 "%s: failed to allocate page list\n", __func__);
-		ion_unmap_dma(omx->ion_client, buffer->ion_handle);
 		return;
 	}
 
-	for_each_sg(sglist, sg, n_pages, i) {
+	for_each_sg(sglist->sgl, sg, n_pages, i)
 		buffer->page_list[i] = sg_phys(sg);
-	}
+
 	wmb();
 }
 
@@ -225,7 +225,6 @@ _rpmsg_buffer_free(struct rpmsg_omx_instance *omx, struct rpmsg_buffer *buffer)
 	if (buffer->page_list) {
 		dma_free_coherent(NULL, sizeof(phys_addr_t) * buffer->n_pages,
 				  buffer->page_list, buffer->page_list_pa);
-		ion_unmap_dma(omx->ion_client, buffer->ion_handle);
 	}
 	if (buffer->ion_handle)
 		ion_free(omx->ion_client, buffer->ion_handle);
@@ -491,7 +490,7 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				_IOC_NR(cmd), ret);
 			return -EFAULT;
 		}
-		data.handle = ion_import_fd(omx->ion_client, data.fd);
+		data.handle = ion_import_dma_buf(omx->ion_client, data.fd);
 		if (IS_ERR_OR_NULL(data.handle))
 			data.handle = NULL;
 		if (copy_to_user((char __user *) arg, &data, sizeof(data))) {

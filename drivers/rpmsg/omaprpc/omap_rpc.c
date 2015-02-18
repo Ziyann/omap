@@ -397,7 +397,7 @@ static long omaprpc_ioctl(struct file *filp,
 					    "OMAPRPC: %s: %d: copy_from_user fail: %d\n",
 					    __func__, _IOC_NR(cmd), ret);
 			}
-			data.handle = ion_import_fd(rpc->ion_client, data.fd);
+			data.handle = ion_import_dma_buf(rpc->ion_client, data.fd);
 			if (IS_ERR(data.handle))
 				data.handle = NULL;
 			if (copy_to_user
