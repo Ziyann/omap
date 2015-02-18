@@ -39,7 +39,7 @@ static size_t omap4_ion_heap_tiler_mem_size;
 static size_t omap4_ion_heap_nonsec_tiler_mem_size;
 
 static struct ion_platform_data omap4_ion_data = {
-	.nr = 4,
+	.nr = 5,
 	.heaps = {
 		{
 			.type = ION_HEAP_TYPE_CARVEOUT,
