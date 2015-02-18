@@ -740,7 +740,7 @@ static long tf_device_ioctl(struct file *file, unsigned int ioctl_num,
 		 * TODO: We should use a reference count on this handle in order
 		 * to not unregistered it while using it.
 		 */
-		return (long)ion_import_fd(connection->ion_client, ion_register);
+		return (long)ion_import_dma_buf(connection->ion_client, ion_register);
 	}
 
 	case IOCTL_TF_ION_UNREGISTER: {
