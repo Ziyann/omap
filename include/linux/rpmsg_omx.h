@@ -37,13 +37,13 @@
 
 /**
  * struct omx_pvr_data - metadata passed to/from userspace for a pvr register
- * @fd:           a file descriptor representing a pvr handle
+ * @fds:           a file descriptors representing a pvr handle
  * @num_handles:  field filled by driver. userspace uses this to determine
  *                number of handles associated with fd
  * @handles:      opaque pointers pointing to buffers
  */
 struct omx_pvr_data {
-	int fd;
+	int fds[2];
 	unsigned int num_handles;
 	void *handles[2];
 };

@@ -514,30 +514,31 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 
-		if (!fcheck(data.fd)) {
+		if (!fcheck(data.fds[0]) || !fcheck(data.fds[1])) {
 			dev_err(omxserv->dev,
-				"%s: %d: invalid fd: %d\n", __func__,
-				_IOC_NR(cmd), ret);
+				"%s: %d: invalid fd: fd0 - %d, fd1 - %d\n",
+				__func__, _IOC_NR(cmd),
+				data.fds[0], data.fds[1]);
 			return -EBADF;
 		}
 
-		data.handles[0] = data.handles[1] = NULL;
-		if (!omap_ion_share_fd_to_handles(data.fd, omx->ion_client,
-						  ion_handles, &num_handles)) {
-			unsigned int size = ARRAY_SIZE(data.handles);
-			for (i = 0; (i < num_handles) && (i < size); i++) {
-				if (IS_ERR_OR_NULL(ion_handles[i]))
-					continue;
+		data.num_handles = 0;
 
-				if (_is_page_list(omx, ion_handles[i]))
-					data.handles[i] = (void *)
-						_rpmsg_buffer_new(omx,
-								ion_handles[i]);
-				else
-					data.handles[i] = ion_handles[i];
-			}
+		data.handles[0] = data.handles[1] = NULL;
+		for (i = 0; (i < num_handles); i++) {
+			ion_handles[i] = ion_import_dma_buf(omx->ion_client,
+							    data.fds[i]);
+			if (IS_ERR_OR_NULL(ion_handles[i]))
+				continue;
+
+			data.num_handles++;
+			if (_is_page_list(omx, ion_handles[i]))
+				data.handles[i] = (void *)
+					_rpmsg_buffer_new(omx,
+							  ion_handles[i]);
+			else
+				data.handles[i] = ion_handles[i];
 		}
-		data.num_handles = i;
 
 		if (copy_to_user((char __user *)arg, &data, sizeof(data))) {
 			dev_err(omxserv->dev,
