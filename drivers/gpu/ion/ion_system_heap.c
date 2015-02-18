@@ -33,12 +33,12 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	return 0;
 }
 
-static void ion_system_heap_free(struct ion_buffer *buffer)
+void ion_system_heap_free(struct ion_buffer *buffer)
 {
 	vfree(buffer->priv_virt);
 }
 
-static struct scatterlist *ion_system_heap_map_dma(struct ion_heap *heap,
+struct scatterlist *ion_system_heap_map_dma(struct ion_heap *heap,
 					    struct ion_buffer *buffer)
 {
 	struct scatterlist *sglist;
@@ -66,7 +66,7 @@ end:
 	return NULL;
 }
 
-static void ion_system_heap_unmap_dma(struct ion_heap *heap,
+void ion_system_heap_unmap_dma(struct ion_heap *heap,
 			       struct ion_buffer *buffer)
 {
 	/* XXX undo cache maintenance for dma? */
@@ -74,20 +74,19 @@ static void ion_system_heap_unmap_dma(struct ion_heap *heap,
 		vfree(buffer->sglist);
 }
 
-static void *ion_system_heap_map_kernel(struct ion_heap *heap,
+void *ion_system_heap_map_kernel(struct ion_heap *heap,
 				 struct ion_buffer *buffer)
 {
 	return buffer->priv_virt;
 }
 
-static void ion_system_heap_unmap_kernel(struct ion_heap *heap,
+void ion_system_heap_unmap_kernel(struct ion_heap *heap,
 				  struct ion_buffer *buffer)
 {
 }
 
-static int ion_system_heap_map_user(struct ion_heap *heap,
-				struct ion_buffer *buffer,
-				struct vm_area_struct *vma)
+int ion_system_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
+			     struct vm_area_struct *vma)
 {
 	return remap_vmalloc_range(vma, buffer->priv_virt, vma->vm_pgoff);
 }
@@ -131,7 +130,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	return 0;
 }
 
-static void ion_system_contig_heap_free(struct ion_buffer *buffer)
+void ion_system_contig_heap_free(struct ion_buffer *buffer)
 {
 	kfree(buffer->priv_virt);
 }
@@ -145,7 +144,7 @@ static int ion_system_contig_heap_phys(struct ion_heap *heap,
 	return 0;
 }
 
-static struct scatterlist *ion_system_contig_heap_map_dma(struct ion_heap *heap,
+struct scatterlist *ion_system_contig_heap_map_dma(struct ion_heap *heap,
 						   struct ion_buffer *buffer)
 {
 	struct scatterlist *sglist;
@@ -158,7 +157,7 @@ static struct scatterlist *ion_system_contig_heap_map_dma(struct ion_heap *heap,
 	return sglist;
 }
 
-static int ion_system_contig_heap_map_user(struct ion_heap *heap,
+int ion_system_contig_heap_map_user(struct ion_heap *heap,
 				    struct ion_buffer *buffer,
 				    struct vm_area_struct *vma)
 {
