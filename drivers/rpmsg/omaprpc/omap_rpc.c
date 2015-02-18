@@ -498,10 +498,7 @@ static int omaprpc_open(struct inode *inode, struct file *filp)
 	}
 #if defined(OMAPRPC_USE_ION)
 	/* get a handle to the ion client for RPC buffers */
-	rpc->ion_client = ion_client_create(omap_ion_device,
-					    (1 << ION_HEAP_TYPE_CARVEOUT) |
-					    (1 << OMAP_ION_HEAP_TYPE_TILER),
-					    "rpmsg-rpc");
+	rpc->ion_client = ion_client_create(omap_ion_device, "rpmsg-rpc");
 #endif
 
 	/* remember rpc in filp's private data */

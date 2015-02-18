@@ -1394,9 +1394,7 @@ int tf_invoke_client_command(
 
 			if (connection->ion_client == NULL) {
 				connection->ion_client = ion_client_create(
-					tf_ion_device,
-					(1 << ION_HEAP_TYPE_CARVEOUT),
-					"tf");
+					tf_ion_device, "tf");
 			}
 			if (connection->ion_client == NULL) {
 				dprintk(KERN_ERR "%s(%p): "
