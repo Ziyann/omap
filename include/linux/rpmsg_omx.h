@@ -43,7 +43,7 @@
  * @handles:      opaque pointers pointing to buffers
  */
 struct omx_pvr_data {
-	int fds[2];
+	int fd;
 	unsigned int num_handles;
 	void *handles[2];
 };
