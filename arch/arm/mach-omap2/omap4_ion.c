@@ -26,7 +26,7 @@ static struct ion_platform_heap omap4_ion_heaps[] = {
 				OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 		.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 	},
-	{	.type = OMAP_ION_HEAP_TYPE_TILER,
+	{	.type = OMAP_ION_HEAP_TILER,
 		.id = OMAP_ION_HEAP_TILER,
 		.name = "tiler",
 		.base = PHYS_ADDR_SMC_MEM -
@@ -35,7 +35,7 @@ static struct ion_platform_heap omap4_ion_heaps[] = {
 		.size = OMAP4_ION_HEAP_TILER_SIZE,
 	},
 	{
-		.type = OMAP_ION_HEAP_TYPE_TILER,
+		.type = OMAP_ION_HEAP_TILER,
 		.id = OMAP_ION_HEAP_NONSECURE_TILER,
 		.name = "nonsecure_tiler",
 		.base = 0x80000000 + SZ_512M + SZ_2M,
@@ -43,11 +43,11 @@ static struct ion_platform_heap omap4_ion_heaps[] = {
 	},
 	{
 		.type = ION_HEAP_TYPE_SYSTEM,
-		.id = OMAP_ION_HEAP_SYSTEM,
+		.id = ION_HEAP_TYPE_SYSTEM,
 		.name = "system",
 	},
 	{
-		.type = OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
+		.type = OMAP_ION_HEAP_TILER_RESERVATION,
 		.id = OMAP_ION_HEAP_TILER_RESERVATION,
 		.name = "tiler_reservation",
 	},
@@ -78,7 +78,7 @@ void __init omap4_ion_init(void)
 
 	for (i = 0; i < omap4_ion_data.nr; i++)
 		if (omap4_ion_data.heaps[i].type == ION_HEAP_TYPE_CARVEOUT ||
-		    omap4_ion_data.heaps[i].type == OMAP_ION_HEAP_TYPE_TILER) {
+		    omap4_ion_data.heaps[i].type == OMAP_ION_HEAP_TILER) {
 			ret = memblock_remove(omap4_ion_data.heaps[i].base,
 					      omap4_ion_data.heaps[i].size);
 			if (ret)
