@@ -20,6 +20,7 @@
  *  UART: Tablet platform data
  */
 
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 static struct omap_device_pad uart2_pads[] __initdata = {
 	{
 		.name	= "uart2_cts.uart2_cts",
@@ -50,6 +51,24 @@ static struct omap_device_pad uart2_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data uart2_board_data __initdata = {
+	.id = 1,
+	.pads = uart2_pads,
+	.pads_cnt = ARRAY_SIZE(uart2_pads),
+};
+
+static struct omap_uart_port_info uart2_info __initdata = {
+	.dma_enabled = 0,
+	.dma_rx_buf_size = 4096,
+	.dma_rx_poll_rate = 1,
+	.dma_rx_timeout = 3 * HZ,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.rts_mux_driver_control = 1,
+#endif
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
+};
+#endif
+
 static struct omap_device_pad uart3_pads[] __initdata = {
 #ifndef CONFIG_MACH_OMAP4_BOWSER
 	{
@@ -79,6 +98,21 @@ static struct omap_device_pad uart3_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data uart3_board_data __initdata = {
+	.id = 2,
+	.pads = uart3_pads,
+	.pads_cnt = ARRAY_SIZE(uart3_pads),
+};
+
+static struct omap_uart_port_info uart3_info __initdata = {
+	.dma_enabled = 0,
+	.dma_rx_buf_size = 4096,
+	.dma_rx_poll_rate = 1,
+	.dma_rx_timeout = 3 * HZ,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
+};
+
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 static struct omap_device_pad uart4_pads[] __initdata = {
 	{
 		.name	= "uart4_tx.uart4_tx",
@@ -92,41 +126,10 @@ static struct omap_device_pad uart4_pads[] __initdata = {
 	},
 };
 
-static struct omap_board_data uart2_board_data __initdata = {
-	.id = 1,
-	.pads = uart2_pads,
-	.pads_cnt = ARRAY_SIZE(uart2_pads),
-};
-
-static struct omap_board_data uart3_board_data __initdata = {
-	.id = 2,
-	.pads = uart3_pads,
-	.pads_cnt = ARRAY_SIZE(uart3_pads),
-};
-
 static struct omap_board_data uart4_board_data __initdata = {
 	.id = 3,
 	.pads = uart4_pads,
 	.pads_cnt = ARRAY_SIZE(uart4_pads),
-};
-
-static struct omap_uart_port_info uart2_info __initdata = {
-	.dma_enabled = 0,
-	.dma_rx_buf_size = 4096,
-	.dma_rx_poll_rate = 1,
-	.dma_rx_timeout = 3 * HZ,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	.rts_mux_driver_control = 1,
-#endif
-	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
-};
-
-static struct omap_uart_port_info uart3_info __initdata = {
-	.dma_enabled = 0,
-	.dma_rx_buf_size = 4096,
-	.dma_rx_poll_rate = 1,
-	.dma_rx_timeout = 3 * HZ,
-	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
 
 static struct omap_uart_port_info uart4_info __initdata = {
@@ -136,6 +139,7 @@ static struct omap_uart_port_info uart4_info __initdata = {
 	.dma_rx_timeout = 3 * HZ,
 	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
+#endif
 
 /*
  * UART: Tablet platform initialization
@@ -143,7 +147,11 @@ static struct omap_uart_port_info uart4_info __initdata = {
 
 void __init omap4_board_serial_init(void)
 {
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 	omap_serial_init_port(&uart2_board_data, &uart2_info);
+#endif
 	omap_serial_init_port(&uart3_board_data, &uart3_info);
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 	omap_serial_init_port(&uart4_board_data, &uart4_info);
+#endif
 }
