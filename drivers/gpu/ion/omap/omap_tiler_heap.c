@@ -220,7 +220,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	data->stride = info->vstride;
 
 	/* create an ion handle  for the allocation */
-	handle = ion_alloc(client, 0, 0, 1 << OMAP_ION_HEAP_TILER);
+	handle = ion_alloc(client, 0, 0, OMAP_ION_HEAP_TILER_MASK);
 	if (IS_ERR_OR_NULL(handle)) {
 		ret = PTR_ERR(handle);
 		pr_err("%s: failure to allocate handle to manage "
@@ -369,7 +369,7 @@ struct ion_heap *omap_tiler_heap_create(struct ion_platform_heap *data)
 		gen_pool_add(heap->pool, heap->base, data->size, -1);
 	}
 	heap->heap.ops = &omap_tiler_ops;
-	heap->heap.type = OMAP_ION_HEAP_TYPE_TILER;
+	heap->heap.type = OMAP_ION_HEAP_TILER;
 	heap->heap.name = data->name;
 	heap->heap.id = data->id;
 	return &heap->heap;

@@ -100,14 +100,14 @@ static int omap_ion_probe(struct platform_device *pdev)
 	for (i = 0; i < num_heaps; i++) {
 		struct ion_platform_heap *heap_data = &pdata->heaps[i];
 
-		if (heap_data->type == OMAP_ION_HEAP_TYPE_TILER) {
+		if (heap_data->type == OMAP_ION_HEAP_TILER) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 			if (heap_data->id == OMAP_ION_HEAP_NONSECURE_TILER)
 				nonsecure_tiler_heap = heaps[i];
 			else
 				tiler_heap = heaps[i];
 		} else if (heap_data->type ==
-				OMAP_ION_HEAP_TYPE_TILER_RESERVATION) {
+				OMAP_ION_HEAP_TILER_RESERVATION) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 		} else {
 			heaps[i] = ion_heap_create(heap_data);
@@ -128,7 +128,7 @@ static int omap_ion_probe(struct platform_device *pdev)
 err:
 	for (i = 0; i < num_heaps; i++) {
 		if (heaps[i]) {
-			if (heaps[i]->type == OMAP_ION_HEAP_TYPE_TILER)
+			if (heaps[i]->type == OMAP_ION_HEAP_TILER)
 				omap_tiler_heap_destroy(heaps[i]);
 			else
 				ion_heap_destroy(heaps[i]);
@@ -145,7 +145,7 @@ static int omap_ion_remove(struct platform_device *pdev)
 
 	ion_device_destroy(idev);
 	for (i = 0; i < num_heaps; i++)
-		if (heaps[i]->type == OMAP_ION_HEAP_TYPE_TILER)
+		if (heaps[i]->type == OMAP_ION_HEAP_TILER)
 			omap_tiler_heap_destroy(heaps[i]);
 		else
 			ion_heap_destroy(heaps[i]);
