@@ -949,7 +949,9 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 	struct rpmsg_omx_service *omxserv = dev_get_drvdata(&rpdev->dev);
 	int major = MAJOR(rpmsg_omx_dev);
 	struct rpmsg_omx_instance *omx;
+#ifndef CONFIG_USE_AMAZON_DUCATI
 	struct rproc *rproc = vdev_to_rproc(rpdev->vrp->vdev);
+#endif
 
 	dev_info(omxserv->dev, "rpmsg omx driver is removed\n");
 
