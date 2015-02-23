@@ -514,20 +514,23 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 
-		if (!fcheck(data.fds[0]) || !fcheck(data.fds[1])) {
+		if (!fcheck(data.fd)) {
 			dev_err(omxserv->dev,
-				"%s: %d: invalid fd: fd0 - %d, fd1 - %d\n",
+				"%s: %d: invalid fd: %d\n",
 				__func__, _IOC_NR(cmd),
-				data.fds[0], data.fds[1]);
+				data.fd);
 			return -EBADF;
 		}
 
 		data.num_handles = 0;
 
 		data.handles[0] = data.handles[1] = NULL;
+		ret = omap_ion_share_fd_to_handles(data.fd, omx->ion_client, ion_handles, &num_handles);
+		if (ret != 0) {
+			return ret;
+		}
+
 		for (i = 0; (i < num_handles); i++) {
-			ion_handles[i] = ion_import_dma_buf(omx->ion_client,
-							    data.fds[i]);
 			if (IS_ERR_OR_NULL(ion_handles[i]))
 				continue;
 
