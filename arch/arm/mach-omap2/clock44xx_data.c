@@ -1548,9 +1548,6 @@ static struct clk dss_48mhz_clk = {
 	.clkdm_name	= "l3_dss_clkdm",
 	.parent		= &func_48mc_fclk,
 	.recalc		= &followparent_recalc,
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-	.flags		= ENABLE_ON_INIT,
-#endif
 };
 
 static struct clk dss_fck = {
