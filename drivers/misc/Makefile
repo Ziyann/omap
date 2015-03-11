@@ -62,4 +62,5 @@ obj-$(CONFIG_GCCORE)		+= gcx/gccore/
 obj-$(CONFIG_GCBV)		+= gcx/gcbv/
 obj-$(CONFIG_GCIOCTL)		+= gcx/gcioctl/
 obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/
+obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
 
