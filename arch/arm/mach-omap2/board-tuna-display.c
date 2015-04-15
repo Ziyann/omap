@@ -29,8 +29,6 @@
 #include "control.h"
 #include "mux.h"
 
-#define TUNA_FB_RAM_SIZE		SZ_16M /* ~1280*720*4 * 2 */
-
 #define TUNA_GPIO_MLCD_RST		23
 
 /* 4.65" Panel ID Info (D1h 1st Para) */
@@ -1062,11 +1060,6 @@ static struct omap_dss_board_info tuna_dss_data = {
 static struct omapfb_platform_data tuna_fb_pdata = {
 	.mem_desc = {
 		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = TUNA_FB_RAM_SIZE,
-			},
-		},
 	},
 };
 
