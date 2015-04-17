@@ -293,22 +293,23 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   board-44xx-identity.o \
 					   omap4_apps_brd_id.o \
 					   omap_phy_internal.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna.o \
+obj-$(CONFIG_MACH_TUNA)		+= board-tuna.o \
 					   hsmmc.o \
-					   omap_phy_internal.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-display.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-input.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-jack.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-nfc.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-power.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-sensors.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-vibrator.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-wifi.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-bluetooth.o \
-					   board-tuna-emif.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-connector.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-pogo.o
-obj-$(CONFIG_MACH_TUNA)			+= board-tuna-usbhost.o
+					   omap_phy_internal.o \
+					   board-tuna-display.o \
+					   board-tuna-input.o \
+					   board-tuna-jack.o \
+					   board-tuna-nfc.o \
+					   board-tuna-power.o \
+					   board-tuna-sensors.o \
+					   board-tuna-vibrator.o \
+					   board-tuna-wifi.o \
+					   board-tuna-bluetooth.o \
+					   board-tuna-emif.o \
+					   board-tuna-connector.o \
+					   board-tuna-pogo.o \
+					   board-tuna-usbhost.o \
+					   omap4_apps_brd_id.o
 
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o \
 					   omap_phy_internal.o \

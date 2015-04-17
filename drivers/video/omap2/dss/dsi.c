@@ -41,6 +41,7 @@
 #include <video/omapdss.h>
 #include <plat/clock.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/omap_hwmod.h>
 
 #include "dss.h"
 #include "dss_features.h"
