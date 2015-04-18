@@ -3135,6 +3135,7 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 		dsi_vc_write_long_payload(dsidev, channel, b1, b2, b3, 0);
 	}
 
+#ifndef CONFIG_MACH_TUNA
 	/* wait for IRQ for long packet transmission confirmation */
 	for (i = 0; i < 1000; i++) {
 		u32 val;
@@ -3148,6 +3149,7 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 	}
 
 	DSSERR("long packet send failed\n");
+#endif
 
 	return r;
 }
@@ -3326,7 +3328,11 @@ int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 		buf[1] = (data >> 8) & 0xff;
 
 		return 2;
+#ifdef CONFIG_MACH_TUNA
+	} else if (dt == DSI_DT_RX_DCS_LONG_READ || dt == DSI_DT_RX_LONG_READ) {
+#else
 	} else if (dt == DSI_DT_RX_DCS_LONG_READ) {
+#endif
 		int w;
 		int len = FLD_GET(val, 23, 8);
 		if (dsi->debug_read)
@@ -3987,6 +3993,13 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 	dsi_write_reg(dsidev, DSI_VC_CTRL(0), r);
 	dsi_write_reg(dsidev, DSI_VC_CTRL(0) , 0x20800790);
 
+#ifdef CONFIG_MACH_TUNA
+	r = dsi_read_reg(dsidev, DSI_VC_CTRL(1));
+	r = FLD_MOD(r, 0, 4, 4);
+	r = FLD_MOD(r, 1, 9, 9);
+	dsi_write_reg(dsidev, DSI_VC_CTRL(1), r);
+#endif
+
 	word_count = dssdev->panel.timings.x_res * dssdev->ctrl.pixel_size / 8;
 	header = FLD_VAL(0, 31, 24) | /* ECC */
 		FLD_VAL(word_count, 23, 8) | /* WORD_COUNT */
@@ -3994,6 +4007,9 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 		FLD_VAL(data_type, 5, 0);
 	dsi_write_reg(dsidev, DSI_VC_LONG_PACKET_HEADER(0), header);
 
+#ifdef CONFIG_MACH_TUNA
+	dsi_vc_enable(dsidev, 1, true);
+#endif
 	dsi_vc_enable(dsidev, 0, true);
 	dsi_if_enable(dsidev, true);
 
@@ -4727,11 +4743,13 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if(!dssdev->skip_init)
 		dsi_enable_pll_clock(dsidev, 1);
 
+#ifndef CONFIG_MACH_TUNA
 	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 	_dsi_wait_reset(dsidev);
 
 	/* ENWAKEUP */
 	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 2, 2);
+#endif
 
 	_dsi_initialize_irq(dsidev);
 
