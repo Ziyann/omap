@@ -21,6 +21,9 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/wakelock.h>
+#ifdef CONFIG_MACH_TUNA
+#include <linux/reboot.h>
+#endif
 
 enum {
 	DEBOUNCE_UNSTABLE     = BIT(0),	/* Got irq, while debouncing */
@@ -42,6 +45,9 @@ struct gpio_input_state {
 	struct gpio_event_input_devs *input_devs;
 	const struct gpio_event_input_info *info;
 	struct hrtimer timer;
+#ifdef CONFIG_MACH_TUNA
+	struct hrtimer longpress_timer;
+#endif
 	int use_irq;
 	int debounce_count;
 	spinlock_t irq_lock;
@@ -132,6 +138,16 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 				key_entry->code, i, key_entry->gpio, pressed);
 		input_event(ds->input_devs->dev[key_entry->dev], ds->info->type,
 			    key_entry->code, pressed);
+#ifdef CONFIG_MACH_TUNA
+		/* long press timer */
+		if (key_entry->gpio == 3) {
+			if (pressed == 1) {
+				hrtimer_start(&ds->longpress_timer, ktime_set(10, 0), HRTIMER_MODE_REL);
+			} else if (!pressed) {
+				hrtimer_cancel(&ds->longpress_timer);
+			}
+		}
+#endif
 		sync_needed = true;
 	}
 	if (sync_needed) {
@@ -159,6 +175,17 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 
 	return HRTIMER_NORESTART;
 }
+
+#ifdef CONFIG_MACH_TUNA
+static enum hrtimer_restart longpress_timer_callback(struct hrtimer *timer)
+{
+	printk(KERN_ERR "Power key long press detected, shutting down...\n");
+
+	kernel_power_off();
+
+	return HRTIMER_NORESTART;
+}
+#endif
 
 static irqreturn_t gpio_event_input_irq_handler(int irq, void *dev_id)
 {
@@ -345,6 +372,12 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		hrtimer_init(&ds->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		ds->timer.function = gpio_event_input_timer_func;
 		hrtimer_start(&ds->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+
+#ifdef CONFIG_MACH_TUNA
+		hrtimer_init(&ds->longpress_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		ds->longpress_timer.function = longpress_timer_callback;
+#endif
+
 		spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 		return 0;
 	}
