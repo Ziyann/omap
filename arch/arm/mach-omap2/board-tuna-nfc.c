@@ -40,21 +40,31 @@ static unsigned int nfc_power;
 static struct wake_lock nfc_wake_lock;
 
 static void nfc_power_apply(void) {
+	int irq = gpio_to_irq(GPIO_NFC_IRQ);
 	switch (nfc_power) {
 	case PWR_OFF:
 		pr_info("%s OFF\n", __func__);
+		if (disable_irq_wake(irq)) {
+			pr_err("%s: disable_irq_wake() failed\n", __func__);
+		}
 		gpio_set_value(GPIO_NFC_FW, 0);
 		gpio_set_value(GPIO_NFC_EN, 0);
 		msleep(60);
 		break;
 	case PWR_ON:
 		pr_info("%s ON\n", __func__);
+		if (enable_irq_wake(irq)) {
+			pr_err("%s: enable_irq_wake() failed\n", __func__);
+		}
 		gpio_set_value(GPIO_NFC_FW, 0);
 		gpio_set_value(GPIO_NFC_EN, 1);
 		msleep(20);
 		break;
 	case PWR_ON_FW:
 		pr_info("%s ON (firmware download)\n", __func__);
+		if (enable_irq_wake(irq)) {
+			pr_err("%s: enable_irq_wake() failed\n", __func__);
+		}
 		gpio_set_value(GPIO_NFC_FW, 1);
 		gpio_set_value(GPIO_NFC_EN, 1);
 		msleep(20);
@@ -128,11 +138,6 @@ void __init omap4_tuna_nfc_init(void)
 	if (request_irq(irq, nfc_irq_isr, IRQF_TRIGGER_RISING, "nfc_irq",
 			NULL)) {
 		pr_err("%s: request_irq() failed\n", __func__);
-		return;
-	}
-
-	if (enable_irq_wake(irq)) {
-		pr_err("%s: irq_set_irq_wake() failed\n", __func__);
 		return;
 	}
 
