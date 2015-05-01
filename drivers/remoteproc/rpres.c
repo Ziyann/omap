@@ -15,7 +15,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/err.h>
-#include <linux/opp.h>
 #include <plat/omap_device.h>
 #include <plat/rpres.h>
 
@@ -76,13 +75,12 @@ void rpres_put(struct rpres *obj)
 }
 EXPORT_SYMBOL(rpres_put);
 
-int rpres_set_constraints(struct rpres *obj, enum rpres_constraint type,
-				long val)
+int rpres_set_constraints(struct rpres *obj, enum rpres_constraint type, long val)
 {
 	int ret;
 	struct rpres_platform_data *pdata = obj->pdev->dev.platform_data;
 	struct platform_device *pdev = obj->pdev;
-	static char * const cname[] = {"scale", "latency", "bandwidth"};
+	static const char *cname[] = {"scale", "latency", "bandwidth"};
 	int (*func)(struct platform_device *, long);
 
 	switch (type) {
@@ -124,22 +122,6 @@ int rpres_set_constraints(struct rpres *obj, enum rpres_constraint type,
 	return ret;
 }
 EXPORT_SYMBOL(rpres_set_constraints);
-
-unsigned long rpres_get_max_freq(struct rpres *obj)
-{
-	struct platform_device *pdev = obj->pdev;
-	struct opp *opp;
-	unsigned long maxfreq = ULONG_MAX;
-
-	rcu_read_lock();
-	opp = opp_find_freq_floor(&pdev->dev, &maxfreq);
-	if (IS_ERR(opp))
-		maxfreq = 0;
-	rcu_read_unlock();
-
-	return maxfreq;
-}
-EXPORT_SYMBOL(rpres_get_max_freq);
 
 static int rpres_probe(struct platform_device *pdev)
 {

@@ -36,6 +36,7 @@
 #include <plat/clock.h>
 #include <plat/dma.h>
 #include <plat/i2c.h>
+#include <plat/omap_hwmod.h>
 
 #define NAME_SIZE	50
 #define REGULATOR_MAX	1
@@ -422,16 +423,21 @@ static int rprm_i2c_request(struct rprm_elem *e, struct rprm_i2c *obj)
 {
 	struct device *i2c_dev;
 	struct i2c_adapter *adapter;
+	char i2c_name[NAME_SIZE];
 	int ret = -EINVAL;
+
+	sprintf(i2c_name, "i2c%d", obj->id);
+	i2c_dev = omap_hwmod_name_get_dev(i2c_name);
+	if (IS_ERR_OR_NULL(i2c_dev)) {
+		pr_err("%s: unable to lookup %s\n", __func__, i2c_name);
+		return ret;
+	}
 
 	adapter = i2c_get_adapter(obj->id);
 	if (!adapter) {
 		pr_err("%s: could not get i2c%d adapter\n", __func__, obj->id);
 		return -EINVAL;
 	}
-
-	i2c_dev = adapter->dev.parent;
-
 	i2c_detect_ext_master(adapter);
 	i2c_put_adapter(adapter);
 
@@ -539,7 +545,6 @@ int _set_constraints(struct rprm_elem *e, struct rprm_constraints_data *c)
 		_set_constraints_func = _rpres_set_constraints;
 		break;
 	case RPRM_IPU:
-	case RPRM_DSP:
 		_set_constraints_func = _rproc_set_constraints;
 		break;
 	default:
@@ -897,71 +902,6 @@ out:
 	return ret;
 }
 
-static int _request_max_freq(struct rprm_elem *e, unsigned long *freq)
-{
-	int ret = 0;
-
-	switch (e->type) {
-	case RPRM_IVAHD:
-	case RPRM_FDIF:
-		*freq = rpres_get_max_freq(e->handle);
-		break;
-	default:
-		pr_err("%s: not supported for resource type %d!\n",
-							__func__, e->type);
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
-}
-
-static int _request_data(struct rprm_elem *e, int type, void *data, int len)
-{
-	int ret = 0;
-
-	switch (type) {
-	case RPRM_MAX_FREQ:
-		if (len != sizeof(unsigned long)) {
-			ret = -EINVAL;
-			break;
-		}
-		ret = _request_max_freq(e, data);
-		break;
-	default:
-		pr_err("%s: invalid data request %d!\n", __func__, type);
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
-}
-
-static int rprm_req_data(struct rprm *rprm, u32 addr, int res_id,
-				void *data, int len)
-{
-	int ret = 0;
-	struct rprm_elem *e;
-	struct rprm_request_data *rd = data;
-
-	mutex_lock(&rprm->lock);
-	if (!idr_find(&rprm->conn_list, addr)) {
-		ret = -ENOTCONN;
-		goto out;
-	}
-
-	e = idr_find(&rprm->id_list, res_id);
-	if (!e || e->src != addr) {
-		ret = -ENOENT;
-		goto out;
-	}
-
-	ret = _request_data(e, rd->type, rd->data, len - sizeof(*rd));
-out:
-	mutex_unlock(&rprm->lock);
-	return ret;
-}
-
 static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 			void *priv, u32 src)
 {
@@ -1030,17 +970,6 @@ static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 		if (ret)
 			dev_err(dev, "rel constraints failed! ret %d\n", ret);
 		return;
-	case RPRM_REQ_DATA:
-		r_sz = len - sizeof(*req);
-		if (r_sz < 0) {
-			r_sz = 0;
-			ret = -EINVAL;
-			break;
-		}
-		ret = rprm_req_data(rprm, src, req->res_id, req->data, r_sz);
-		if (ret)
-			dev_err(dev, "request data failed! ret %d\n", ret);
-		break;
 	default:
 		dev_err(dev, "Unknow request\n");
 		ret = -EINVAL;
@@ -1242,7 +1171,7 @@ static struct rpmsg_device_id rprm_id_table[] = {
 	},
 	{ },
 };
-MODULE_DEVICE_TABLE(rpmsg, rprm_id_table);
+MODULE_DEVICE_TABLE(platform, rprm_id_table);
 
 static struct rpmsg_driver rprm_driver = {
 	.drv.name	= KBUILD_MODNAME,
