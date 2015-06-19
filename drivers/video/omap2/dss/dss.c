@@ -804,7 +804,6 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	if (r)
 		goto err_runtime_get;
 
-#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* Select DPLL */
 	REG_FLD_MOD(DSS_CONTROL, 0, 0, 0);
 
@@ -812,7 +811,6 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	REG_FLD_MOD(DSS_CONTROL, 1, 4, 4);	/* venc dac demen */
 	REG_FLD_MOD(DSS_CONTROL, 1, 3, 3);	/* venc clock 4x enable */
 	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
-#endif
 #endif
 	dss.dsi_clk_source[0] = OMAP_DSS_CLK_SRC_FCK;
 	dss.dsi_clk_source[1] = OMAP_DSS_CLK_SRC_FCK;
