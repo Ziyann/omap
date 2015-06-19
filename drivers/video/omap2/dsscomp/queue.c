@@ -33,8 +33,10 @@
 #include "dsscomp.h"
 /* queue state */
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 #include <linux/pm_qos.h>
-struct pm_qos_request qos_req;
+struct pm_qos_request req;
+#endif
 
 static DEFINE_MUTEX(mtx);
 
@@ -431,7 +433,11 @@ static void dsscomp_mgr_delayed_cb(struct work_struct *work)
 	mutex_unlock(&mtx);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 u32 dsscomp_mgr_callback(void *data, int id, int status)
+#else
+static u32 dsscomp_mgr_callback(void *data, int id, int status)
+#endif
 {
 	struct dsscomp *comp = data;
 
@@ -449,7 +455,9 @@ u32 dsscomp_mgr_callback(void *data, int id, int status)
 	/* get each callback only once */
 	return ~status;
 }
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 EXPORT_SYMBOL(dsscomp_mgr_callback);
+#endif
 
 static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 {
@@ -458,7 +466,11 @@ static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 
 /* apply composition */
 /* at this point the composition is not on any queue */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 int dsscomp_apply(struct dsscomp *comp)
+#else
+static int dsscomp_apply(struct dsscomp *comp)
+#endif
 {
 	int i, r = -EFAULT;
 	u32 dmask, display_ix;
@@ -676,10 +688,12 @@ skip_ovl_set:
 	comp->state = DSSCOMP_STATE_APPLIED;
 	log_state(comp, dsscomp_apply, 0);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (!d->win.w && !d->win.x)
 		d->win.w = dssdev->panel.timings.x_res - d->win.x;
 	if (!d->win.h && !d->win.y)
 		d->win.h = dssdev->panel.timings.y_res - d->win.y;
+#endif
 
 	if (wb_apply) {
 		struct omap_writeback_info wb_info;
@@ -791,15 +805,19 @@ skip_ovl_set:
 			drv->update(dssdev, d->win.x, d->win.y, d->win.w,
 					d->win.h);
 		else
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		{
+#endif
 			/* wait for sync to do smooth animations */
 			mgr->wait_for_vsync(mgr);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 			/* Release OPP constraint on CORE when it posible */
 			if (!omap_dss_overlay_ensure_bw())
 				dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
 			else
 				dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE);
 		}
+#endif
 	}
 
 	return r;
@@ -808,7 +826,9 @@ err:
 done:
 	return r;
 }
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 EXPORT_SYMBOL(dsscomp_apply);
+#endif
 
 struct dsscomp_apply_work {
 	struct work_struct work;

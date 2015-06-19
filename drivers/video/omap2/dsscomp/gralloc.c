@@ -38,6 +38,7 @@ static bool presentation_mode;
 #define NUM_TILER1D_SLOTS 2
 #define MAX_NUM_TILER1D_SLOTS 4
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 #include <linux/ion.h>
 #include <plat/dma.h>
 
@@ -61,6 +62,7 @@ struct dsscomp_clone_work {
 wait_queue_head_t transfer_waitq;
 wait_queue_head_t dma_waitq;
 static bool dma_transfer_done;
+#endif
 
 static struct tiler1d_slot {
 	struct list_head q;
@@ -235,6 +237,7 @@ bool dsscomp_check_mflag(struct dsscomp_setup_dispc_data *d)
 	return true;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 static void dsscomp_gralloc_dma_cb(int channel, u16 status, void *data)
 {
 	if (!(status & OMAP_DMA_BLOCK_IRQ) && (status != 0))
@@ -344,6 +347,7 @@ static void dsscomp_gralloc_do_clone(struct work_struct *work)
 
 	kfree(wk);
 }
+#endif
 
 int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			struct tiler_pa_info **pas,
@@ -369,9 +373,11 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 	struct dsscomp_gralloc_t *gsync;
 	struct dss2_rect_t win = { .w = 0 };
 	bool use_mflag = false;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	ion_phys_addr_t phys = 0;
 	size_t tiler2d_size;
 	struct tiler_view_t view;
+#endif
 
 	/* reserve tiler areas if not already done so */
 	dsscomp_gralloc_init(cdev);
@@ -487,8 +493,10 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 	/* configure manager data from gralloc composition */
 	for (i = 0; i < d->num_mgrs; i++) {
 		ch = channels[i];
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		if((mgr_set_mask & (1<<ch)) == 0)
 			continue;
+#endif
 		r = dsscomp_set_mgr(comp[ch], d->mgrs + i);
 		if (r)
 			dev_err(DEV(cdev), "failed to set mgr%d (%d)\n", ch, r);
@@ -499,8 +507,10 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		struct dss2_ovl_info *oi = d->ovls + i;
 		u32 size;
 		int j;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		if((mgr_set_mask & (1<<ch)) == 0)
 			continue;
+#endif
 		for (j = 0; j < d->num_mgrs; j++)
 			if (d->mgrs[j].ix == oi->cfg.mgr_ix) {
 				/* swap red & blue if requested */
@@ -558,6 +568,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			oi->ba += fbi->fix.smem_start;
 			oi->uv += fbi_uv->fix.smem_start;
 			goto skip_map1d;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		}else if (oi->addressing == OMAP_DSS_BUFADDR_ION) {
 					ion_phys_frm_dev(omap_ion_device,
 					(struct ion_handle *)oi->ba, &phys, &tiler2d_size);
@@ -569,6 +580,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 					oi->uv = oi->ba;
 
 					goto skip_map1d;
+#endif
 		} else if (oi->addressing != OMAP_DSS_BUFADDR_DIRECT) {
 			goto skip_buffer;
 		}
@@ -671,6 +683,7 @@ skip_map1d:
 		log_event(0, ms, gsync, "++refs=%d for [%p]",
 				atomic_read(&gsync->refs), (u32) comp[ch]);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		if (ch == 1 && clone_wq && phys) {
 			/* start work-queue */
 			struct dsscomp_clone_work *wk = kzalloc(sizeof(*wk),
@@ -699,6 +712,7 @@ skip_map1d:
 
 			continue;
 		}
+#endif
 
 		r = dsscomp_delayed_apply(comp[ch]);
 		if (r)
@@ -867,7 +881,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 			struct tiler_block *block_handle =
 				tiler_reserve_1d(tiler1d_slot_size(cdev_));
 			if (IS_ERR_OR_NULL(block_handle)) {
-				pr_err("could not allocate tiler block (%d)\n", tiler1d_slot_size(cdev_));
+				pr_err("could not allocate tiler block\n");
 				break;
 			}
 			slots[i].block_handle = block_handle;
@@ -888,6 +902,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 		if (!i)
 			ZERO(free_slots);
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if (!clone_wq) {
 		clone_wq = create_singlethread_workqueue("dsscomp_clone_wq");
 		if (!clone_wq)
@@ -897,6 +912,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 		init_waitqueue_head(&transfer_waitq);
 		init_waitqueue_head(&dma_waitq);
 	}
+#endif
 }
 
 static struct tiler1d_slot *alloc_tiler_slot(void)

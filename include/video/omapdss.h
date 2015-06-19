@@ -304,8 +304,10 @@ struct omap_dss_dsi_videomode_data {
 	u16 vsa;
 	u16 vfp;
 	u16 vbp;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	u16 ddr_clk_pre;
 	u16 ddr_clk_post;
+#endif
 
 	/* DSI blanking modes */
 	int blanking_mode;
@@ -973,11 +975,14 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
 					 struct omapdss_ovl_cb *cb);
 int dss_set_dispc_clk(unsigned long freq);
-int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev);
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 bool omap_dss_overlay_ensure_bw(void);
 void dss_tput_request(u32 tput);
+#endif
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask);
+#endif
 
 /* generic callback handling */
 static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)

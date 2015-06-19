@@ -1334,6 +1334,7 @@ static int dsi_calc_clock_rates(struct omap_dss_device *dssdev,
 	else
 		cinfo->dsi_pll_hsdiv_dsi_clk = 0;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	dsi->current_cinfo.use_sys_clk = cinfo->use_sys_clk;
 	dsi->current_cinfo.highfreq = cinfo->highfreq;
 
@@ -1348,6 +1349,7 @@ static int dsi_calc_clock_rates(struct omap_dss_device *dssdev,
 	dsi->current_cinfo.regm = cinfo->regm;
 	dsi->current_cinfo.regm_dispc = cinfo->regm_dispc;
 	dsi->current_cinfo.regm_dsi = cinfo->regm_dsi;
+#endif
 
 	return 0;
 }
@@ -2460,8 +2462,10 @@ static int dsi_cio_init(struct omap_dss_device *dssdev)
 	if (r)
 		return r;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* HS_AUTO_STOP_ENABLE */
 	REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 18, 18);
+#endif
 
 	dsi_enable_scp_clk(dsidev);
 
@@ -2823,12 +2827,14 @@ static void dsi_vc_initial_config(struct platform_device *dsidev, int channel)
 	if (dss_has_feature(FEAT_DSI_VC_OCP_WIDTH))
 		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH = 32 bit */
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* TO DO: This is a HACK as performing this command on blaze
 	 * causes DSI errors and does not allow blaze to display anything
 	 * for now cause it to skip on blaze but allow this on tablet video
 	 * displays */
 	if (channel == 0)
 		r = FLD_MOD(r, 1, 11, 10); /* OCP_WIDTH = 24 bit */
+#endif
 
 	r = FLD_MOD(r, 4, 29, 27); /* DMA_RX_REQ_NB = no dma */
 	r = FLD_MOD(r, 4, 23, 21); /* DMA_TX_REQ_NB = no dma */
@@ -4150,6 +4156,7 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 	/* DDR PRE & DDR POST increased to keep LP-11 under 10 usec */
 	offset_ddr_clk = dssdev->clocks.dsi.offset_ddr_clk;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	if(dssdev->panel.dsi_vm_data.ddr_clk_pre == 0)
 		ddr_clk_pre = DIV_ROUND_UP(tclk_pre + tlpx + tclk_zero + tclk_prepare,
 				4) + offset_ddr_clk;
@@ -4161,6 +4168,12 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 			+ offset_ddr_clk;
 	else
 		ddr_clk_post = dssdev->panel.dsi_vm_data.ddr_clk_post;
+#else
+	ddr_clk_pre = DIV_ROUND_UP(tclk_pre + tlpx + tclk_zero + tclk_prepare,
+			4) + offset_ddr_clk;
+	ddr_clk_post = DIV_ROUND_UP(tclk_post + ths_trail, 4) + ths_eot
+		+ offset_ddr_clk;
+#endif
 
 	BUG_ON(ddr_clk_pre == 0 || ddr_clk_pre > 255);
 	BUG_ON(ddr_clk_post == 0 || ddr_clk_post > 255);
@@ -4694,12 +4707,16 @@ static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 		irq = dssdev->manager->id == OMAP_DSS_CHANNEL_LCD ?
 			DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 		omap_dispc_unregister_isr_sync(dsi_framedone_irq_callback,
+#else
+		omap_dispc_unregister_isr(dsi_framedone_irq_callback,
+#endif
 			(void *) dssdev, irq);
 	}
 }
 
-int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
+static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	struct dsi_clock_info cinfo;
@@ -4760,7 +4777,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	int dsi_module = dsi_get_dsidev_id(dsidev);
 	int r;
-#ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 	dsi->debug_write = true;
 	dsi->debug_read = true;
@@ -4772,9 +4789,11 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 	/* The SCPClk is required for PLL and complexio registers on OMAP4 */
 	if (cpu_is_omap44xx())
 		REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 14, 14);
+#endif
 
 	r = dsi_pll_init(dsidev, true, true);
 	if (r)
@@ -4827,10 +4846,18 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	if (1)
 		_dsi_print_reset_status(dsidev);
 
+#if !defined(CONFIG_MACH_OMAP4_BOWSER)
+	r = dsi_proto_config(dssdev);
+	if (r)
+		goto err3;
+#endif
+
 	if (!dssdev->skip_init) {
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
 	        r = dsi_proto_config(dssdev);
 		if (r)
 			goto err3;
+#endif
 		/* enable interface */
 		dsi_vc_enable(dsidev, 0, 1);
 		dsi_vc_enable(dsidev, 1, 1);
@@ -4903,6 +4930,7 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 static int _dsi_wait_reset(struct platform_device *dsidev)
 {
 	int t = 0;
@@ -4917,6 +4945,7 @@ static int _dsi_wait_reset(struct platform_device *dsidev)
 
 	return 0;
 }
+#endif
 
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 {
@@ -4948,11 +4977,13 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	if (!dssdev->skip_init) {
 		dsi_enable_pll_clock(dsidev, 1);
+#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
 		REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 		_dsi_wait_reset(dsidev);
 
 		/* ENWAKEUP */
 		REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 2, 2);
+#endif
 	}
 
 	_dsi_initialize_irq(dsidev);

@@ -29,11 +29,13 @@
 #include "dss.h"
 #include "dss_features.h"
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 #include <linux/pm_qos.h>
 bool band_changed;
 static int pm_init_cstr = 0;
-extern struct pm_qos_request qos_req;
+extern struct pm_qos_request req;
 #define OVERLAY_AREA_BW_THRESHOLD (1920*1080)
+#endif
 
 struct callback_states {
 	/*
@@ -1365,15 +1367,18 @@ static void omap_dss_mgr_apply_mgr(struct omap_overlay_manager *mgr)
 	DSSDBG("%s %d\n",__FUNCTION__,mp->skip_init);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 void dss_tput_request(u32 tput)
 {
 	if(!pm_init_cstr) {
-		pm_qos_add_request(&qos_req, PM_QOS_MEMORY_THROUGHPUT, tput);
+		pm_qos_add_request(&req, PM_QOS_MEMORY_THROUGHPUT,
+					 tput);
 		pm_init_cstr = 1;
 	}
 	else
-		pm_qos_update_request(&qos_req, tput);
+		pm_qos_update_request(&req, tput);
 }
+#endif
 
 int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 {
@@ -1385,10 +1390,12 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
 	mgr->get_manager_info(mgr, &info);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	/* Set OPP constraint on CORE only when it needed */
 	if (mgr->device && (mgr->device->state == OMAP_DSS_DISPLAY_ACTIVE))
 		if (omap_dss_overlay_ensure_bw())
 			dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE);
+#endif
 	spin_lock_irqsave(&data_lock, flags);
 
 	if (!mgr->device) {
@@ -2225,6 +2232,7 @@ err:
 	return r;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 bool omap_dss_overlay_ensure_bw(void)
 {
 	int i;
@@ -2261,3 +2269,4 @@ bool omap_dss_overlay_ensure_bw(void)
 	return false;
 }
 EXPORT_SYMBOL(omap_dss_overlay_ensure_bw);
+#endif

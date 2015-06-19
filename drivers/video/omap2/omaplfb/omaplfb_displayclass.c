@@ -172,12 +172,14 @@ static IMG_VOID SetDCState(IMG_HANDLE hDevice, IMG_UINT32 ui32State)
 	switch (ui32State)
 	{
 		case DC_STATE_FLUSH_COMMANDS:
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 			/* Flush out any 'real' operation waiting for another flip.
 			 * In flush state we won't pass any 'real' operations along
 			 * to dsscomp_gralloc_queue(); we'll just CmdComplete them
 			 * immediately.
 			 */
 			OMAPLFBFlip(psDevInfo, &psDevInfo->sSystemBuffer);
+#endif
 			OMAPLFBAtomicBoolSet(&psDevInfo->sFlushCommands, OMAPLFB_TRUE);
 			break;
 		case DC_STATE_FORCE_SWAP_TO_SYSTEM:
