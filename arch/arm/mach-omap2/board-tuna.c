@@ -1067,7 +1067,6 @@ static void set_osc_timings(void)
 
 static void __init tuna_init(void)
 {
-	int status = 0;
 	int package = OMAP_PACKAGE_CBS;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
@@ -1156,13 +1155,6 @@ static void __init tuna_init(void)
 		omap4_ehci_init();
 	}
 #endif
-	if (cpu_is_omap446x()) {
-		/* Vsel0 = gpio, vsel1 = gnd */
-		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
-					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
-		if (status)
-			pr_err("TPS62361 initialization failed: %d\n", status);
-	}
 	omap_enable_smartreflex_on_init();
 }
 
