@@ -1392,6 +1392,12 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "could not create sysfs files\n");
 
+#ifdef CONFIG_MACH_TUNA
+	/* Enables reading of values from channel 2 */
+	twl6030_gpadc_write(gpadc, TWL6030_GPADC_CTRL,
+						TWL6030_GPADC_CTRL_SCALER_EN);
+#endif
+
 	return 0;
 
 err_calib:
