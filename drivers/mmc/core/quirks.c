@@ -88,7 +88,7 @@ EXPORT_SYMBOL(mmc_fixup_device);
 #if __GNUC__ > 4 || ( __GNUC__ == 4 && __GNUC_MINOR__ >= 8 )
 #pragma GCC push_options
 /* As a workaround, drop the optimization level */
-#pragma GCC optimize ("O0")
+#pragma GCC optimize ("O1")
 #endif
 
 /*
