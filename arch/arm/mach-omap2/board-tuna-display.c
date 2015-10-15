@@ -1063,11 +1063,29 @@ static struct omapfb_platform_data tuna_fb_pdata = {
 	},
 };
 
+#if defined(CONFIG_FB_OMAP2_NUM_FBS)
+#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
+#else
+#define OMAPLFB_NUM_DEV 1
+#endif
+
+static struct sgx_omaplfb_config omaplfb_config_tuna[OMAPLFB_NUM_DEV] = {
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data tuna_omaplfb_plat_data = {
+	.num_configs = OMAPLFB_NUM_DEV,
+	.configs = omaplfb_config_tuna,
+};
+
 void tuna_android_display_setup(struct omap_ion_platform_data *ion)
 {
 	omap_android_display_setup(&tuna_dss_data,
 				   NULL,
-				   NULL,
+				   &tuna_omaplfb_plat_data,
 				   &tuna_fb_pdata,
 				   ion);
 }
