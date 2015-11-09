@@ -169,7 +169,7 @@ static irqreturn_t slaveirq_handler(int irq, void *dev_id)
 	/* wake up (unblock) for reading data from userspace */
 	data->data_ready = 1;
 
-	data->data.irqtime = ktime_to_ns(ktime_get());
+	data->data.irqtime = ktime_to_ns(ktime_get_boottime());
 	data->data.data_type |= 1;
 
 	wake_up_interruptible(&data->slaveirq_wait);

@@ -100,7 +100,7 @@ static int mpu_pm_notifier_callback(struct notifier_block *nb,
 	if (event == PM_POST_SUSPEND)
 		mpu->event = MPU_PM_EVENT_POST_SUSPEND;
 
-	mpu->mpu_pm_event.irqtime = ktime_to_ns(ktime_get());
+	mpu->mpu_pm_event.irqtime = ktime_to_ns(ktime_get_boottime());
 	mpu->mpu_pm_event.interruptcount++;
 	mpu->mpu_pm_event.data_type = MPUIRQ_DATA_TYPE_PM_EVENT;
 	mpu->mpu_pm_event.data = mpu->event;

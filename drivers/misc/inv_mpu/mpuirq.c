@@ -163,7 +163,7 @@ static irqreturn_t mpuirq_handler(int irq, void *dev_id)
 	/* and ignore first interrupt generated in module init */
 	mpuirq_dev_data.data_ready = 1;
 
-	mpuirq_data.irqtime = ktime_to_ns(ktime_get());
+	mpuirq_data.irqtime = ktime_to_ns(ktime_get_boottime());
 	mpuirq_data.data_type = MPUIRQ_DATA_TYPE_MPU_IRQ;
 	mpuirq_data.data = 0;
 

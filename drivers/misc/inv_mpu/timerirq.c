@@ -66,7 +66,7 @@ static void timerirq_handler(unsigned long arg)
 
 	data->data_ready = 1;
 
-	data->data.irqtime = ktime_to_ns(ktime_get());
+	data->data.irqtime = ktime_to_ns(ktime_get_boottime());
 	data->data.data_type |= 1;
 
 	dev_dbg(data->dev->this_device,
