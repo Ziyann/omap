@@ -63,6 +63,11 @@ enum {
 #define ISP_MAX_FW_SIZE		(0x1F00 * 4)
 #define ISP_IC_INFO_ADDR	0x1F00
 
+#define FW_NAME_REV31	"melfas/mms144_ts_rev31.fw"
+#define FW_NAME_REV32	"melfas/mms144_ts_rev32.fw"
+MODULE_FIRMWARE(FW_NAME_REV31);
+MODULE_FIRMWARE(FW_NAME_REV32);
+
 static bool mms_force_reflash = false;
 module_param_named(force_reflash, mms_force_reflash, bool, S_IWUSR | S_IRUGO);
 
@@ -726,22 +731,22 @@ static int __devinit mms_ts_config(struct mms_ts_info *info, bool nowait)
 {
 	struct i2c_client *client = info->client;
 	int ret = 0;
-	const char *filename = info->pdata->fw_name ?: "mms144_ts.fw";
+	const char *filename = info->pdata->fw_name ?: "melfas/mms144_ts_rev32.fw";
 
 	mms_pwr_on_reset(info);
 
+	info->fw_name = kasprintf(GFP_KERNEL, "melfas/%s", filename);
+
 	if (nowait) {
 		const struct firmware *fw;
-		info->fw_name = kasprintf(GFP_KERNEL, "melfas/%s", filename);
 		ret = request_firmware(&fw, info->fw_name, &client->dev);
 		if (ret) {
 			dev_err(&client->dev,
-				"error requesting built-in firmware\n");
+				"error requesting built-in firmware: %s\n", filename);
 			goto out;
 		}
 		mms_ts_fw_load(fw, info);
 	} else {
-		info->fw_name = kstrdup(filename, GFP_KERNEL);
 		ret = request_firmware_nowait(THIS_MODULE, true, info->fw_name,
 					      &client->dev, GFP_KERNEL,
 					      info, mms_ts_fw_load);
