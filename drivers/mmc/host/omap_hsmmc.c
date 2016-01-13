@@ -1785,7 +1785,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	u32 con;
 	int do_send_init_stream = 0;
 
-	pm_runtime_get_sync(host->dev);
+	mmc_claim_host(host->mmc);
 
 	if (ios->power_mode != host->power_mode) {
 		switch (ios->power_mode) {
@@ -1886,7 +1886,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	else
 		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
 
-	pm_runtime_put_sync(host->dev);
+	mmc_release_host(host->mmc);
 }
 
 static int omap_hsmmc_get_cd(struct mmc_host *mmc)
@@ -2671,7 +2671,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 	struct resource *res;
 
 	if (host) {
-		mmc_host_enable(host->mmc);
+		mmc_claim_host(host->mmc);
 		mmc_remove_host(host->mmc);
 		if (host->use_reg)
 			omap_hsmmc_reg_put(host);
@@ -2685,7 +2685,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 			dma_free_coherent(NULL, ADMA_TABLE_SZ,
 				host->adma_table, host->phy_adma_table);
 
-		mmc_host_disable(host->mmc);
+		mmc_release_host(host->mmc);
 		pm_runtime_suspend(host->dev);
 
 		clk_put(host->fclk);
@@ -2719,8 +2719,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 		return 0;
 
 	if (host) {
-		pm_runtime_get_sync(host->dev);
-
 		host->suspended = 1;
 		if (host->pdata->suspend) {
 			ret = host->pdata->suspend(&pdev->dev,
@@ -2730,7 +2728,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 					"Unable to handle MMC board"
 					" level suspend\n");
 				host->suspended = 0;
-				pm_runtime_put_sync(host->dev);
 				return ret;
 			}
 		}
@@ -2738,9 +2735,11 @@ static int omap_hsmmc_suspend(struct device *dev)
 			host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 		ret = mmc_suspend_host(host->mmc);
 		if (ret == 0) {
+			mmc_claim_host(host->mmc);
 			omap_hsmmc_disable_irq(host);
 			OMAP_HSMMC_WRITE(host->base, HCTL,
 				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
+			mmc_release_host_sync(host->mmc);
 
 			if (host->got_dbclk)
 				clk_disable(host->dbclk);
@@ -2755,7 +2754,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 			}
 		}
 
-		pm_runtime_put_sync(host->dev);
 	}
 	return ret;
 }
@@ -2771,7 +2769,7 @@ static int omap_hsmmc_resume(struct device *dev)
 		return 0;
 
 	if (host) {
-		pm_runtime_get_sync(host->dev);
+		mmc_claim_host(host->mmc);
 
 		if (host->got_dbclk)
 			clk_enable(host->dbclk);
@@ -2792,7 +2790,7 @@ static int omap_hsmmc_resume(struct device *dev)
 		if (ret == 0)
 			host->suspended = 0;
 
-		pm_runtime_put_sync(host->dev);
+		mmc_release_host(host->mmc);
 	}
 
 	return ret;
