@@ -1403,7 +1403,6 @@ static void __init tuna_reserve(void)
 
 
 	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 
 	/* ipu needs to recognize secure input buffer area as well */
