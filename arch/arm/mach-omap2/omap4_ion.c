@@ -122,7 +122,11 @@ void __init omap_ion_init(void)
 		omap4_ion_heap_nonsec_tiler_mem_size = 0;
 		omap4_ion_heap_tiler_mem_size = 0;
 	} else {
+#if defined(CONFIG_ION_OMAP_IPU_MEM_IOBUFS_SIZE) && CONFIG_ION_OMAP_IPU_MEM_IOBUFS_SIZE > 0
+		omap4_ion_heap_secure_input_size = (SZ_1M * CONFIG_ION_OMAP_IPU_MEM_IOBUFS_SIZE);
+#else
 		omap4_ion_heap_secure_input_size = (SZ_1M * 90);
+#endif
 #ifdef CONFIG_MACH_TUNA
 		omap4_ion_heap_secure_output_wfdhdcp_size = 0;
 #else
