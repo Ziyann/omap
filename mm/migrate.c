@@ -758,6 +758,19 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 	return rc;
 }
 
+static void write_dirty_buffers(struct page *page)
+{
+	struct buffer_head *head = page_buffers(page);
+	struct buffer_head *bh;
+
+	bh = head;
+	do {
+		write_dirty_buffer(bh, WRITE_SYNC);
+		wait_on_buffer(bh);
+		bh = bh->b_this_page;
+	} while (bh != head);
+}
+
 static int __unmap_and_move(struct page *page, struct page *newpage,
 			int force, bool offlining, enum migrate_mode mode)
 {
@@ -905,6 +918,14 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	if (!page->mapping) {
 		VM_BUG_ON(PageAnon(page));
 		if (page_has_private(page)) {
+			/* try_to_free_buffers() call below won't try to write
+			 * buffers if they're dirty, so it will fail. */
+			if (PageDirty(page)) {
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+				pr_info("__unmap_and_move: flushing dirty page buffers ...\n");
+#endif
+				write_dirty_buffers(page);
+			}
 			if (!try_to_free_buffers(page)) {
 #ifdef CONFIG_CMA_DEBUG_VERBOSE
 				pr_err("__unmap_and_move: in !page_mapping/page_has_private case, mode = %d, force = %d\n", mode, force);
