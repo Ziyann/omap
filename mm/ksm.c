@@ -1784,6 +1784,14 @@ void ksm_migrate_page(struct page *newpage, struct page *oldpage)
 	if (stable_node) {
 		VM_BUG_ON(stable_node->kpfn != page_to_pfn(oldpage));
 		stable_node->kpfn = page_to_pfn(newpage);
+		/*
+		 * newpage->mapping was set in advance; now we need smp_wmb()
+		 * to make sure that the new stable_node->kpfn is visible
+		 * to get_ksm_page() before it can see that oldpage->mapping
+		 * has gone stale (or that PageSwapCache has been cleared).
+		 */
+		smp_wmb();
+		set_page_stable_node(oldpage, NULL);
 	}
 }
 
