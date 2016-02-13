@@ -91,7 +91,7 @@ int rmap_walk_ksm(struct page *page, int (*rmap_one)(struct page *,
 void ksm_migrate_page(struct page *newpage, struct page *oldpage);
 void ksm_start_migration(void);
 void ksm_finalize_migration(unsigned long start_pfn, unsigned long nr_pages);
-void ksm_abort_migration(void);
+void ksm_stop_migration(void);
 
 #else  /* !CONFIG_KSM */
 

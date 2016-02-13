@@ -1814,10 +1814,9 @@ void ksm_finalize_migration(unsigned long start_pfn, unsigned long nr_pages)
 	while ((stable_node = ksm_check_stable_tree(start_pfn,
 				start_pfn + nr_pages)) != NULL)
 		remove_node_from_stable_tree(stable_node);
-	mutex_unlock(&ksm_thread_mutex);
 }
 
-void ksm_abort_migration(void)
+void ksm_stop_migration(void)
 {
 	mutex_unlock(&ksm_thread_mutex);
 }

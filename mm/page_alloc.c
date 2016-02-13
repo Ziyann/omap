@@ -59,6 +59,7 @@
 #include <linux/prefetch.h>
 #include <linux/migrate.h>
 #include <linux/ksm.h>
+#include <linux/delay.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -5802,7 +5803,11 @@ int set_migratetype_isolate(struct page *page)
 	 * FIXME: Now, memory hotplug doesn't call shrink_slab() by itself.
 	 * We just check MOVABLE pages.
 	 */
-	if (__count_immobile_pages(zone, page, arg.pages_found))
+	/* Note: if pageblock has MIGRATE_ISOLATE type already set, it means
+	 * the previous __count_immobile_pages() check succeeded and we're now
+	 * in retry mode, so skip this check now as it will fail. */
+	if (get_pageblock_migratetype(page) == MIGRATE_ISOLATE ||
+		__count_immobile_pages(zone, page, arg.pages_found))
 		ret = 0;
 
 	/*
@@ -5977,9 +5982,8 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 		       unsigned migratetype)
 {
 	struct zone *zone = page_zone(pfn_to_page(start));
-	unsigned long outer_start, outer_end;
-        bool ksm_migration_started = false;
-	int ret = 0, order;
+	unsigned long outer_start = start, outer_end = end;
+	int ret = -EBUSY, order, tries, nMaxTries = 25;
 
 	/*
 	 * What we do here is we mark all pageblocks in range as
@@ -6005,68 +6009,105 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	 * put back to page allocator so that buddy can use them.
 	 */
 
-	ret = start_isolate_page_range(pfn_max_align_down(start),
-				       pfn_max_align_up(end), migratetype);
-	if (ret)
-		goto done;
-
-	// Need to take KSM lock, so that we can specify offlining = true
-	// and move KSM pages.
-	ksm_start_migration();
-        ksm_migration_started = true;
-
-	ret = __alloc_contig_migrate_range(start, end);
-	if (ret)
-		goto done;
-
-	/*
-	 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
-	 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
-	 * more, all pages in [start, end) are free in page allocator.
-	 * What we are going to do is to allocate all pages from
-	 * [start, end) (that is remove them from page allocator).
-	 *
-	 * The only problem is that pages at the beginning and at the
-	 * end of interesting range may be not aligned with pages that
-	 * page allocator holds, ie. they can be part of higher order
-	 * pages.  Because of this, we reserve the bigger range and
-	 * once this is done free the pages we are not interested in.
-	 *
-	 * We don't have to hold zone->lock here because the pages are
-	 * isolated thus they won't get removed from buddy.
-	 */
-
-	lru_add_drain_all();
-	drain_all_pages();
-
-	order = 0;
-	outer_start = start;
-	while (!PageBuddy(pfn_to_page(outer_start))) {
-		if (++order >= MAX_ORDER) {
-			ret = -EBUSY;
-			goto done;
+	for (tries = 0; ret && tries < nMaxTries; ++tries) {
+#ifdef CONFIG_KSM
+		if (tries > 0) {
+			ksm_stop_migration();
 		}
-		outer_start &= ~0UL << order;
+#endif
+
+		/* If we had several unsuccessful iterations already -
+		 * try to wait a bit between them so that the chances
+		 * of pages beeing freed are higher. */
+		if (tries > 5) {
+			msleep(50);
+		}
+
+#ifdef CONFIG_KSM
+		/* Need to take KSM lock, so that we can specify offlining = true
+		 * and move KSM pages.*/
+		ksm_start_migration();
+#endif
+
+		ret = start_isolate_page_range(pfn_max_align_down(start),
+					       pfn_max_align_up(end), migratetype);
+		if (ret) {
+#ifdef CONFIG_CMA_DEBUG
+			pr_warn("alloc_contig_range: start_isolate_page_range failed, result = %d, retrying at iteration %d\n", ret, tries);
+#endif
+			continue;
+		}
+
+		ret = __alloc_contig_migrate_range(start, end);
+		if (ret) {
+#ifdef CONFIG_CMA_DEBUG
+			pr_warn("alloc_contig_range: __alloc_contig_migrate_range failed, result = %d, retrying at iteration %d\n", ret, tries);
+#endif
+			continue;
+		}
+
+		/*
+		 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
+		 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
+		 * more, all pages in [start, end) are free in page allocator.
+		 * What we are going to do is to allocate all pages from
+		 * [start, end) (that is remove them from page allocator).
+		 *
+		 * The only problem is that pages at the beginning and at the
+		 * end of interesting range may be not aligned with pages that
+		 * page allocator holds, ie. they can be part of higher order
+		 * pages.  Because of this, we reserve the bigger range and
+		 * once this is done free the pages we are not interested in.
+		 *
+		 * We don't have to hold zone->lock here because the pages are
+		 * isolated thus they won't get removed from buddy.
+		 */
+
+		lru_add_drain_all();
+		drain_all_pages();
+
+		order = 0;
+		outer_start = start;
+		while (!PageBuddy(pfn_to_page(outer_start))) {
+			if (++order >= MAX_ORDER) {
+#ifdef CONFIG_CMA_DEBUG
+				pr_warn("alloc_contig_range: MAX_ORDER exceeded, retrying at iteration %d\n", tries);
+#endif
+				ret = -EBUSY;
+				break;
+			}
+			outer_start &= ~0UL << order;
+		}
+
+		if (ret)
+			continue;
+
+		/* Make sure the range is really isolated. */
+		if (test_pages_isolated(outer_start, end)) {
+#ifdef CONFIG_CMA_DEBUG
+			pr_warn("alloc_contig_range: test_pages_isolated(%lx, %lx) failed, retrying at iteration %d\n",
+			       outer_start, end, tries);
+#endif
+			ret = -EBUSY;
+			continue;
+		}
+
+		/*
+		 * Reclaim enough pages to make sure that contiguous allocation
+		 * will not starve the system.
+		 */
+		__reclaim_pages(zone, GFP_HIGHUSER_MOVABLE, end-start);
+
+		/* Grab isolated pages from freelists. */
+		outer_end = isolate_freepages_range(outer_start, end);
+		if (!outer_end) {
+			ret = -EBUSY;
+			continue;
+		}
 	}
 
-	/* Make sure the range is really isolated. */
-	if (test_pages_isolated(outer_start, end)) {
-		pr_warn("alloc_contig_range test_pages_isolated(%lx, %lx) failed\n",
-		       outer_start, end);
-		ret = -EBUSY;
-		goto done;
-	}
-
-	/*
-	 * Reclaim enough pages to make sure that contiguous allocation
-	 * will not starve the system.
-	 */
-	__reclaim_pages(zone, GFP_HIGHUSER_MOVABLE, end-start);
-
-	/* Grab isolated pages from freelists. */
-	outer_end = isolate_freepages_range(outer_start, end);
-	if (!outer_end) {
-		ret = -EBUSY;
+	if (ret) {
+		pr_err("alloc_contig_range: max retries reached, failing\n");
 		goto done;
 	}
 
@@ -6076,15 +6117,17 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	if (end != outer_end)
 		free_contig_range(end, outer_end - end);
 
+#ifdef CONFIG_KSM
 	// Finalize KSM migration.
 	ksm_finalize_migration(start, end - start);
+#endif
 
 done:
 	undo_isolate_page_range(pfn_max_align_down(start),
 				pfn_max_align_up(end), migratetype);
-	if (ksm_migration_started) {
-		ksm_abort_migration();
-	}
+#ifdef CONFIG_KSM
+	ksm_stop_migration();
+#endif
 	return ret;
 }
 
