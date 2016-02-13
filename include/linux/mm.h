@@ -1669,5 +1669,9 @@ extern void copy_user_huge_page(struct page *dst, struct page *src,
 				unsigned int pages_per_huge_page);
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE || CONFIG_HUGETLBFS */
 
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+void print_cma_page_stats(struct page *page);
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

@@ -22,14 +22,32 @@
 #include <linux/sysfs.h>
 #include <linux/xattr.h>
 #include <linux/security.h>
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+#include <linux/migrate.h>
+#endif
 #include "sysfs.h"
 
 extern struct super_block * sysfs_sb;
+
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int sysfs_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = fallback_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("sysfs_migrate_page: fallback_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
 
 static const struct address_space_operations sysfs_aops = {
 	.readpage	= simple_readpage,
 	.write_begin	= simple_write_begin,
 	.write_end	= simple_write_end,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage	= sysfs_migrate_page,
+#endif
 };
 
 static struct backing_dev_info sysfs_backing_dev_info = {

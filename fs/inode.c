@@ -26,6 +26,9 @@
 #include <linux/ima.h>
 #include <linux/cred.h>
 #include <linux/buffer_head.h> /* for inode_has_buffers */
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+#include <linux/migrate.h>
+#endif
 #include "internal.h"
 
 /*
@@ -81,11 +84,26 @@ __cacheline_aligned_in_smp DEFINE_SPINLOCK(inode_wb_list_lock);
  */
 static DECLARE_RWSEM(iprune_sem);
 
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int empty_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = fallback_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("empty_migrate_page: fallback_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
+
 /*
  * Empty aops. Can be used for the cases where the user does not
  * define any of the address_space operations.
  */
 const struct address_space_operations empty_aops = {
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage	= empty_migrate_page,
+#endif
 };
 EXPORT_SYMBOL(empty_aops);
 

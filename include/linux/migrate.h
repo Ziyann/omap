@@ -25,6 +25,9 @@ enum migrate_mode {
 extern void putback_lru_pages(struct list_head *l);
 extern int migrate_page(struct address_space *,
 			struct page *, struct page *, enum migrate_mode);
+extern int fallback_migrate_page(struct address_space *,
+			struct page *, struct page *, enum migrate_mode);
+
 extern int migrate_pages(struct list_head *l, new_page_t x,
 			unsigned long private, bool offlining,
 			enum migrate_mode mode);

@@ -42,6 +42,9 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/ratelimit.h>
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+#include <linux/migrate.h>
+#endif
 
 #include "ext4_jbd2.h"
 #include "xattr.h"
@@ -3868,6 +3871,28 @@ static int ext4_journalled_set_page_dirty(struct page *page)
 	return __set_page_dirty_nobuffers(page);
 }
 
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int ext4_journalled_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = fallback_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("ext4_journalled_migrate_page: fallback_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+
+int ext4_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = buffer_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("ext4_migrate_page: buffer_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
+
 static const struct address_space_operations ext4_ordered_aops = {
 	.readpage		= ext4_readpage,
 	.readpages		= ext4_readpages,
@@ -3878,7 +3903,11 @@ static const struct address_space_operations ext4_ordered_aops = {
 	.invalidatepage		= ext4_invalidatepage,
 	.releasepage		= ext4_releasepage,
 	.direct_IO		= ext4_direct_IO,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage		= ext4_migrate_page,
+#else
 	.migratepage		= buffer_migrate_page,
+#endif
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 };
@@ -3893,7 +3922,11 @@ static const struct address_space_operations ext4_writeback_aops = {
 	.invalidatepage		= ext4_invalidatepage,
 	.releasepage		= ext4_releasepage,
 	.direct_IO		= ext4_direct_IO,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage		= ext4_migrate_page,
+#else
 	.migratepage		= buffer_migrate_page,
+#endif
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 };
@@ -3908,6 +3941,9 @@ static const struct address_space_operations ext4_journalled_aops = {
 	.bmap			= ext4_bmap,
 	.invalidatepage		= ext4_invalidatepage,
 	.releasepage		= ext4_releasepage,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage		= ext4_journalled_migrate_page,
+#endif
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 };
@@ -3923,7 +3959,11 @@ static const struct address_space_operations ext4_da_aops = {
 	.invalidatepage		= ext4_da_invalidatepage,
 	.releasepage		= ext4_releasepage,
 	.direct_IO		= ext4_direct_IO,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage		= ext4_migrate_page,
+#else
 	.migratepage		= buffer_migrate_page,
+#endif
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 };

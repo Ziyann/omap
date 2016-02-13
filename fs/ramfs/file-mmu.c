@@ -27,14 +27,32 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/ramfs.h>
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+#include <linux/migrate.h>
+#endif
 
 #include "internal.h"
+
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int ramfs_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = fallback_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("ramfs_migrate_page: fallback_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
 
 const struct address_space_operations ramfs_aops = {
 	.readpage	= simple_readpage,
 	.write_begin	= simple_write_begin,
 	.write_end	= simple_write_end,
 	.set_page_dirty = __set_page_dirty_no_writeback,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage	= ramfs_migrate_page,
+#endif
 };
 
 const struct file_operations ramfs_file_operations = {

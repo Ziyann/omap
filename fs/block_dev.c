@@ -26,6 +26,9 @@
 #include <linux/log2.h>
 #include <linux/kmemleak.h>
 #include <asm/uaccess.h>
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+#include <linux/migrate.h>
+#endif
 #include "internal.h"
 
 struct bdev_inode {
@@ -1574,6 +1577,18 @@ static int blkdev_releasepage(struct page *page, gfp_t wait)
 	return try_to_free_buffers(page);
 }
 
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int blkdev_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = fallback_migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("blkdev_migrate_page: fallback_migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
+
 static const struct address_space_operations def_blk_aops = {
 	.readpage	= blkdev_readpage,
 	.writepage	= blkdev_writepage,
@@ -1582,6 +1597,9 @@ static const struct address_space_operations def_blk_aops = {
 	.writepages	= generic_writepages,
 	.releasepage	= blkdev_releasepage,
 	.direct_IO	= blkdev_direct_IO,
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage	= blkdev_migrate_page,
+#endif
 };
 
 const struct file_operations def_blk_fops = {

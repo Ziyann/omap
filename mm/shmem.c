@@ -2692,6 +2692,18 @@ static void destroy_inodecache(void)
 	kmem_cache_destroy(shmem_inode_cachep);
 }
 
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+int shmem_migrate_page(struct address_space *mapping,
+			struct page *newpage, struct page *page, enum migrate_mode mode)
+{
+	int rc = migrate_page(mapping, newpage, page, mode);
+	if (rc) {
+		pr_err("shmem_migrate_page: migrate_page failed with error %d\n", rc);
+	}
+	return rc;
+}
+#endif
+
 static const struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
 	.set_page_dirty	= __set_page_dirty_no_writeback,
@@ -2700,7 +2712,11 @@ static const struct address_space_operations shmem_aops = {
 	.write_begin	= shmem_write_begin,
 	.write_end	= shmem_write_end,
 #endif
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+	.migratepage	= shmem_migrate_page,
+#else
 	.migratepage	= migrate_page,
+#endif
 	.error_remove_page = generic_error_remove_page,
 };
 

@@ -5,7 +5,18 @@
 #include <linux/mm.h>
 #include <linux/page-isolation.h>
 #include <linux/pageblock-flags.h>
+#include <linux/ksm.h>
 #include "internal.h"
+
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+void print_cma_page_stats(struct page *page)
+{
+	pr_err("page: phys = 0x%x, count = %d, order = %lu, private = %ld\n", page_to_phys(page), page_count(page), page_order(page), page_private(page));
+	pr_err("page: buddy = %d, LRU = %d, KSM = %d, mapping = 0x%p, map count = %d\n", PageBuddy(page), PageLRU(page), PageKsm(page), page->mapping, atomic_read(&page->_mapcount));
+	pr_err("page: index = 0x%lx, anon = %d, writeback = %d, dirty = %d, swap cache = %d\n", page->index, PageAnon(page), PageWriteback(page), PageDirty(page), PageSwapCache(page));
+	pr_err("pageblock: migratetype = 0x%x, flags = 0x%lx\n", get_pageblock_migratetype(page), get_pageblock_flags(page));
+}
+#endif
 
 static inline struct page *
 __first_valid_page(unsigned long pfn, unsigned long nr_pages)
@@ -108,8 +119,12 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn)
 		else
 			break;
 	}
-	if (pfn < end_pfn)
+	if (pfn < end_pfn) {
+#ifdef CONFIG_CMA_DEBUG_VERBOSE
+		print_cma_page_stats(pfn_to_page(pfn));
+#endif
 		return 0;
+	}
 	return 1;
 }
 
