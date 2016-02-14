@@ -580,12 +580,17 @@ static struct rproc_ops omap_rproc_ops = {
 static int omap_rproc_probe(struct platform_device *pdev)
 {
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+#ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND_TIMEOUT
+	unsigned timeout = CONFIG_REMOTE_PROC_AUTOSUSPEND_TIMEOUT * 1000;
+#else
+	unsigned timeout = pdata->sus_timeout;
+#endif
 
 	pdata->clkdm = clkdm_lookup(pdata->clkdm_name);
 
 	return rproc_register(&pdev->dev, pdata->name, &omap_rproc_ops,
 				pdata->firmware, pdata->memory_pool,
-				THIS_MODULE, pdata->sus_timeout);
+				THIS_MODULE, timeout);
 }
 
 static int __devexit omap_rproc_remove(struct platform_device *pdev)

@@ -14,6 +14,14 @@ config REMOTE_PROC_AUTOSUSPEND
           Say Y here if you want remote processor to suspend
           after some time of inactivity.
 
+config REMOTE_PROC_AUTOSUSPEND_TIMEOUT
+	int "Timeout for remoteproc autosuspend, in seconds"
+	depends on REMOTE_PROC_AUTOSUSPEND
+	default 0
+	help
+	  If set, this will override default timeout for remoteproc
+	  autosuspend.
+
 # can't be tristate, due to omap_device_* and omap_hwmod_* dependency
 config OMAP_REMOTE_PROC
 	bool "OMAP remoteproc support"
