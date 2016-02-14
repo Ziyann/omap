@@ -115,6 +115,9 @@ static LIST_HEAD(rpmsg_omx_services_list);
 #define ION_1D_START	0xBA300000
 #define ION_1D_END	0xBFD00000
 #define ION_1D_VA	0x88000000
+
+static u32 max_iobufs_addr = ION_1D_VA;
+
 static int _rpmsg_pa_to_da(u32 pa, u32 *da)
 {
 	int ret = 0;
@@ -204,6 +207,15 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 				*buffer = da;
 		}
 	}
+
+#ifdef CONFIG_CMA_DEBUG
+	if (da > TILER_END && da < ION_1D_VA + ION_1D_END - ION_1D_START) {
+		if (da > max_iobufs_addr) {
+			max_iobufs_addr = da;
+			pr_err("new max IOBUFS addr is 0x%x, max size is %dMB\n", max_iobufs_addr, (max_iobufs_addr - ION_1D_VA) / SZ_1M);
+		}
+	}
+#endif
 
 	return ret;
 }
