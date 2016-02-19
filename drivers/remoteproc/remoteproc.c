@@ -1378,7 +1378,7 @@ void rproc_put(struct rproc *rproc)
 	 * make sure rproc is really running before powering it off.
 	 * this is important, because the fw loading might have failed.
 	 */
-	if (rproc->state == RPROC_RUNNING || rproc->state == RPROC_CRASHED) {
+	if (rproc->state != RPROC_OFFLINE && rproc->state != RPROC_LOADING) {
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 		/*
 		 * Call resume, it will cancel any pending autosuspend,
