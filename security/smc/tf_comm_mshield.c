@@ -69,6 +69,7 @@
 #define RPC_ADVANCEMENT_FINISHED	2
 
 u32 g_RPC_advancement;
+u32 g_RPC_parameters[4] = {0, 0, 0, 0};
 u32 g_secure_task_id;
 u32 g_service_end;
 
@@ -342,14 +343,14 @@ int tf_schedule_secure_world(struct tf_comm *comm)
 		dpr_err("Service End ret=%X\n", ret);
 
 		if (ret == 0) {
-			dmac_flush_range((void *)comm->l1_buffer,
-				(void *)(((u32)(comm->l1_buffer)) +
+			dmac_flush_range((void *)comm->init_shared_buffer,
+				(void *)(((u32)(comm->init_shared_buffer)) +
 					PAGE_SIZE));
-			outer_inv_range(__pa(comm->l1_buffer),
-				__pa(comm->l1_buffer) +
+			outer_inv_range(__pa(comm->init_shared_buffer),
+				__pa(comm->init_shared_buffer) +
 				PAGE_SIZE);
 
-			ret = comm->l1_buffer->exit_code;
+			ret = comm->init_shared_buffer->exit_code;
 
 			dpr_err("SMC PA failure ret=%X\n", ret);
 			if (ret == 0)
@@ -463,7 +464,12 @@ static u32 tf_rpc_init(struct tf_comm *comm)
 
 	spin_lock(&(comm->lock));
 
-	protocol_version = comm->l1_buffer->protocol_version;
+	dmac_flush_range((void *)comm->init_shared_buffer,
+		(void *)(((u32)(comm->init_shared_buffer)) + PAGE_SIZE));
+	outer_inv_range(__pa(comm->init_shared_buffer),
+		__pa(comm->init_shared_buffer) +  PAGE_SIZE);
+
+	protocol_version = comm->init_shared_buffer->protocol_version;
 
 	if ((GET_PROTOCOL_MAJOR_VERSION(protocol_version))
 			!= TF_S_PROTOCOL_MAJOR_VERSION) {
@@ -514,7 +520,7 @@ int tf_rpc_execute(struct tf_comm *comm)
 	/* Lock the RPC */
 	mutex_lock(&(comm->rpc_mutex));
 
-	rpc_command = comm->l1_buffer->rpc_command;
+	rpc_command = g_RPC_parameters[1];
 
 	if (g_RPC_advancement == RPC_ADVANCEMENT_PENDING) {
 		dpr_info("%s: Executing CMD=0x%x\n",
@@ -525,21 +531,20 @@ int tf_rpc_execute(struct tf_comm *comm)
 			dpr_info("%s: RPC_CMD_YIELD\n", __func__);
 
 			rpc_error = RPC_YIELD;
-			comm->l1_buffer->rpc_status = RPC_SUCCESS;
+			g_RPC_parameters[0] = RPC_SUCCESS;
 			break;
 
 		case RPC_CMD_TRACE:
 			rpc_error = RPC_NON_YIELD;
-			comm->l1_buffer->rpc_status = tf_rpc_trace(comm);
+			g_RPC_parameters[0] = tf_rpc_trace(comm);
 			break;
 
 		default:
 			if (tf_crypto_execute_rpc(rpc_command,
 				comm->l1_buffer->rpc_cus_buffer) != 0)
-				comm->l1_buffer->rpc_status =
-					RPC_ERROR_BAD_PARAMETERS;
+				g_RPC_parameters[0] = RPC_ERROR_BAD_PARAMETERS;
 			else
-				comm->l1_buffer->rpc_status = RPC_SUCCESS;
+				g_RPC_parameters[0] = RPC_SUCCESS;
 			rpc_error = RPC_NON_YIELD;
 			break;
 		}
@@ -641,6 +646,7 @@ int tf_init(struct tf_comm *comm)
 	spin_lock_init(&(comm->lock));
 	comm->flags = 0;
 	comm->l1_buffer = NULL;
+	comm->init_shared_buffer = NULL;
 
 	comm->se_initialized = false;
 
@@ -662,8 +668,9 @@ int tf_init(struct tf_comm *comm)
 int tf_start(struct tf_comm *comm,
 	u32 workspace_addr, u32 workspace_size,
 	u8 *pa_buffer, u32 pa_size,
-	u32 conf_descriptor, u32 conf_offset, u32 conf_size)
+	u8 *properties_buffer, u32 properties_length)
 {
+	struct tf_init_buffer *init_shared_buffer = NULL;
 	struct tf_l1_shared_buffer *l1_shared_buffer = NULL;
 	struct tf_ns_pa_info pa_info;
 	int ret;
@@ -712,6 +719,18 @@ int tf_start(struct tf_comm *comm,
 		goto error1;
 	}
 
+	init_shared_buffer =
+		(struct tf_init_buffer *)
+			internal_get_zeroed_page(GFP_KERNEL);
+	if (init_shared_buffer == NULL) {
+		dpr_err("%s(%p): Ouf of memory!\n", __func__, comm);
+
+		ret = -ENOMEM;
+		goto error1;
+	}
+	/* Ensure the page is mapped */
+	__set_page_locked(virt_to_page(init_shared_buffer));
+
 	l1_shared_buffer =
 		(struct tf_l1_shared_buffer *)
 			internal_get_zeroed_page(GFP_KERNEL);
@@ -725,6 +744,9 @@ int tf_start(struct tf_comm *comm,
 	/* Ensure the page is mapped */
 	__set_page_locked(virt_to_page(l1_shared_buffer));
 
+	dpr_info("%s(%p): L0SharedBuffer={0x%08x, 0x%08x}\n",
+		__func__, comm,
+		(u32) init_shared_buffer, (u32) __pa(init_shared_buffer));
 	dpr_info("%s(%p): L1SharedBuffer={0x%08x, 0x%08x}\n",
 		__func__, comm,
 		(u32) l1_shared_buffer, (u32) __pa(l1_shared_buffer));
@@ -732,28 +754,57 @@ int tf_start(struct tf_comm *comm,
 	descr = tf_get_l2_descriptor_common((u32) l1_shared_buffer,
 			current->mm);
 	pa_info.certificate = (void *) workspace_addr;
-	pa_info.parameters = (void *) __pa(l1_shared_buffer);
-	pa_info.results = (void *) __pa(l1_shared_buffer);
+	pa_info.parameters = (void *) __pa(init_shared_buffer);
+	pa_info.results = (void *) __pa(init_shared_buffer);
 
-	l1_shared_buffer->l1_shared_buffer_descr = descr & 0xFFF;
+	init_shared_buffer->l1_shared_buffer_descr = (((u32) __pa(l1_shared_buffer) & 0xFFFFF000) | (descr & 0xFFF));
 
-	l1_shared_buffer->backing_store_addr = sdp_backing_store_addr;
-	l1_shared_buffer->backext_storage_addr = sdp_bkext_store_addr;
-	l1_shared_buffer->workspace_addr = workspace_addr;
-	l1_shared_buffer->workspace_size = workspace_size;
+	init_shared_buffer->backing_store_addr = sdp_backing_store_addr;
+	init_shared_buffer->backext_storage_addr = sdp_bkext_store_addr;
+	init_shared_buffer->workspace_addr = workspace_addr;
+	init_shared_buffer->workspace_size = workspace_size;
+
+	init_shared_buffer->properties_length = properties_length;
+	if (properties_length == 0) {
+		init_shared_buffer->properties_buffer[0] = 0;
+	} else {
+		/* Test for overflow */
+		if ((init_shared_buffer->properties_buffer +
+			properties_length >
+				init_shared_buffer->properties_buffer) &&
+			(properties_length <=
+				init_shared_buffer->properties_length)) {
+					if (copy_from_user(init_shared_buffer->properties_buffer,
+						properties_buffer,
+						properties_length)) {
+						dpr_err("%s(%p): Failed to copy config buffer (%d, %d)\n",
+							__func__, comm,
+							(u32) properties_length, init_shared_buffer->properties_length);
+						ret = -EFAULT;
+						goto error1;
+					}
+		} else {
+			dpr_err("%s(%p): Configuration buffer size from userland is "
+				"incorrect(%d, %d)\n",
+				__func__, comm,
+				(u32) properties_length, init_shared_buffer->properties_length);
+			ret = -EFAULT;
+			goto error1;
+		}
+	}
 
 	dpr_info("%s(%p): System Configuration (%d bytes)\n",
-		__func__, comm, conf_size);
+		__func__, comm, properties_length);
 	dpr_info("%s(%p): Starting PA (%d bytes)...\n",
 		__func__, comm, pa_size);
 
 	/*
 	 * Make sure all data is visible to the secure world
 	 */
-	dmac_flush_range((void *)l1_shared_buffer,
-		(void *)(((u32)l1_shared_buffer) + PAGE_SIZE));
-	outer_clean_range(__pa(l1_shared_buffer),
-		__pa(l1_shared_buffer) + PAGE_SIZE);
+	dmac_flush_range((void *)init_shared_buffer,
+		(void *)(((u32)init_shared_buffer) + PAGE_SIZE));
+	outer_clean_range(__pa(init_shared_buffer),
+		__pa(init_shared_buffer) + PAGE_SIZE);
 
 	if (pa_size > workspace_size) {
 		dpr_err("%s(%p): PA size is incorrect (%x)\n",
@@ -782,11 +833,10 @@ int tf_start(struct tf_comm *comm,
 	wmb();
 
 	spin_lock(&(comm->lock));
+	comm->init_shared_buffer = init_shared_buffer;
 	comm->l1_buffer = l1_shared_buffer;
-	comm->l1_buffer->conf_descriptor = conf_descriptor;
-	comm->l1_buffer->conf_offset     = conf_offset;
-	comm->l1_buffer->conf_size       = conf_size;
 	spin_unlock(&(comm->lock));
+	init_shared_buffer = NULL;
 	l1_shared_buffer = NULL;
 
 	/*
@@ -815,27 +865,27 @@ loop:
 
 	if (g_RPC_advancement == RPC_ADVANCEMENT_PENDING) {
 		dpr_info("%s: Executing CMD=0x%x\n",
-			__func__, comm->l1_buffer->rpc_command);
+			__func__, g_RPC_parameters[1]);
 
-		switch (comm->l1_buffer->rpc_command) {
+		switch (g_RPC_parameters[1]) {
 		case RPC_CMD_YIELD:
 			dpr_info("%s: RPC_CMD_YIELD\n", __func__);
 			set_bit(TF_COMM_FLAG_L1_SHARED_ALLOCATED,
 				&(comm->flags));
-			comm->l1_buffer->rpc_status = RPC_SUCCESS;
+			g_RPC_parameters[0] = RPC_SUCCESS;
 			break;
 
 		case RPC_CMD_INIT:
 			dpr_info("%s: RPC_CMD_INIT\n", __func__);
-			comm->l1_buffer->rpc_status = tf_rpc_init(comm);
+			g_RPC_parameters[0] = tf_rpc_init(comm);
 			break;
 
 		case RPC_CMD_TRACE:
-			comm->l1_buffer->rpc_status = tf_rpc_trace(comm);
+			g_RPC_parameters[0] = tf_rpc_trace(comm);
 			break;
 
 		default:
-			comm->l1_buffer->rpc_status = RPC_ERROR_BAD_PARAMETERS;
+			g_RPC_parameters[0] = RPC_ERROR_BAD_PARAMETERS;
 			break;
 		}
 		g_RPC_advancement = RPC_ADVANCEMENT_FINISHED;
@@ -867,10 +917,16 @@ error2:
 
 	spin_lock(&(comm->lock));
 	l1_shared_buffer = comm->l1_buffer;
+	init_shared_buffer = comm->init_shared_buffer;
 	comm->l1_buffer = NULL;
+	comm->init_shared_buffer = NULL;
 	spin_unlock(&(comm->lock));
 
 error1:
+	if (init_shared_buffer != NULL) {
+		__clear_page_locked(virt_to_page(init_shared_buffer));
+		internal_free_page((unsigned long) init_shared_buffer);
+	}
 	if (l1_shared_buffer != NULL) {
 		__clear_page_locked(virt_to_page(l1_shared_buffer));
 		internal_free_page((unsigned long) l1_shared_buffer);

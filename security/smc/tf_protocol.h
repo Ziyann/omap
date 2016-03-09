@@ -624,27 +624,11 @@ union tf_answer {
 
 /* Structure of the Communication Buffer */
 struct tf_l1_shared_buffer {
-	#ifdef CONFIG_TF_ZEBRA
-	u32 exit_code;
-	u32 l1_shared_buffer_descr;
-	u32 backing_store_addr;
-	u32 backext_storage_addr;
-	u32 workspace_addr;
-	u32 workspace_size;
-	u32 conf_descriptor;
-	u32 conf_size;
-	u32 conf_offset;
-	u32 protocol_version;
-	u32 rpc_command;
-	u32 rpc_status;
-	u8  reserved1[16];
-	#else
 	u32 config_flag_s;
 	u32 w3b_size_max_s;
 	u32 reserved0;
 	u32 w3b_size_current_s;
 	u8  reserved1[48];
-	#endif
 	u8  version_description[TF_DESCRIPTION_BUFFER_LENGTH];
 	u32 status_s;
 	u32 reserved2;

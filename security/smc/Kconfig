@@ -3,7 +3,7 @@ config TF_ZEBRA
 
 config TF_CRYPTO_RNG
 	tristate "Use OMAP4 HW RNG"
-	depends on ARCH_OMAP4 && m
+	depends on ARCH_OMAP4
 	select SECURITY_MIDDLEWARE_COMPONENT
 	default n
 	help

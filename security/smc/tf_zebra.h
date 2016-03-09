@@ -32,7 +32,7 @@ int tf_ctrl_device_register(void);
 int tf_start(struct tf_comm *comm,
 	u32 workspace_addr, u32 workspace_size,
 	u8 *pa_buffer, u32 pa_size,
-	u32 conf_descriptor, u32 conf_offset, u32 conf_size);
+	u8 *properties_buffer, u32 properties_length);
 
 /* Assembler entry points to/from secure */
 u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);

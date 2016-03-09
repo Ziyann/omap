@@ -63,12 +63,8 @@ schedule_secure_world:
 	b	label_smc
 
 return_from_rpc:
-	/* Always return success to an RPC */
-	/* The effective status is stored in the L1 shared buffer */
-	mov	r0, #0x00000000
-	mov	r1, #0x00000000
-	mov	r2, #0x00000000
-	mov	r3, #0x00000000
+	ldr	r9, =g_RPC_parameters
+	ldm	r9, {r0-r3}
 	/* fall through... */
 
 return_from_irq:
@@ -109,8 +105,8 @@ rpc_handler:
 	mov	r9, #RPC_ADVANCEMENT_PENDING
 	str	r9, [r8]
 
-	/* The effective command is stored in the L1 shared buffer */
-	mov	r0, #0x00000000
+	ldr	r8, =g_RPC_parameters
+	stm	r8, {r0-r3}
 
 	ldr	r8, =g_secure_task_id
 	str	r6, [r8]

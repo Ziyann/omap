@@ -137,10 +137,6 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 
 	switch (pa_ctrl.nPACommand) {
 	case TF_PA_CTRL_START: {
-		struct tf_shmem_desc *shmem_desc = NULL;
-		u32 shared_mem_descriptors[TF_MAX_COARSE_PAGES];
-		u32 descriptor_count;
-		u32 offset;
 		struct tf_connection *connection;
 
 		dpr_info("%s(%p): Start the SMC PA (%d bytes) with conf "
@@ -154,41 +150,12 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 			goto start_exit;
 		}
 
-		result = tf_validate_shmem_and_flags(
-				(u32)pa_ctrl.conf_buffer,
-				pa_ctrl.conf_size,
-				TF_SHMEM_TYPE_READ);
-		if (result != 0)
-			goto start_exit;
-
-		offset = 0;
-		result = tf_map_shmem(
-				connection,
-				(u32)pa_ctrl.conf_buffer,
-				TF_SHMEM_TYPE_READ,
-				true, /* in user space */
-				shared_mem_descriptors,
-				&offset,
-				pa_ctrl.conf_size,
-				&shmem_desc,
-				&descriptor_count);
-		if (result != 0)
-			goto start_exit;
-
-		if (descriptor_count > 1) {
-			dpr_err("%s(%p): configuration file is too long (%d)\n",
-				__func__, file, descriptor_count);
-			result = -ENOMEM;
-			goto start_exit;
-		}
-
 		result = tf_start(&dev->sm,
 			dev->workspace_addr,
 			dev->workspace_size,
 			pa_ctrl.pa_buffer,
 			pa_ctrl.pa_size,
-			shared_mem_descriptors[0],
-			offset,
+			pa_ctrl.conf_buffer,
 			pa_ctrl.conf_size);
 		if (result)
 			dpr_err("SMC: start failed\n");
@@ -196,7 +163,6 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 			dpr_info("SMC: started\n");
 
 start_exit:
-		tf_unmap_shmem(connection, shmem_desc, true); /* full cleanup */
 		break;
 	}
 
