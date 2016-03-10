@@ -115,6 +115,20 @@ static struct wake_lock g_tf_wake_lock;
 
 static struct clockdomain *smc_l4_sec_clkdm;
 
+void tf_crypto_clockdomain_wakeup(void)
+{
+	if (smc_l4_sec_clkdm) {
+		clkdm_wakeup(smc_l4_sec_clkdm);
+	}
+}
+
+void tf_crypto_clockdomain_idle(void)
+{
+	if (smc_l4_sec_clkdm) {
+		clkdm_allow_idle(smc_l4_sec_clkdm);
+	}
+}
+
 static int __init tf_early_init(void)
 {
 	g_secure_task_id = 0;
@@ -203,6 +217,7 @@ static void tf_clock_timer_cb(unsigned long data)
 	clkdm_allow_idle(smc_l4_sec_clkdm);
 
 	spin_unlock_irqrestore(&clk_timer_lock, flags);
+	tf_crypto_digest_apply_clock_workaround();
 
 	dprintk(KERN_INFO "%s success\n", __func__);
 	return;

@@ -850,6 +850,28 @@ end:
 	spin_unlock_irqrestore(&clk_lock, flags);
 }
 
+u32 tf_crypto_read_clock_value(uint32_t clock_paddr)
+{
+	u32 *clock_reg;
+	u32 val;
+	unsigned long flags;
+
+	dprintk(KERN_INFO "tf_crypto_read_clock_value: " \
+		"clock_paddr=0x%08X\n",
+		clock_paddr);
+
+	/* Ensure none concurrent access when changing clock registers */
+	spin_lock_irqsave(&clk_lock, flags);
+
+	clock_reg = (u32 *)IO_ADDRESS(clock_paddr);
+
+	val = __raw_readl(clock_reg);
+
+	spin_unlock_irqrestore(&clk_lock, flags);
+
+	return val;
+}
+
 /*------------------------------------------------------------------------- */
 /*                     CUS RPCs                                             */
 /*------------------------------------------------------------------------- */

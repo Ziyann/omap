@@ -395,4 +395,9 @@ extern char *tf_integrity_hmac_sha256_expected_value;
 
 #endif /* CONFIG_TF_DRIVER_CRYPTO_FIPS */
 
+u32 tf_crypto_read_clock_value(uint32_t clock_paddr);
+void tf_crypto_digest_apply_clock_workaround(void);
+void tf_crypto_clockdomain_wakeup(void);
+void tf_crypto_clockdomain_idle(void);
+
 #endif /*__TF_PUBLIC_CRYPTO_H */

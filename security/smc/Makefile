@@ -35,6 +35,7 @@ tf_driver-objs += tf_device.o
 tf_driver-objs += tf_comm.o
 tf_driver-objs += tf_crypto.o
 tf_driver-objs += tf_crypto_digest.o
+tf_driver-objs += tf_crypto_digest_clock_workaround.o
 tf_driver-objs += tf_crypto_aes.o
 tf_driver-objs += tf_crypto_des.o
 tf_driver-objs += tf_dma.o
