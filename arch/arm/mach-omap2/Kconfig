@@ -393,6 +393,15 @@ config MACH_OMAP4_PANDA
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select OMAP_TPS6236X
 
+config MACH_TUNA
+	bool "Tuna Board"
+	default y
+	depends on ARCH_OMAP4
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select OMAP_TPS6236X
+
 config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
 	default y
