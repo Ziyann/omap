@@ -267,6 +267,11 @@ int omap_vram_reserve(unsigned long paddr, size_t size)
 }
 EXPORT_SYMBOL(omap_vram_reserve);
 
+// VRAM clean-up is called only once during the boot,
+// and at that point vram contains the boot logo already -
+// hence just leave it "as is" until "bootanim" service
+// starts and cleans the stuff.
+#ifndef CONFIG_MACH_TUNA
 static void _omap_vram_dma_cb(int lch, u16 ch_status, void *data)
 {
 	struct completion *compl = data;
@@ -319,6 +324,7 @@ err:
 
 	return r;
 }
+#endif
 
 static int _omap_vram_alloc(int mtype, unsigned pages, unsigned long *paddr)
 {
@@ -357,7 +363,9 @@ found:
 
 		*paddr = start;
 
+#ifndef CONFIG_MACH_TUNA
 		_omap_vram_clear(start, pages);
+#endif
 
 		return 0;
 	}
