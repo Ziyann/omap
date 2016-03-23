@@ -73,6 +73,8 @@ int dma_declare_contiguous(struct device *dev, unsigned long size,
 
 struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 				       unsigned int order);
+struct page *dma_alloc_from_contiguous_fixed_addr(struct device *dev,
+						  phys_addr_t addr, int count);
 bool dma_release_from_contiguous(struct device *dev, struct page *pages,
 				 int count);
 

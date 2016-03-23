@@ -364,6 +364,54 @@ error:
 	return NULL;
 }
 
+struct page *dma_alloc_from_contiguous_fixed_addr(struct device *dev, phys_addr_t addr, int count)
+{
+	unsigned long pageno, start, pfn = PFN_DOWN(addr);
+	struct cma *cma = dev_get_cma_area(dev);
+	int ret;
+
+	pr_debug("%s(): requested cma allocation at 0x%x for %d pages\n", __func__, addr, count);
+
+	if (!cma || !cma->count) {
+		pr_err("%s(): CMA is not initialized\n", __func__);
+		return NULL;
+	}
+
+	if (!count || pfn < cma->base_pfn || pfn + count > cma->base_pfn + cma->count) {
+		pr_err("%s(): unexpected parameters: count = %d, pfn = 0x%lx, base_pfn = 0x%lx, "
+			"cma_count = %ld\n", __func__, count, pfn, cma->base_pfn, cma->count);
+		return NULL;
+	}
+
+	start = pfn - cma->base_pfn;
+
+	mutex_lock(&cma_mutex);
+
+	pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count, start, count, 0);
+	if (pageno != start) {
+		pr_err("%s(): couldn't allocate the requested area: pfn = 0x%lx, pageno = 0x%lx\n",
+			__func__, pfn, pageno);
+		goto error;
+	}
+
+	ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+	if (ret == 0) {
+		bitmap_set(cma->bitmap, pageno, count);
+	} else {
+		pr_err("%s(): allocation failed, error code %d\n", __func__, ret);
+		goto error;
+	}
+
+	mutex_unlock(&cma_mutex);
+
+	pr_debug("%s(): returned %p\n", __func__, pfn_to_page(pfn));
+	return pfn_to_page(pfn);
+
+error:
+	mutex_unlock(&cma_mutex);
+	return NULL;
+}
+
 /**
  * dma_release_from_contiguous() - release allocated pages
  * @dev:   Pointer to device for which the pages were allocated.
