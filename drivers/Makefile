@@ -137,3 +137,4 @@ obj-$(CONFIG_HYPERV)		+= hv/
 obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
 
 obj-$(CONFIG_OMAP_HSI)		+= omap_hsi/
+obj-$(CONFIG_INPUT_YAS_SENSORS)		+= sensors/
