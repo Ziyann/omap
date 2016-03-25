@@ -58,3 +58,4 @@ obj-$(CONFIG_PHONE)		+= telephony/
 obj-$(CONFIG_RAMSTER)		+= ramster/
 obj-$(CONFIG_USB_WPAN_HCD)	+= ozwpan/
 obj-$(CONFIG_THERMAL_FRAMEWORK)	+= thermal_framework/
+obj-$(CONFIG_SEC_IRLED)		+= sec_irled/
