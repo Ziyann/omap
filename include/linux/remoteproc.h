@@ -277,6 +277,7 @@ struct rproc {
 	unsigned sus_timeout;
 	bool force_suspend;
 	bool need_resume;
+	bool need_restart;
 	struct mutex pm_lock;
 #endif
 	struct pm_qos_request_list *qos_request;
