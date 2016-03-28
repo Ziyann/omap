@@ -758,7 +758,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 	return rc;
 }
 
-static void write_dirty_buffers(struct page *page)
+static void write_dirty_buffers_sync(struct page *page)
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh;
@@ -919,12 +919,14 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 		VM_BUG_ON(PageAnon(page));
 		if (page_has_private(page)) {
 			/* try_to_free_buffers() call below won't try to write
-			 * buffers if they're dirty, so it will fail. */
-			if (PageDirty(page)) {
+			 * buffers if they're dirty, so it will fail. Do this
+			 * only in SYNC mode, though, when extra delay is
+			 * acceptable. */
+			if (PageDirty(page) && mode != MIGRATE_ASYNC) {
 #ifdef CONFIG_CMA_DEBUG_VERBOSE
 				pr_info("__unmap_and_move: flushing dirty page buffers ...\n");
 #endif
-				write_dirty_buffers(page);
+				write_dirty_buffers_sync(page);
 			}
 			if (!try_to_free_buffers(page)) {
 #ifdef CONFIG_CMA_DEBUG_VERBOSE
