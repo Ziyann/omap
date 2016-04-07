@@ -89,6 +89,9 @@ int try_to_unmap_ksm(struct page *page, enum ttu_flags flags);
 int rmap_walk_ksm(struct page *page, int (*rmap_one)(struct page *,
 		  struct vm_area_struct *, unsigned long, void *), void *arg);
 void ksm_migrate_page(struct page *newpage, struct page *oldpage);
+void ksm_start_migration(void);
+void ksm_finalize_migration(unsigned long start_pfn, unsigned long nr_pages);
+void ksm_abort_migration(void);
 
 #else  /* !CONFIG_KSM */
 

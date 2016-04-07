@@ -1786,9 +1786,7 @@ void ksm_migrate_page(struct page *newpage, struct page *oldpage)
 		stable_node->kpfn = page_to_pfn(newpage);
 	}
 }
-#endif /* CONFIG_MIGRATION */
 
-#ifdef CONFIG_MEMORY_HOTREMOVE
 static struct stable_node *ksm_check_stable_tree(unsigned long start_pfn,
 						 unsigned long end_pfn)
 {
@@ -1805,6 +1803,27 @@ static struct stable_node *ksm_check_stable_tree(unsigned long start_pfn,
 	return NULL;
 }
 
+void ksm_start_migration(void)
+{
+	mutex_lock(&ksm_thread_mutex);
+}
+
+void ksm_finalize_migration(unsigned long start_pfn, unsigned long nr_pages)
+{
+	struct stable_node *stable_node;
+	while ((stable_node = ksm_check_stable_tree(start_pfn,
+				start_pfn + nr_pages)) != NULL)
+		remove_node_from_stable_tree(stable_node);
+	mutex_unlock(&ksm_thread_mutex);
+}
+
+void ksm_abort_migration(void)
+{
+	mutex_unlock(&ksm_thread_mutex);
+}
+#endif /* CONFIG_MIGRATION */
+
+#ifdef CONFIG_MEMORY_HOTREMOVE
 static int ksm_memory_callback(struct notifier_block *self,
 			       unsigned long action, void *arg)
 {

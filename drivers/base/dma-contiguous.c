@@ -218,6 +218,7 @@ static int __init cma_init_reserved_areas(void)
 }
 core_initcall(cma_init_reserved_areas);
 
+void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
 /**
  * dma_declare_contiguous() - reserve area for contiguous memory handling
  *			      for particular device
@@ -343,6 +344,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 
 		pfn = cma->base_pfn + pageno;
 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+		pr_debug("base_pfn = 0x%lx, pageno = 0x%lx\n", cma->base_pfn, pageno);
 		if (ret == 0) {
 			bitmap_set(cma->bitmap, pageno, count);
 			break;

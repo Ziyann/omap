@@ -58,6 +58,7 @@
 #include <linux/memcontrol.h>
 #include <linux/prefetch.h>
 #include <linux/migrate.h>
+#include <linux/ksm.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -5298,7 +5299,6 @@ static void __setup_per_zone_wmarks(void)
 			zone->watermark[WMARK_MIN] = min;
 		}
 
-
 		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) +
 					low + (min >> 2);
 		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
@@ -5898,7 +5898,7 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
 
 		ret = migrate_pages(&cc.migratepages,
 				    __alloc_contig_migrate_alloc,
-				    0, false, MIGRATE_SYNC);
+				    0, true, MIGRATE_SYNC);
 	}
 
 	putback_lru_pages(&cc.migratepages);
@@ -5943,7 +5943,7 @@ static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
 						      NULL);
 		if (!did_some_progress) {
 			/* Exhausted what can be done so it's blamo time */
-			out_of_memory(zonelist, gfp_mask, order, NULL, false);
+			out_of_memory(zonelist, gfp_mask, order, NULL);
 		}
 	}
 
@@ -5978,6 +5978,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 {
 	struct zone *zone = page_zone(pfn_to_page(start));
 	unsigned long outer_start, outer_end;
+        bool ksm_migration_started = false;
 	int ret = 0, order;
 
 	/*
@@ -6008,6 +6009,11 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 				       pfn_max_align_up(end), migratetype);
 	if (ret)
 		goto done;
+
+	// Need to take KSM lock, so that we can specify offlining = true
+	// and move KSM pages.
+	ksm_start_migration();
+        ksm_migration_started = true;
 
 	ret = __alloc_contig_migrate_range(start, end);
 	if (ret)
@@ -6070,9 +6076,15 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	if (end != outer_end)
 		free_contig_range(end, outer_end - end);
 
+	// Finalize KSM migration.
+	ksm_finalize_migration(start, end - start);
+
 done:
 	undo_isolate_page_range(pfn_max_align_down(start),
 				pfn_max_align_up(end), migratetype);
+	if (ksm_migration_started) {
+		ksm_abort_migration();
+	}
 	return ret;
 }
 
