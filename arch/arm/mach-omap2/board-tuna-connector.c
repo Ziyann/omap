@@ -504,8 +504,10 @@ static void tuna_fsa_usb_detected(int device)
 			tuna_lte_uart_actions(tuna_otg);
 			break;
 		case TUNA_MANUAL_UART_MODEM:
-		default:
 			tuna_cp_uart_actions(tuna_otg);
+			break;
+		default:
+			tuna_ap_uart_actions(tuna_otg);
 			break;
 		};
 		break;
