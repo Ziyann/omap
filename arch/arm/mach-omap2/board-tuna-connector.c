@@ -897,7 +897,6 @@ static struct i2c_board_info __initdata tuna_i2c5_boardinfo[] = {
 
 int __init omap4_tuna_connector_init(void)
 {
-#if 0
 	struct tuna_otg *tuna_otg = &tuna_otg_xceiv;
 	struct usb_otg *otg;
 	int ret;
@@ -1011,7 +1010,6 @@ int __init omap4_tuna_connector_init(void)
 	tuna_i2c5_boardinfo[0].irq = gpio_to_irq(GPIO_MHL_INT);
 	i2c_register_board_info(5, tuna_i2c5_boardinfo,
 			ARRAY_SIZE(tuna_i2c5_boardinfo));
-#endif
 #endif
 
 	return 0;
