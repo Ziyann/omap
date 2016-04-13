@@ -559,7 +559,8 @@ static int fsa9480_detect_callback(struct otg_id_notifier_block *nb)
 			 * a possibility that we won't charge if it takes
 			 * longer than this for VBUS to be present. */
 			msleep(10);
-			if ((nb_info->detect_set->mask &
+			if (usbsw->pdata->external_vbus_irq >= 0 &&
+				(nb_info->detect_set->mask &
 					FSA9480_DETECT_AV_365K_CHARGER) &&
 					usbsw->pdata->vbus_present()) {
 				_detected(usbsw,
@@ -571,7 +572,8 @@ static int fsa9480_detect_callback(struct otg_id_notifier_block *nb)
 				enable_irq(usbsw->pdata->external_vbus_irq);
 				mutex_unlock(&usbsw->lock);
 				return OTG_ID_HANDLED;
-			} else if ((nb_info->detect_set->mask &
+			} else if (usbsw->pdata->external_vbus_irq >= 0 &&
+					(nb_info->detect_set->mask &
 					FSA9480_DETECT_AV_365K) &&
 					!usbsw->pdata->vbus_present()) {
 				_detected(usbsw, FSA9480_DETECT_AV_365K);
@@ -579,7 +581,8 @@ static int fsa9480_detect_callback(struct otg_id_notifier_block *nb)
 				goto unhandled;
 			}
 			goto handled;
-		} else if ((nb_info->detect_set->mask &
+		} else if (usbsw->pdata->external_vbus_irq >= 0 &&
+				(nb_info->detect_set->mask &
 				FSA9480_DETECT_AV_POWERED) &&
 				usbsw->pdata->vbus_present()) {
 			_detected(usbsw, FSA9480_DETECT_AV_POWERED);
@@ -784,10 +787,7 @@ static int __devinit fsa9480_probe(struct i2c_client *client,
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -EIO;
-	if (!pdata || !pdata->detected || !pdata->enable ||
-			!pdata->mask_vbus_irq || !pdata->unmask_vbus_irq ||
-			!pdata->vbus_present ||
-			(pdata->external_vbus_irq < 0)) {
+	if (!pdata || !pdata->detected || !pdata->enable) {
 		dev_err(&client->dev, "missing/invalid platform data\n");
 		return -EINVAL;
 	}
@@ -823,18 +823,20 @@ static int __devinit fsa9480_probe(struct i2c_client *client,
 		}
 	}
 
-	pdata->mask_vbus_irq();
-	ret = request_threaded_irq(pdata->external_vbus_irq, NULL,
-			vbus_irq_thread, pdata->external_vbus_flags,
-			"external_vbus", usbsw);
-	if (ret) {
-		dev_err(&client->dev,
-				"failed to request vbus IRQ err %d\n",
-				ret);
-		goto err_req_vbus_irq;
+	if (pdata->external_vbus_irq) {
+		pdata->mask_vbus_irq();
+		ret = request_threaded_irq(pdata->external_vbus_irq, NULL,
+				vbus_irq_thread, pdata->external_vbus_flags,
+				"external_vbus", usbsw);
+		if (ret) {
+			dev_err(&client->dev,
+					"failed to request vbus IRQ err %d\n",
+					ret);
+			goto err_req_vbus_irq;
+		}
+		disable_irq(pdata->external_vbus_irq);
+		pdata->unmask_vbus_irq();
 	}
-	disable_irq(pdata->external_vbus_irq);
-	pdata->unmask_vbus_irq();
 
 	/* mask all irqs to prevent event processing between
 	 * request_irq and disable_irq
@@ -932,7 +934,8 @@ err_en_wake:
 	if (client->irq)
 		free_irq(client->irq, usbsw);
 err_req_irq:
-	free_irq(usbsw->pdata->external_vbus_irq, usbsw);
+	if (usbsw->pdata->external_vbus_irq >= 0)
+		free_irq(usbsw->pdata->external_vbus_irq, usbsw);
 err_req_vbus_irq:
 	if (usbsw->pdata->external_id >= 0)
 		free_irq(usbsw->external_id_irq, usbsw);
@@ -973,7 +976,8 @@ static int __devexit fsa9480_remove(struct i2c_client *client)
 		gpio_free(usbsw->pdata->external_id);
 	}
 
-	free_irq(usbsw->pdata->external_vbus_irq, usbsw);
+	if (usbsw->pdata->external_vbus_irq >= 0)
+		free_irq(usbsw->pdata->external_vbus_irq, usbsw);
 
 	i2c_set_clientdata(client, NULL);
 
