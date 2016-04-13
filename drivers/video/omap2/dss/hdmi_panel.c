@@ -175,12 +175,14 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 		goto done_err;
 	}
 
+#ifndef CONFIG_MACH_TUNA
 	r = gpio_request_one(priv->ls_oe_gpio, GPIOF_OUT_INIT_HIGH,
 				"hdmi_gpio_ls_oe");
 	if (r) {
 		DSSERR("Could not get HDMI_GPIO_LS_OE gpio\n");
 		goto done_err1;
 	}
+#endif
 
 #ifndef CONFIG_MACH_OMAP4_BOWSER
 	r = gpio_request_one(priv->hpd_gpio, GPIOF_DIR_IN,
@@ -209,8 +211,10 @@ err_irq:
 	gpio_free(priv->hpd_gpio);
 done_hpd_err:
 #endif
+#ifndef CONFIG_MACH_TUNA
 	gpio_free(priv->ls_oe_gpio);
 done_err1:
+#endif
 	gpio_free(priv->ct_cp_hpd_gpio);
 done_err:
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
@@ -230,7 +234,9 @@ static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 	device_remove_file(&dssdev->dev, &dev_attr_edid);
 	free_irq(gpio_to_irq(hdmi.hpd_gpio), NULL);
 	gpio_free(priv->hpd_gpio);
+#ifndef CONFIG_MACH_TUNA
 	gpio_free(priv->ls_oe_gpio);
+#endif
 	gpio_free(priv->ct_cp_hpd_gpio);
 }
 
