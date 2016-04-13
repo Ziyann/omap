@@ -541,11 +541,13 @@ static struct fsa9480_platform_data tuna_fsa9480_pdata = {
 	.detected		= tuna_fsa_usb_detected,
 	.external_id		= GPIO_USB_OTG_ID,
 
+#if 0 // TODO: fix this to support docks with 365K ID resistor
 	.external_vbus_irq	= TWL6030_VBUS_IRQ,
 	.external_vbus_flags	= TWL6030_VBUS_FLAGS,
 	.mask_vbus_irq		= tuna_otg_mask_vbus_irq,
 	.unmask_vbus_irq	= tuna_otg_unmask_vbus_irq,
 	.vbus_present		= tuna_otg_vbus_present,
+#endif
 };
 
 static struct i2c_board_info __initdata tuna_connector_i2c4_boardinfo[] = {
