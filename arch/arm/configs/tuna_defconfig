@@ -518,7 +518,7 @@ CONFIG_USE_OF=y
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
 # CONFIG_ARM_APPENDED_DTB is not set
-CONFIG_CMDLINE="console=ttyFIQ0 androidboot.console=ttyFIQ0 mem=1G omap_wdt.timer_margin=30 vmalloc=496M androidboot.selinux=permissive omapfb.fb_opt=-1,-1,-1,1,720,1280"
+CONFIG_CMDLINE="console=ttyO2 androidboot.console=ttyO2 mem=1G omap_wdt.timer_margin=30 vmalloc=496M androidboot.selinux=permissive omapfb.fb_opt=-1,-1,-1,1,720,1280"
 # CONFIG_CMDLINE_FROM_BOOTLOADER is not set
 CONFIG_CMDLINE_EXTEND=y
 # CONFIG_CMDLINE_FORCE is not set
