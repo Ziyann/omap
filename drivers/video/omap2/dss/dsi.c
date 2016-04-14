@@ -3682,8 +3682,7 @@ static int dsi_enter_ulps(struct platform_device *dsidev)
 {
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 	DECLARE_COMPLETION_ONSTACK(completion);
-	int r, i;
-	unsigned mask;
+	int r;
 
 	DSSDBGF();
 
@@ -3728,19 +3727,10 @@ static int dsi_enter_ulps(struct platform_device *dsidev)
 	if (r)
 		return r;
 
-	mask = 0;
-
-	for (i = 0; i < dsi->num_lanes_supported; ++i) {
-		if (dsi->lanes[i].function == DSI_LANE_UNUSED)
-			continue;
-		mask |= 1 << i;
-	}
 	/* Assert TxRequestEsc for data lanes and TxUlpsClk for clk lane */
 	/* LANEx_ULPS_SIG2 */
-	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG2, mask, 9, 5);
-
-	/* flush posted write and wait for SCP interface to finish the write */
-	dsi_read_reg(dsidev, DSI_COMPLEXIO_CFG2);
+	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG2, (1 << 0) | (1 << 1) | (1 << 2),
+		7, 5);
 
 	if (wait_for_completion_timeout(&completion,
 				msecs_to_jiffies(1000)) == 0) {
@@ -3753,10 +3743,8 @@ static int dsi_enter_ulps(struct platform_device *dsidev)
 			DSI_CIO_IRQ_ULPSACTIVENOT_ALL0);
 
 	/* Reset LANEx_ULPS_SIG2 */
-	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG2, 0, 9, 5);
-
-	/* flush posted write and wait for SCP interface to finish the write */
-	dsi_read_reg(dsidev, DSI_COMPLEXIO_CFG2);
+	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG2, (0 << 0) | (0 << 1) | (0 << 2),
+		7, 5);
 
 	dsi_cio_power(dsidev, DSI_COMPLEXIO_POWER_ULPS);
 
@@ -3793,17 +3781,10 @@ static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	if (fck != 0) {
-		DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = %lu ns\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-				(total_ticks * 1000) / (fck / 1000 / 1000));
-	}
-	else {
-		DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
-	}
+	DSSDBG("LP_RX_TO %lu ticks (%#x%s%s) = %lu ns\n",
+			total_ticks,
+			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+			(total_ticks * 1000) / (fck / 1000 / 1000));
 }
 
 static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
@@ -3819,7 +3800,7 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, to ? 1 : 0, 31, 31);	/* TA_TO */
+	r = FLD_MOD(r, 0, 31, 31);	/* TA_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 30, 30);	/* TA_TO_X16 */
 	r = FLD_MOD(r, x8 ? 1 : 0, 29, 29);	/* TA_TO_X8 */
 	r = FLD_MOD(r, ticks, 28, 16);	/* TA_TO_COUNTER */
@@ -3827,22 +3808,15 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x8 ? 8 : 1);
 
-	if (fck != 0) {
-		DSSDBG("TA_TO %lu ticks (%#x%s%s) = %lu ns\n",
-				total_ticks,
-				ticks, x8 ? " x8" : "", x16 ? " x16" : "",
-				(total_ticks * 1000) / (fck / 1000 / 1000));
-	}
-	else {
-		DSSDBG("TA_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
-				total_ticks,
-				ticks, x8 ? " x8" : "", x16 ? " x16" : "");
-	}
+	DSSDBG("TA_TO %lu ticks (%#x%s%s) = %lu ns\n",
+			total_ticks,
+			ticks, x8 ? " x8" : "", x16 ? " x16" : "",
+			(total_ticks * 1000) / (fck / 1000 / 1000));
 }
 
 static void dsi_set_stop_state_counter(struct platform_device *dsidev,
-		unsigned ticks, bool x4, bool x16,
-		bool stop_mode)
+				       unsigned ticks, bool x4, bool x16,
+				       bool stop_mode)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3862,17 +3836,10 @@ static void dsi_set_stop_state_counter(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	if (fck != 0) {
-		DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = %lu ns\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-				(total_ticks * 1000) / (fck / 1000 / 1000));
-	}
-	else {
-		DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
-	}
+	DSSDBG("STOP_STATE_COUNTER %lu ticks (%#x%s%s) = %lu ns\n",
+			total_ticks,
+			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+			(total_ticks * 1000) / (fck / 1000 / 1000));
 }
 
 static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
@@ -3896,17 +3863,10 @@ static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
 
 	total_ticks = ticks * (x16 ? 16 : 1) * (x4 ? 4 : 1);
 
-	if (fck != 0) {
-		DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = %lu ns\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "",
-				(total_ticks * 1000) / (fck / 1000 / 1000));
-	}
-	else {
-		DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = 0 ns(fck==0)\n",
-				total_ticks,
-				ticks, x4 ? " x4" : "", x16 ? " x16" : "");
-	}
+	DSSDBG("HS_TX_TO %lu ticks (%#x%s%s) = %lu ns\n",
+			total_ticks,
+			ticks, x4 ? " x4" : "", x16 ? " x16" : "",
+			(total_ticks * 1000) / (fck / 1000 / 1000));
 }
 
 static void dsi_config_vp_num_line_buffers(struct omap_dss_device *dssdev)
@@ -3975,38 +3935,6 @@ static void dsi_config_blanking_modes(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, hbp_blanking_mode, 22, 22);	/* HBP_BLANKING */
 	r = FLD_MOD(r, hsa_blanking_mode, 23, 23);	/* HSA_BLANKING */
 	dsi_write_reg(dsidev, DSI_CTRL, r);
-}
-
-static int dsi_compute_interleave_hs(int blank, bool ddr_alwon, int enter_hs,
-		int exit_hs, int ddr_pre, int ddr_post)
-{
-	int transition, trans1, trans2;
-
-	if (ddr_alwon) {
-		transition = enter_hs + exit_hs + max(enter_hs, 2) + 1;
-	} else {
-		trans1 = ddr_pre + enter_hs + exit_hs + max(enter_hs, 2) + 1;
-		trans2 = ddr_pre + enter_hs + ddr_post + ddr_pre + enter_hs + 1;
-		transition = max(trans1, trans2);
-	}
-
-	return blank > transition ? blank - transition : 0;
-}
-
-
-static int dsi_compute_interleave_lp(int blank, int enter_hs, int exit_hs,
-		int lp_clk_div, int regm_dsi)
-{
-	int trans_lp, lp_avail, lp_inter, dsi_hsdiv;
-
-	dsi_hsdiv = regm_dsi - 1;
-
-	trans_lp = exit_hs + max(enter_hs, 2) + 1;
-	lp_avail = 16 * (blank - trans_lp);	/* unit is clkin4DDR */
-	lp_inter = ((lp_avail - 8 * 16 - 5 * dsi_hsdiv) / dsi_hsdiv
-			/ lp_clk_div - 26) / 16;
-
-	return max(lp_inter, 0);
 }
 
 static void dsi_check_dispc_hsync_period(struct omap_dss_device *dssdev)
@@ -4206,117 +4134,6 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 
 	DSSDBG("enter_hs_mode_lat %u, exit_hs_mode_lat %u\n",
 			enter_hs_mode_lat, exit_hs_mode_lat);
-
-	 if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
-		/* TODO: Implement a video mode check_timings function */
-		int hsa = dssdev->panel.dsi_vm_data.hsa;
-		int hfp = dssdev->panel.dsi_vm_data.hfp;
-		int hbp = dssdev->panel.dsi_vm_data.hbp;
-		int vsa = dssdev->panel.dsi_vm_data.vsa;
-		int vfp = dssdev->panel.dsi_vm_data.vfp;
-		int vbp = dssdev->panel.dsi_vm_data.vbp;
-		int window_sync = dssdev->panel.dsi_vm_data.window_sync;
-		bool hsync_end = dssdev->panel.dsi_vm_data.vp_hsync_end;
-		bool ddr_alwon = dssdev->panel.dsi_vm_data.ddr_clk_always_on;
-		int lp_clk_div = dssdev->clocks.dsi.lp_clk_div;
-		int regm_dsi = dssdev->clocks.dsi.regm_dsi;
-		struct omap_video_timings *timings = &dssdev->panel.timings;
-		int bpp = dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt);
-		int tl, t_he, width_bytes;
-		int hsa_interleave_hs, hsa_interleave_lp;
-		int hfp_interleave_hs, hfp_interleave_lp;
-		int hbp_interleave_hs, hbp_interleave_lp;
-		int bl_interleave_hs, bl_interleave_lp, bllp;
-
-		t_he = hsync_end ?
-			((hsa == 0 && ndl == 3) ? 1 : DIV_ROUND_UP(4, ndl)) : 0;
-
-		width_bytes = DIV_ROUND_UP(timings->x_res * bpp, 8);
-
-		/* TL = t_HS + HSA + t_HE + HFP + ceil((WC + 6) / NDL) + HBP */
-		tl = DIV_ROUND_UP(4, ndl) + (hsync_end ? hsa : 0) + t_he + hfp +
-			DIV_ROUND_UP(width_bytes + 6, ndl) + hbp;
-
-		DSSDBG("HBP: %d, HFP: %d, HSA: %d, TL: %d TXBYTECLKHS\n", hbp,
-			hfp, hsync_end ? hsa : 0, tl);
-		DSSDBG("VBP: %d, VFP: %d, VSA: %d, VACT: %d lines\n", vbp, vfp,
-			vsa, timings->y_res);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING1);
-		r = FLD_MOD(r, hbp, 11, 0);	/* HBP */
-		r = FLD_MOD(r, hfp, 23, 12);	/* HFP */
-		r = FLD_MOD(r, hsync_end ? hsa : 0, 31, 24);	/* HSA */
-		dsi_write_reg(dsidev, DSI_VM_TIMING1, r);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING2);
-		r = FLD_MOD(r, vbp, 7, 0);	/* VBP */
-		r = FLD_MOD(r, vfp, 15, 8);	/* VFP */
-		r = FLD_MOD(r, vsa, 23, 16);	/* VSA */
-		r = FLD_MOD(r, window_sync, 27, 24);	/* WINDOW_SYNC */
-		dsi_write_reg(dsidev, DSI_VM_TIMING2, r);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING3);
-		r = FLD_MOD(r, timings->y_res, 14, 0);	/* VACT */
-		r = FLD_MOD(r, tl, 31, 16);		/* TL */
-		dsi_write_reg(dsidev, DSI_VM_TIMING3, r);
-
-		/* Command mode interleave configuration */
-
-		hsa_interleave_hs = dsi_compute_interleave_hs(hsa, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hfp_interleave_hs = dsi_compute_interleave_hs(hfp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hbp_interleave_hs = dsi_compute_interleave_hs(hbp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hsa_interleave_lp = dsi_compute_interleave_lp(hsa,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		hfp_interleave_lp = dsi_compute_interleave_lp(hfp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		hbp_interleave_lp = dsi_compute_interleave_lp(hbp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		/*
-		 * BLLP gap is between HE and HS short packets during vertical
-		 * blanking
-		 */
-		bllp = hbp + hfp + DIV_ROUND_UP(width_bytes + 6, ndl);
-
-		bl_interleave_hs = dsi_compute_interleave_hs(bllp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		bl_interleave_lp = dsi_compute_interleave_lp(bllp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING4);
-		r = FLD_MOD(r, hsa_interleave_hs, 23, 16);
-		r = FLD_MOD(r, hfp_interleave_hs, 15, 8);
-		r = FLD_MOD(r, hbp_interleave_hs, 7, 0);
-		dsi_write_reg(dsidev, DSI_VM_TIMING4, r);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING5);
-		r = FLD_MOD(r, hsa_interleave_lp, 23, 16);
-		r = FLD_MOD(r, hfp_interleave_lp, 15, 8);
-		r = FLD_MOD(r, hbp_interleave_lp, 7, 0);
-		dsi_write_reg(dsidev, DSI_VM_TIMING5, r);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING6);
-		r = FLD_MOD(r, bl_interleave_hs, 31, 15);
-		r = FLD_MOD(r, bl_interleave_lp, 16, 0);
-		dsi_write_reg(dsidev, DSI_VM_TIMING6, r);
-	}
 }
 
 static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev,
