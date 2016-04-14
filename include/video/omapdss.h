@@ -135,6 +135,11 @@ enum omap_panel_config {
 	OMAP_DSS_LCD_TFT		= 1<<20,
 };
 
+enum omap_dss_dsi_type {
+	OMAP_DSS_DSI_TYPE_CMD_MODE = 0,
+	OMAP_DSS_DSI_TYPE_VIDEO_MODE,
+};
+
 enum omap_dss_venc_type {
 	OMAP_DSS_VENC_TYPE_COMPOSITE,
 	OMAP_DSS_VENC_TYPE_SVIDEO,
@@ -193,7 +198,7 @@ enum omap_overlay_caps {
 };
 
 enum omap_overlay_manager_caps {
-	OMAP_DSS_DUMMY_VALUE, /* add a dummy value to prevent compiler error */
+	OMAP_DSS_OVL_MGR_CAP_DISPC = 1 << 0,
 };
 
 enum omap_dss_clk_source {
