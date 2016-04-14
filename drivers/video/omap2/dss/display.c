@@ -367,18 +367,14 @@ int omapdss_default_get_recommended_bpp(struct omap_dss_device *dssdev)
 {
 	switch (dssdev->type) {
 	case OMAP_DISPLAY_TYPE_DPI:
-		if (dssdev->phy.dpi.data_lines == 24)
+		if (dssdev->phy.dpi.data_lines > 16)
 			return 24;
 		else
 			return 16;
 
 	case OMAP_DISPLAY_TYPE_DBI:
-		if (dssdev->ctrl.pixel_size == 24)
-			return 24;
-		else
-			return 16;
 	case OMAP_DISPLAY_TYPE_DSI:
-		if (dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt) > 16)
+		if (dssdev->ctrl.pixel_size > 16)
 			return 24;
 		else
 			return 16;
@@ -417,10 +413,8 @@ bool dss_use_replication(struct omap_dss_device *dssdev,
 		bpp = 24;
 		break;
 	case OMAP_DISPLAY_TYPE_DBI:
-		bpp = dssdev->ctrl.pixel_size;
-		break;
 	case OMAP_DISPLAY_TYPE_DSI:
-		bpp = dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt);
+		bpp = dssdev->ctrl.pixel_size;
 		break;
 	default:
 		BUG();
@@ -476,6 +470,8 @@ void dss_init_device(struct platform_device *pdev,
 		return;
 	}
 
+	BLOCKING_INIT_NOTIFIER_HEAD(&dssdev->state_notifiers);
+
 	/* create device sysfs files */
 	i = 0;
 	while ((attr = display_sysfs_attrs[i++]) != NULL) {
@@ -483,8 +479,6 @@ void dss_init_device(struct platform_device *pdev,
 		if (r)
 			DSSERR("failed to create sysfs file\n");
 	}
-
-	BLOCKING_INIT_NOTIFIER_HEAD(&dssdev->state_notifiers);
 
 	/* create display? sysfs links */
 	r = sysfs_create_link(&pdev->dev.kobj, &dssdev->dev.kobj,
