@@ -190,7 +190,7 @@ static int s6e8aa0_write_block_nosync(struct s6e8aa0_data *s6, const u8 *data, i
 
 static int s6e8aa0_read_block(struct s6e8aa0_data *s6, u8 cmd, u8 *data, int len)
 {
-	return dsi_vc_generic_read_1(s6->dssdev, s6->channel1, cmd, data, len);
+	return dsi_vc_dcs_read(s6->dssdev, s6->channel1, cmd, data, len);
 }
 
 static void s6e8aa0_write_sequence(struct s6e8aa0_data *s6, const struct s6e8aa0_sequence_entry *seq, int seq_len)
@@ -1003,6 +1003,8 @@ static void s6e8aa0_adjust_brightness_from_mtp(struct s6e8aa0_data *s6)
 	struct s6e8aa0_gamma_entry *brightness_table;
 	int brightness_table_size = 1;
 
+	dev_info(&s6->dssdev->dev, "%s\n", __func__);
+
 	for (b = 0; b < 2; b++)
 		for (i = 0; i < V_COUNT; i++)
 			if (fi->brightness[b][i])
@@ -1527,7 +1529,7 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 	};
 	struct s6e8aa0_data *s6 = NULL;
 
-	dev_dbg(&dssdev->dev, "s6e8aa0_probe\n");
+	dev_info(&dssdev->dev, "%s enter\n", __func__);
 
 	if (dssdev->data == NULL) {
 		dev_err(&dssdev->dev, "no platform data!\n");
@@ -1619,7 +1621,7 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 		goto err_backlight_device_register;
 	}
 
-	dev_dbg(&dssdev->dev, "s6e8aa0_probe\n");
+	dev_info(&dssdev->dev, "%s exit\n", __func__);
 	return ret;
 
 err_backlight_device_register:
@@ -1653,6 +1655,9 @@ static void s6e8aa0_config(struct omap_dss_device *dssdev)
 {
 	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
 	struct panel_s6e8aa0_data *pdata = s6->pdata;
+
+	dev_info(&dssdev->dev, "%s enter\n", __func__);
+
 	if (!s6->brightness_table) {
 		s6e8aa0_read_id_info(s6);
 		s6e8aa0_read_mtp_info(s6, 0);
@@ -1669,12 +1674,16 @@ static void s6e8aa0_config(struct omap_dss_device *dssdev)
 
 	s6e8aa0_write_sequence(s6, pdata->seq_etc_set,
 			       pdata->seq_etc_set_size);
+
+	dev_info(&dssdev->dev, "%s exit\n", __func__);
 }
 
 static int s6e8aa0_power_on(struct omap_dss_device *dssdev)
 {
 	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
 	int r = 0;
+
+	dev_info(&dssdev->dev, "%s enter\n", __func__);
 
 	dsi_bus_lock(dssdev);
 
@@ -1694,6 +1703,7 @@ static int s6e8aa0_power_on(struct omap_dss_device *dssdev)
 
 		/* reset s6e8aa0 bridge */
 		if (!dssdev->skip_init) {
+			dev_info(&dssdev->dev, "reset s6e8aa0 bridge\n");
 			s6e8aa0_hw_reset(dssdev);
 
 			/* XXX */
@@ -1703,8 +1713,10 @@ static int s6e8aa0_power_on(struct omap_dss_device *dssdev)
 
 			s6e8aa0_config(dssdev);
 
-			dsi_enable_video_output(dssdev, s6->channel0);
+			r = dsi_enable_video_output(dssdev, s6->channel0);
 			// HASH: TODO dsi_video_mode_enable(dssdev, 0x3E); /* DSI_DT_PXLSTREAM_24BPP_PACKED; */
+			if (r)
+				dev_err(&dssdev->dev, "failed to enable video output\n");
 		}
 
 		s6->enabled = 1;
@@ -1712,6 +1724,8 @@ static int s6e8aa0_power_on(struct omap_dss_device *dssdev)
 
 	if (dssdev->skip_init)
 		dssdev->skip_init = false;
+
+	dev_info(&dssdev->dev, "%s exit\n", __func__);
 
 err:
 	dsi_bus_unlock(dssdev);
@@ -1740,7 +1754,7 @@ static void s6e8aa0_disable(struct omap_dss_device *dssdev)
 {
 	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
 
-	dev_dbg(&dssdev->dev, "disable\n");
+	dev_info(&dssdev->dev, "disable\n");
 
 	mutex_lock(&s6->lock);
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
@@ -1756,7 +1770,7 @@ static int s6e8aa0_enable(struct omap_dss_device *dssdev)
 	int ret;
 	unsigned long pclk;
 
-	dev_dbg(&dssdev->dev, "enable\n");
+	dev_info(&dssdev->dev, "%s enter\n", __func__);
 
 	mutex_lock(&s6->lock);
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
@@ -1766,7 +1780,7 @@ static int s6e8aa0_enable(struct omap_dss_device *dssdev)
 
 	ret = s6e8aa0_power_on(dssdev);
 	if (ret) {
-		dev_dbg(&dssdev->dev, "enable failed\n");
+		dev_err(&dssdev->dev, "enable failed\n");
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	} else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
@@ -1779,6 +1793,9 @@ static int s6e8aa0_enable(struct omap_dss_device *dssdev)
 
 out:
 	mutex_unlock(&s6->lock);
+
+	dev_info(&dssdev->dev, "%s exit\n", __func__);
+
 	return ret;
 }
 
@@ -1833,7 +1850,7 @@ static int s6e8aa0_resume(struct omap_dss_device *dssdev)
 	int ret;
 	unsigned long pclk;
 
-	dev_dbg(&dssdev->dev, "resume\n");
+	dev_info(&dssdev->dev, "resume\n");
 
 	mutex_lock(&s6->lock);
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
@@ -1843,7 +1860,7 @@ static int s6e8aa0_resume(struct omap_dss_device *dssdev)
 
 	ret = s6e8aa0_power_on(dssdev);
 	if (ret) {
-		dev_dbg(&dssdev->dev, "resume failed\n");
+		dev_err(&dssdev->dev, "resume failed\n");
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	} else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
@@ -1864,7 +1881,7 @@ static int s6e8aa0_suspend(struct omap_dss_device *dssdev)
 	struct s6e8aa0_data *s6 = dev_get_drvdata(&dssdev->dev);
 	int ret = 0;
 
-	dev_dbg(&dssdev->dev, "suspend\n");
+	dev_info(&dssdev->dev, "suspend\n");
 
 	mutex_lock(&s6->lock);
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {

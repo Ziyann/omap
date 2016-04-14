@@ -3311,70 +3311,25 @@ int dsi_vc_dcs_write_1(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 }
 EXPORT_SYMBOL(dsi_vc_dcs_write_1);
 
-static int dsi_vc_dcs_send_read_request(struct omap_dss_device *dssdev,
-		int channel, u8 dcs_cmd)
+int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
+		u8 *buf, int buflen)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
-	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
-	int r;
-
-	if (dsi->debug_read)
-		DSSDBG("dsi_vc_dcs_send_read_request(ch%d, dcs_cmd %x)\n",
-			channel, dcs_cmd);
-
-	r = dsi_vc_send_short(dsidev, channel, MIPI_DSI_DCS_READ, dcs_cmd, 0);
-	if (r) {
-		DSSERR("dsi_vc_dcs_send_read_request(ch %d, cmd 0x%02x)"
-			" failed\n", channel, dcs_cmd);
-		return r;
-	}
-
-	return 0;
-}
-
-static int dsi_vc_generic_send_read_request(struct omap_dss_device *dssdev,
-		int channel, u8 *reqdata, int reqlen)
-{
-	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
-	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
-	u16 data;
-	u8 data_type;
-	int r;
-
-	if (dsi->debug_read)
-		DSSDBG("dsi_vc_generic_send_read_request(ch %d, reqlen %d)\n",
-			channel, reqlen);
-
-	if (reqlen == 0) {
-		data_type = MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM;
-		data = 0;
-	} else if (reqlen == 1) {
-		data_type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
-		data = reqdata[0];
-	} else if (reqlen == 2) {
-		data_type = MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM;
-		data = reqdata[0] | (reqdata[1] << 8);
-	} else {
-		BUG();
-	}
-
-	r = dsi_vc_send_short(dsidev, channel, data_type, data, 0);
-	if (r) {
-		DSSERR("dsi_vc_generic_send_read_request(ch %d, reqlen %d)"
-			" failed\n", channel, reqlen);
-		return r;
-	}
-
-	return 0;
-}
-
-static int dsi_vc_read_rx_fifo(struct platform_device *dsidev, int channel,
-		u8 *buf, int buflen, enum dss_dsi_content_type type)
-{
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 	u32 val;
 	u8 dt;
 	int r;
+
+	if (dsi->debug_read)
+		DSSDBG("%s(ch%d, dcs_cmd %x)\n", __func__, channel, dcs_cmd);
+
+	r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_READ, dcs_cmd, 0);
+	if (r)
+		goto err;
+
+	r = dsi_vc_send_bta_sync(dssdev, channel);
+	if (r)
+		goto err;
 
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20) == 0) {
@@ -3387,15 +3342,13 @@ static int dsi_vc_read_rx_fifo(struct platform_device *dsidev, int channel,
 	if (dsi->debug_read)
 		DSSDBG("\theader: %08x\n", val);
 	dt = FLD_GET(val, 5, 0);
-	if (dt == MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT) {
+	if (dt == DSI_DT_RX_ACK_WITH_ERR) {
 		u16 err = FLD_GET(val, 23, 8);
 		dsi_show_rx_ack_with_err(err);
 		r = -EIO;
 		goto err;
 
-	} else if (dt == (type == DSS_DSI_CONTENT_GENERIC ?
-			MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE :
-			MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE)) {
+	} else if (dt == DSI_DT_RX_SHORT_READ_1) {
 		u8 data = FLD_GET(val, 15, 8);
 		if (dsi->debug_read)
 			DSSDBG("\tDCS short response, 1 byte: %02x\n", data);
@@ -3408,9 +3361,7 @@ static int dsi_vc_read_rx_fifo(struct platform_device *dsidev, int channel,
 		buf[0] = data;
 
 		return 1;
-	} else if (dt == (type == DSS_DSI_CONTENT_GENERIC ?
-			MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_2BYTE :
-			MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_2BYTE)) {
+	} else if (dt == DSI_DT_RX_SHORT_READ_2) {
 		u16 data = FLD_GET(val, 23, 8);
 		if (dsi->debug_read)
 			DSSDBG("\tDCS short response, 2 byte: %04x\n", data);
@@ -3424,8 +3375,11 @@ static int dsi_vc_read_rx_fifo(struct platform_device *dsidev, int channel,
 		buf[1] = (data >> 8) & 0xff;
 
 		return 2;
-	} else if (dt == MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE ||
-				 dt == MIPI_DSI_RX_DCS_LONG_READ_RESPONSE) {
+#ifdef CONFIG_MACH_TUNA
+	} else if (dt == DSI_DT_RX_DCS_LONG_READ || dt == DSI_DT_RX_LONG_READ) {
+#else
+	} else if (dt == DSI_DT_RX_DCS_LONG_READ) {
+#endif
 		int w;
 		int len = FLD_GET(val, 23, 8);
 		if (dsi->debug_read)
@@ -3465,19 +3419,83 @@ static int dsi_vc_read_rx_fifo(struct platform_device *dsidev, int channel,
 
 	BUG();
 err:
-	DSSERR("dsi_vc_read_rx_fifo(ch %d type %s) failed\n", channel,
-		type == DSS_DSI_CONTENT_GENERIC ? "GENERIC" : "DCS");
-
+	DSSERR("%s(ch %d, cmd 0x%02x) failed\n",
+			__func__, channel, dcs_cmd);
 	return r;
 }
+EXPORT_SYMBOL(dsi_vc_dcs_read);
 
-int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
-		u8 *buf, int buflen)
+int dsi_vc_dcs_read_1(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
+		u8 *data)
+{
+	int r;
+
+	r = dsi_vc_dcs_read(dssdev, channel, dcs_cmd, data, 1);
+
+	if (r < 0)
+		return r;
+
+	if (r != 1)
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL(dsi_vc_dcs_read_1);
+
+int dsi_vc_dcs_read_2(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
+		u8 *data1, u8 *data2)
+{
+	u8 buf[2];
+	int r;
+
+	r = dsi_vc_dcs_read(dssdev, channel, dcs_cmd, buf, 2);
+
+	if (r < 0)
+		return r;
+
+	if (r != 2)
+		return -EIO;
+
+	*data1 = buf[0];
+	*data2 = buf[1];
+
+	return 0;
+}
+EXPORT_SYMBOL(dsi_vc_dcs_read_2);
+
+
+int dsi_vc_gen_write_nosync(struct omap_dss_device *dssdev, int channel,
+		u8 *data, int len)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	int r;
 
-	r = dsi_vc_dcs_send_read_request(dssdev, channel, dcs_cmd);
+	BUG_ON(len == 0);
+
+	if (len == 1) {
+		BUG();
+		r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_SHORT_WRITE_0,
+				data[0], 0);
+	} else if (len == 2) {
+		BUG();
+		r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_SHORT_WRITE_1,
+				data[0] | (data[1] << 8), 0);
+	} else {
+		r = dsi_vc_send_long(dsidev, channel, DSI_DT_GENERIC_LONG_WRITE,
+				data, len, 0);
+	}
+
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_gen_write_nosync);
+
+int dsi_vc_gen_write(struct omap_dss_device *dssdev, int channel, u8 *data,
+		int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	int r;
+
+	r = dsi_vc_gen_write_nosync(dssdev, channel, data, len);
 	if (r)
 		goto err;
 
@@ -3485,98 +3503,132 @@ int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 	if (r)
 		goto err;
 
-	r = dsi_vc_read_rx_fifo(dsidev, channel, buf, buflen,
-		DSS_DSI_CONTENT_DCS);
-	if (r < 0)
-		goto err;
-
-	if (r != buflen) {
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20)) {
+		DSSERR("rx fifo not empty after write, dumping data:\n");
+		dsi_vc_flush_receive_data(dsidev, channel);
 		r = -EIO;
 		goto err;
 	}
 
 	return 0;
 err:
-	DSSERR("dsi_vc_dcs_read(ch %d, cmd 0x%02x) failed\n", channel, dcs_cmd);
+	DSSERR("dsi_vc_gen_write(ch %d, len %d) failed\n",
+			channel, len);
 	return r;
 }
-EXPORT_SYMBOL(dsi_vc_dcs_read);
+EXPORT_SYMBOL(dsi_vc_gen_write);
 
-static int dsi_vc_generic_read(struct omap_dss_device *dssdev, int channel,
-		u8 *reqdata, int reqlen, u8 *buf, int buflen)
+int dsi_vc_gen_read_2(struct omap_dss_device *dssdev, int channel, u16 cmd,
+		u8 *buf, int buflen)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+	u32 val;
+	u8 dt;
 	int r;
 
-	r = dsi_vc_generic_send_read_request(dssdev, channel, reqdata, reqlen);
+	if (dsi->debug_read)
+		DSSDBG("%s(ch%d, cmd %x)\n", __func__, channel, cmd);
+
+	r = dsi_vc_send_short(dsidev, channel, DSI_DT_GENERIC_READ_2, cmd, 0);
 	if (r)
-		return r;
+		goto err;
 
 	r = dsi_vc_send_bta_sync(dssdev, channel);
 	if (r)
-		return r;
+		goto err;
 
-	r = dsi_vc_read_rx_fifo(dsidev, channel, buf, buflen,
-		DSS_DSI_CONTENT_GENERIC);
-	if (r < 0)
-		return r;
-
-	if (r != buflen) {
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20) == 0) {
+		DSSERR("RX fifo empty when trying to read.\n");
 		r = -EIO;
-		return r;
+		goto err;
 	}
 
-	return 0;
-}
+	val = dsi_read_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(channel));
+	if (dsi->debug_read)
+		DSSDBG("\theader: %08x\n", val);
+	dt = FLD_GET(val, 5, 0);
+	if (dt == DSI_DT_RX_ACK_WITH_ERR) {
+		u16 err = FLD_GET(val, 23, 8);
+		dsi_show_rx_ack_with_err(err);
+		r = -EIO;
+		goto err;
 
-int dsi_vc_generic_read_0(struct omap_dss_device *dssdev, int channel, u8 *buf,
-		int buflen)
-{
-	int r;
+	} else if (dt == DSI_DT_RX_SHORT_READ_1) {
+		u8 data = FLD_GET(val, 15, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS short response, 1 byte: %02x\n", data);
 
-	r = dsi_vc_generic_read(dssdev, channel, NULL, 0, buf, buflen);
-	if (r) {
-		DSSERR("dsi_vc_generic_read_0(ch %d) failed\n", channel);
-		return r;
+		if (buflen < 1) {
+			r = -EIO;
+			goto err;
+		}
+
+		buf[0] = data;
+
+		return 1;
+	} else if (dt == DSI_DT_RX_SHORT_READ_2) {
+		u16 data = FLD_GET(val, 23, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS short response, 2 byte: %04x\n", data);
+
+		if (buflen < 2) {
+			r = -EIO;
+			goto err;
+		}
+
+		buf[0] = data & 0xff;
+		buf[1] = (data >> 8) & 0xff;
+
+		return 2;
+	} else if (dt == DSI_DT_RX_LONG_READ) {
+		int w;
+		int len = FLD_GET(val, 23, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS long response, len %d\n", len);
+
+		if (len > buflen) {
+			r = -EIO;
+			goto err;
+		}
+
+		/* two byte checksum ends the packet, not included in len */
+		for (w = 0; w < len + 2;) {
+			int b;
+			val = dsi_read_reg(dsidev,
+				DSI_VC_SHORT_PACKET_HEADER(channel));
+			if (dsi->debug_read)
+				DSSDBG("\t\t%02x %02x %02x %02x\n",
+						(val >> 0) & 0xff,
+						(val >> 8) & 0xff,
+						(val >> 16) & 0xff,
+						(val >> 24) & 0xff);
+
+			for (b = 0; b < 4; ++b) {
+				if (w < len)
+					buf[w] = (val >> (b * 8)) & 0xff;
+				/* we discard the 2 byte checksum */
+				++w;
+			}
+		}
+
+		return len;
+	} else {
+		DSSERR("\tunknown datatype 0x%02x\n", dt);
+		r = -EIO;
+		goto err;
 	}
 
-	return 0;
+	BUG();
+err:
+	DSSERR("%s(ch %d, cmd 0x%02x) failed\n",
+			__func__, channel, cmd);
+	return r;
+
 }
-EXPORT_SYMBOL(dsi_vc_generic_read_0);
-
-int dsi_vc_generic_read_1(struct omap_dss_device *dssdev, int channel, u8 param,
-		u8 *buf, int buflen)
-{
-	int r;
-
-	r = dsi_vc_generic_read(dssdev, channel, &param, 1, buf, buflen);
-	if (r) {
-		DSSERR("dsi_vc_generic_read_1(ch %d) failed\n", channel);
-		return r;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(dsi_vc_generic_read_1);
-
-int dsi_vc_generic_read_2(struct omap_dss_device *dssdev, int channel,
-		u8 param1, u8 param2, u8 *buf, int buflen)
-{
-	int r;
-	u8 reqdata[2];
-
-	reqdata[0] = param1;
-	reqdata[1] = param2;
-
-	r = dsi_vc_generic_read(dssdev, channel, reqdata, 2, buf, buflen);
-	if (r) {
-		DSSERR("dsi_vc_generic_read_2(ch %d) failed\n", channel);
-		return r;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(dsi_vc_generic_read_2);
+EXPORT_SYMBOL(dsi_vc_gen_read_2);
 
 int dsi_vc_set_max_rx_packet_size(struct omap_dss_device *dssdev, int channel,
 		u16 len)
