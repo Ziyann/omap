@@ -33,10 +33,8 @@
 #include <linux/pm_runtime.h>
 
 #include <video/omapdss.h>
-
 #include <plat/cpu.h>
 #include <plat/clock.h>
-
 #include "dss.h"
 #include "dss_features.h"
 
@@ -340,7 +338,7 @@ void dss_select_dsi_clk_source(int dsi_module,
 		enum omap_dss_clk_source clk_src)
 {
 	struct platform_device *dsidev;
-	int b, pos;
+	int b;
 
 	switch (clk_src) {
 	case OMAP_DSS_CLK_SRC_FCK:
@@ -362,9 +360,7 @@ void dss_select_dsi_clk_source(int dsi_module,
 		BUG();
 	}
 
-	pos = dsi_module == 0 ? 1 : 10;
-
-	REG_FLD_MOD(DSS_CONTROL, b, pos, pos);	/* DSIx_CLK_SWITCH */
+	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
 
 	dss.dsi_clk_source[dsi_module] = clk_src;
 }
@@ -437,9 +433,6 @@ int dss_calc_clock_rates(struct dss_clock_info *cinfo)
 		if (cpu_is_omap3630() || cpu_is_omap44xx())
 			fck_div_max = 32;
 
-		if (cpu_is_omap54xx())
-			fck_div_max = 64;
-
 		if (cinfo->fck_div > fck_div_max || cinfo->fck_div == 0)
 			return -EINVAL;
 
@@ -486,7 +479,7 @@ int dss_get_clock_div(struct dss_clock_info *cinfo)
 
 		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
 
-		if (cpu_is_omap3630() || cpu_is_omap44xx() || cpu_is_omap54xx())
+		if (cpu_is_omap3630() || cpu_is_omap44xx())
 			cinfo->fck_div = prate / (cinfo->fck);
 		else
 			cinfo->fck_div = prate / (cinfo->fck / 2);
@@ -567,13 +560,10 @@ retry:
 		if (cpu_is_omap3630() || cpu_is_omap44xx())
 			fck_div_max = 32;
 
-		if (cpu_is_omap54xx())
-			fck_div_max = 64;
-
 		for (fck_div = fck_div_max; fck_div > 0; --fck_div) {
 			struct dispc_clock_info cur_dispc;
 
-			if (fck_div_max == 32 || fck_div_max == 64)
+			if (fck_div_max == 32)
 				fck = prate / fck_div;
 			else
 				fck = prate / fck_div * 2;
@@ -658,10 +648,6 @@ void dss_set_dpi_channel(int channel)
 
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select hdmi)
 {
-	/* TV clock is not selectable on OMAP5 */
-	if (cpu_is_omap54xx())
-		return;
-
 	REG_FLD_MOD(DSS_CONTROL, hdmi, 15, 15);	/* VENC_HDMI_SWITCH */
 }
 
@@ -705,13 +691,6 @@ static int dss_get_clocks(void)
 		clk = clk_get(NULL, "dpll_per_m5x2_ck");
 		if (IS_ERR(clk)) {
 			DSSERR("Failed to get dpll_per_m5x2_ck\n");
-			r = PTR_ERR(clk);
-			goto err;
-		}
-	} else if (cpu_is_omap54xx()) {
-		clk = clk_get(NULL, "dpll_per_h12x2_ck");
-		if (IS_ERR(clk)) {
-			DSSERR("Failed to get dpll_per_h12x2_ck\n");
 			r = PTR_ERR(clk);
 			goto err;
 		}
@@ -786,7 +765,6 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 		DSSERR("can't get IORESOURCE_MEM DSS\n");
 		return -EINVAL;
 	}
-
 	dss.base = devm_ioremap(&pdev->dev, dss_mem->start,
 				resource_size(dss_mem));
 	if (!dss.base) {

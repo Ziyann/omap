@@ -445,19 +445,19 @@ static void omap_dss_driver_disable(struct omap_dss_device *dssdev)
 {
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
 		blocking_notifier_call_chain(&dssdev->state_notifiers,
-				OMAP_DSS_DISPLAY_DISABLED, dssdev);
+					OMAP_DSS_DISPLAY_DISABLED, dssdev);
 	dssdev->driver->disable_orig(dssdev);
 }
 
 static int omap_dss_driver_enable(struct omap_dss_device *dssdev)
 {
-	int r = dssdev->driver->enable_orig(dssdev);
+	int r;
+	r = dssdev->driver->enable_orig(dssdev);
 	if (!r && dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		blocking_notifier_call_chain(&dssdev->state_notifiers,
-				OMAP_DSS_DISPLAY_ACTIVE, dssdev);
+					OMAP_DSS_DISPLAY_ACTIVE, dssdev);
 	return r;
 }
-
 
 int omap_dss_register_driver(struct omap_dss_driver *dssdriver)
 {

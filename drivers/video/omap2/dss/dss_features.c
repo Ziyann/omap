@@ -28,12 +28,6 @@
 #include "dss.h"
 #include "dss_features.h"
 
-#define OMAP5_HDMI_CORE_OFFSET 0x20000
-#define OMAP5_ES_1_0_HDMI_CEC_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x17400)
-#define OMAP5_ES_1_0_HDMI_I2CM_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x17800)
-#define OMAP5_ES_2_0_HDMI_CEC_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x153C8)
-#define OMAP5_ES_2_0_HDMI_I2CM_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x157C8)
-
 /* Defines a generic omap register field */
 struct dss_reg_field {
 	u8 start, end;
@@ -116,21 +110,6 @@ static const struct dss_reg_field omap4_dss_reg_fields[] = {
 	[FEAT_REG_DSIPLL_REGM_DSI]		= { 30, 26 },
 };
 
-static const struct dss_reg_field omap5_dss_reg_fields[] = {
-	[FEAT_REG_FIRHINC]			= { 12, 0 },
-	[FEAT_REG_FIRVINC]			= { 28, 16 },
-	[FEAT_REG_FIFOLOWTHRESHOLD]		= { 15, 0 },
-	[FEAT_REG_FIFOHIGHTHRESHOLD]		= { 31, 16 },
-	[FEAT_REG_FIFOSIZE]			= { 15, 0 },
-	[FEAT_REG_HORIZONTALACCU]		= { 10, 0 },
-	[FEAT_REG_VERTICALACCU]			= { 26, 16 },
-	[FEAT_REG_DISPC_CLK_SWITCH]		= { 9, 7 },
-	[FEAT_REG_DSIPLL_REGN]			= { 8, 1 },
-	[FEAT_REG_DSIPLL_REGM]			= { 20, 9 },
-	[FEAT_REG_DSIPLL_REGM_DISPC]		= { 25, 21 },
-	[FEAT_REG_DSIPLL_REGM_DSI]		= { 30, 26 },
-};
-
 static const enum omap_display_type omap2_dss_supported_displays[] = {
 	/* OMAP_DSS_CHANNEL_LCD */
 	OMAP_DISPLAY_TYPE_DPI | OMAP_DISPLAY_TYPE_DBI,
@@ -163,19 +142,6 @@ static const enum omap_display_type omap4_dss_supported_displays[] = {
 
 	/* OMAP_DSS_CHANNEL_DIGIT */
 	OMAP_DISPLAY_TYPE_VENC | OMAP_DISPLAY_TYPE_HDMI,
-
-	/* OMAP_DSS_CHANNEL_LCD2 */
-	OMAP_DISPLAY_TYPE_DPI | OMAP_DISPLAY_TYPE_DBI |
-	OMAP_DISPLAY_TYPE_DSI,
-};
-
-static const enum omap_display_type omap5_dss_supported_displays[] = {
-	/* OMAP_DSS_CHANNEL_LCD */
-	OMAP_DISPLAY_TYPE_DPI | OMAP_DISPLAY_TYPE_DBI |
-	OMAP_DISPLAY_TYPE_DSI,
-
-	/* OMAP_DSS_CHANNEL_DIGIT */
-	OMAP_DISPLAY_TYPE_HDMI | OMAP_DISPLAY_TYPE_DPI,
 
 	/* OMAP_DSS_CHANNEL_LCD2 */
 	OMAP_DISPLAY_TYPE_DPI | OMAP_DISPLAY_TYPE_DBI |
@@ -243,7 +209,7 @@ static const enum omap_color_mode omap4_dss_supported_color_modes[] = {
 	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
 	OMAP_DSS_COLOR_RGBX32,
 
-       /* OMAP_DSS_VIDEO2 */
+	/* OMAP_DSS_VIDEO2 */
 	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
 	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
 	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
@@ -264,45 +230,73 @@ static const enum omap_color_mode omap4_dss_supported_color_modes[] = {
 	OMAP_DSS_COLOR_RGBX32,
 };
 
-static const enum omap_color_mode omap5_es_2_0_dss_supported_color_modes[] = {
-	/* OMAP_DSS_GFX */
-	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
-	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
-	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_ARGB32 |
-	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32 |
-	OMAP_DSS_COLOR_ARGB16_1555 | OMAP_DSS_COLOR_RGBX16 |
-	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_XRGB16_1555 |
-	OMAP_DSS_COLOR_BGRA32,
+static const char * const omap2_dss_clk_source_names[] = {
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "N/A",
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "N/A",
+	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_FCLK1",
+};
 
-	/* OMAP_DSS_VIDEO1 */
-	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
-	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
-	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
-	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
-	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
-	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
-	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
-	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+static const char * const omap3_dss_clk_source_names[] = {
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "DSI1_PLL_FCLK",
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "DSI2_PLL_FCLK",
+	[OMAP_DSS_CLK_SRC_FCK]			= "DSS1_ALWON_FCLK",
+};
 
-       /* OMAP_DSS_VIDEO2 */
-	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
-	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
-	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
-	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
-	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
-	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
-	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
-	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+static const char * const omap4_dss_clk_source_names[] = {
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "PLL1_CLK1",
+	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "PLL1_CLK2",
+	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_FCLK",
+	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC]	= "PLL2_CLK1",
+	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI]	= "PLL2_CLK2",
+};
 
-	/* OMAP_DSS_VIDEO3 */
-	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
-	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
-	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
-	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
-	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
-	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
-	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
-	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+static const struct dss_param_range omap2_dss_param_range[] = {
+	[FEAT_PARAM_DSS_FCK]			= { 0, 173000000 },
+	[FEAT_PARAM_DSS_PCD]			= { 2, 255 },
+	[FEAT_PARAM_DSIPLL_REGN]		= { 0, 0 },
+	[FEAT_PARAM_DSIPLL_REGM]		= { 0, 0 },
+	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, 0 },
+	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, 0 },
+	[FEAT_PARAM_DSIPLL_FINT]		= { 0, 0 },
+	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, 0 },
+	[FEAT_PARAM_DOWNSCALE]			= { 1, 2 },
+	/*
+	 * Assuming the line width buffer to be 768 pixels as OMAP2 DISPC
+	 * scaler cannot scale a image with width more than 768.
+	 */
+	[FEAT_PARAM_LINEWIDTH]			= { 1, 768 },
+	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
+};
+
+static const struct dss_param_range omap3_dss_param_range[] = {
+	[FEAT_PARAM_DSS_FCK]			= { 0, 173000000 },
+	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
+	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 7) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 11) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 4) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 4) - 1 },
+	[FEAT_PARAM_DSIPLL_FINT]		= { 750000, 2100000 },
+	[FEAT_PARAM_DSIPLL_LPDIV]		= { 1, (1 << 13) - 1},
+	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
+	[FEAT_PARAM_LINEWIDTH]			= { 1, 1024 },
+	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
+};
+
+static const struct dss_param_range omap4_dss_param_range[] = {
+	[FEAT_PARAM_DSS_FCK]			= { 0, 186000000 },
+	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
+	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 8) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 12) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
+	[FEAT_PARAM_DSIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
+	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
+	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
 };
 
 static const enum omap_overlay_caps omap2_dss_overlay_caps[] = {
@@ -357,133 +351,6 @@ static const enum omap_overlay_caps omap4_dss_overlay_caps[] = {
 		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER,
 };
 
-static const enum omap_overlay_caps omap5_es_2_0_dss_overlay_caps[] = {
-	/* OMAP_DSS_GFX */
-	OMAP_DSS_OVL_CAP_GLOBAL_ALPHA | OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA |
-		OMAP_DSS_OVL_CAP_ZORDER | OMAP_DSS_OVL_CAP_FORCE_1D,
-
-	/* OMAP_DSS_VIDEO1 */
-	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
-		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
-		OMAP_DSS_OVL_CAP_FORCE_1D,
-
-	/* OMAP_DSS_VIDEO2 */
-	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
-		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
-		OMAP_DSS_OVL_CAP_FORCE_1D,
-
-	/* OMAP_DSS_VIDEO3 */
-	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
-		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
-		OMAP_DSS_OVL_CAP_FORCE_1D,
-};
-
-static const char * const omap2_dss_clk_source_names[] = {
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "N/A",
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "N/A",
-	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_FCLK1",
-};
-
-static const char * const omap3_dss_clk_source_names[] = {
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "DSI1_PLL_FCLK",
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "DSI2_PLL_FCLK",
-	[OMAP_DSS_CLK_SRC_FCK]			= "DSS1_ALWON_FCLK",
-};
-
-static const char * const omap4_dss_clk_source_names[] = {
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "PLL1_CLK1",
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "PLL1_CLK2",
-	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_FCLK",
-	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC]	= "PLL2_CLK1",
-	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI]	= "PLL2_CLK2",
-};
-
-static const char * const omap5_dss_clk_source_names[] = {
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "DPLL_DSI1_A_CLK1",
-	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "DPLL_DSI1_A_CLK2",
-	[OMAP_DSS_CLK_SRC_FCK]			= "DSS_CLK",
-	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC]	= "DPLL_DSI1_C_CLK1",
-	[OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI]	= "DPLL_DSI1_C_CLK2",
-};
-
-static const struct dss_param_range omap2_dss_param_range[] = {
-	[FEAT_PARAM_DSS_FCK]			= { 0, 173000000 },
-	[FEAT_PARAM_DSS_PCD]			= { 2, 255 },
-	[FEAT_PARAM_DSIPLL_REGN]		= { 0, 0 },
-	[FEAT_PARAM_DSIPLL_REGM]		= { 0, 0 },
-	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, 0 },
-	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, 0 },
-	[FEAT_PARAM_DSIPLL_FINT]		= { 0, 0 },
-	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, 0 },
-	[FEAT_PARAM_DOWNSCALE]			= { 1, 2 },
-	/*
-	 * Assuming the line width buffer to be 768 pixels as OMAP2 DISPC
-	 * scaler cannot scale a image with width more than 768.
-	 */
-	[FEAT_PARAM_LINEWIDTH]			= { 1, 768 },
-	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
-};
-
-static const struct dss_param_range omap3_dss_param_range[] = {
-	[FEAT_PARAM_DSS_FCK]			= { 0, 173000000 },
-	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
-	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 7) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 11) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 4) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 4) - 1 },
-	[FEAT_PARAM_DSIPLL_FINT]		= { 750000, 2100000 },
-	[FEAT_PARAM_DSIPLL_LPDIV]		= { 1, (1 << 13) - 1},
-	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
-	[FEAT_PARAM_LINEWIDTH]			= { 1, 1024 },
-	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
-};
-
-static const struct dss_param_range omap4_dss_param_range[] = {
-	[FEAT_PARAM_DSS_FCK]			= { 0, 186000000 },
-	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
-	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 8) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 12) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_FINT]		= { 500000, 2500000 },
-	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
-	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
-	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_WIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 2048 },
-};
-
-static const struct dss_param_range omap5_dss_param_range[] = {
-	[FEAT_PARAM_DSS_FCK]			= { 0, 200000000 },
-	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
-	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 8) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 12) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_FINT]		= { 500000, 2500000 },
-	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
-	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
-	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_WIDTH]			= { 1, 4096 },
-	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 4096 },
-};
-
-static const struct dss_param_range omap5_es_2_0_dss_param_range[] = {
-	[FEAT_PARAM_DSS_FCK]			= { 0, 209250000 },
-	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
-	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 8) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 12) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
-	[FEAT_PARAM_DSIPLL_FINT]		= { 150000, 52000000 },
-	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
-	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
-	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
-	[FEAT_PARAM_MGR_WIDTH]			= { 1, 4096 },
-	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 4096 },
-};
 
 static const enum dss_feat_id omap2_dss_feat_list[] = {
 	FEAT_LCDENABLEPOL,
@@ -548,24 +415,6 @@ static const enum dss_feat_id omap4430_es1_0_dss_feat_list[] = {
 	FEAT_WB,
 };
 
-static const enum dss_feat_id omap4430_es2_0_1_2_dss_feat_list[] = {
-	FEAT_MGR_LCD2,
-	FEAT_CORE_CLK_DIV,
-	FEAT_LCD_CLK_SRC,
-	FEAT_DSI_DCS_CMD_CONFIG_VC,
-	FEAT_DSI_VC_OCP_WIDTH,
-	FEAT_DSI_GNQ,
-	FEAT_HDMI_CTS_SWMODE,
-	FEAT_HANDLE_UV_SEPARATE,
-	FEAT_ATTR2,
-	FEAT_CPR,
-	FEAT_PRELOAD,
-	FEAT_FIR_COEF_V,
-	FEAT_ALPHA_FREE_ZORDER,
-	FEAT_FIFO_MERGE,
-	FEAT_WB,
-};
-
 static const enum dss_feat_id omap4470_dss_feat_list[] = {
 	FEAT_MGR_LCD2,
 	FEAT_CORE_CLK_DIV,
@@ -606,51 +455,6 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 	FEAT_DSI_PLL_REFSEL,
 #endif
 	FEAT_WB,
-};
-
-static const enum dss_feat_id omap5_dss_feat_list[] = {
-	FEAT_MGR_LCD2,
-	FEAT_CORE_CLK_DIV,
-	FEAT_LCD_CLK_SRC,
-	FEAT_DSI_DCS_CMD_CONFIG_VC,
-	FEAT_DSI_VC_OCP_WIDTH,
-	FEAT_DSI_GNQ,
-	FEAT_HDMI_CTS_SWMODE,
-	FEAT_HDMI_AUDIO_USE_MCLK,
-	FEAT_HANDLE_UV_SEPARATE,
-	FEAT_ATTR2,
-	FEAT_CPR,
-	FEAT_PRELOAD,
-	FEAT_FIR_COEF_V,
-	FEAT_ALPHA_FREE_ZORDER,
-	FEAT_FIFO_MERGE,
-	FEAT_DSI_PLL_SELFREQDCO,
-	FEAT_DSI_PLL_REFSEL,
-	FEAT_WB,
-};
-
-static const enum dss_feat_id omap5_es_2_0_dss_feat_list[] = {
-	FEAT_MGR_LCD2,
-	FEAT_CORE_CLK_DIV,
-	FEAT_LCD_CLK_SRC,
-	FEAT_DSI_DCS_CMD_CONFIG_VC,
-	FEAT_DSI_VC_OCP_WIDTH,
-	FEAT_DSI_GNQ,
-	FEAT_HDMI_CTS_SWMODE,
-	FEAT_HDMI_AUDIO_USE_MCLK,
-	FEAT_HANDLE_UV_SEPARATE,
-	FEAT_ATTR2,
-	FEAT_CPR,
-	FEAT_PRELOAD,
-	FEAT_FIR_COEF_V,
-	FEAT_ALPHA_FREE_ZORDER,
-	FEAT_FIFO_MERGE,
-	FEAT_DSI_PLL_SELFREQDCO,
-	FEAT_DSI_PLL_REFSEL,
-	FEAT_WB,
-	FEAT_FLIP_IMMEDIATE,
-	FEAT_MFLAG,
-	FEAT_3D,
 };
 
 /* OMAP2 DSS Features */
@@ -734,28 +538,6 @@ static const struct omap_dss_features omap4430_es1_0_dss_features  = {
 	.hdmi_cec_offset = 0xD00,
 };
 
-/* For OMAP4430 ES 2.0, 2.1 and 2.2 revisions */
-static const struct omap_dss_features omap4430_es2_0_1_2_dss_features = {
-	.reg_fields = omap4_dss_reg_fields,
-	.num_reg_fields = ARRAY_SIZE(omap4_dss_reg_fields),
-
-	.features = omap4430_es2_0_1_2_dss_feat_list,
-	.num_features = ARRAY_SIZE(omap4430_es2_0_1_2_dss_feat_list),
-
-	.num_mgrs = 3,
-	.num_ovls = 4,
-	.supported_displays = omap4_dss_supported_displays,
-	.supported_color_modes = omap4_dss_supported_color_modes,
-	.overlay_caps = omap4_dss_overlay_caps,
-	.clksrc_names = omap4_dss_clk_source_names,
-	.dss_params = omap4_dss_param_range,
-	.buffer_size_unit = 16,
-	.burst_size_unit = 16,
-	.dsi_ddr_div = 4,
-	.hdmi_core_sys_offset = 0x400,
-	.hdmi_cec_offset = 0xD00,
-};
-
 /* For OMAP4470 revisions */
 static const struct omap_dss_features omap4470_dss_features = {
 	.reg_fields = omap4_dss_reg_fields,
@@ -800,53 +582,7 @@ static const struct omap_dss_features omap4_dss_features = {
 	.hdmi_cec_offset = 0xD00,
 };
 
-/* OMAP5 DSS Features */
-static const struct omap_dss_features omap5_dss_features = {
-	.reg_fields = omap5_dss_reg_fields,
-	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
-
-	.features = omap5_dss_feat_list,
-	.num_features = ARRAY_SIZE(omap5_dss_feat_list),
-
-	.num_mgrs = 3,
-	.num_ovls = 4,
-	.supported_displays = omap5_dss_supported_displays,
-	.supported_color_modes = omap4_dss_supported_color_modes,
-	.overlay_caps = omap4_dss_overlay_caps,
-	.clksrc_names = omap5_dss_clk_source_names,
-	.dss_params = omap5_dss_param_range,
-	.buffer_size_unit = 16,
-	.burst_size_unit = 16,
-	.dsi_ddr_div = 2,
-	.hdmi_core_sys_offset = OMAP5_HDMI_CORE_OFFSET,
-	.hdmi_cec_offset = OMAP5_ES_1_0_HDMI_CEC_OFFSET,
-	.hdmi_core_i2cm_offset = OMAP5_ES_1_0_HDMI_I2CM_OFFSET,
-};
-
-/* OMAP5 ES2.0 DSS Features */
-static const struct omap_dss_features omap5_es2_0_dss_features = {
-	.reg_fields = omap5_dss_reg_fields,
-	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
-
-	.features = omap5_es_2_0_dss_feat_list,
-	.num_features = ARRAY_SIZE(omap5_es_2_0_dss_feat_list),
-
-	.num_mgrs = 3,
-	.num_ovls = 4,
-	.supported_displays = omap5_dss_supported_displays,
-	.supported_color_modes = omap5_es_2_0_dss_supported_color_modes,
-	.overlay_caps = omap5_es_2_0_dss_overlay_caps,
-	.clksrc_names = omap5_dss_clk_source_names,
-	.dss_params = omap5_es_2_0_dss_param_range,
-	.buffer_size_unit = 16,
-	.burst_size_unit = 16,
-	.dsi_ddr_div = 2,
-	.hdmi_core_sys_offset = OMAP5_HDMI_CORE_OFFSET,
-	.hdmi_cec_offset = OMAP5_ES_2_0_HDMI_CEC_OFFSET,
-	.hdmi_core_i2cm_offset = OMAP5_ES_2_0_HDMI_I2CM_OFFSET,
-};
-
-#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
+#if defined(CONFIG_OMAP4_DSS_HDMI)
 /* HDMI OMAP4 Functions*/
 static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 
@@ -888,49 +624,10 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 	.reset_wrapper			=	hdmi_ti_4xxx_set_wait_soft_reset,
 };
 
-/* HDMI OMAP5 Functions*/
-static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
-
-	.video_configure	=	ti_hdmi_5xxx_basic_configure,
-	.phy_enable		=	ti_hdmi_4xxx_phy_enable,
-	.phy_disable		=	ti_hdmi_4xxx_phy_disable,
-	.read_edid		=	ti_hdmi_5xxx_read_edid,
-	.pll_enable		=	ti_hdmi_4xxx_pll_enable,
-	.pll_disable		=	ti_hdmi_4xxx_pll_disable,
-	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
-	.irq_handler		=	ti_hdmi_5xxx_irq_handler,
-	.irq_process		=	ti_hdmi_5xxx_irq_process,
-	.configure_range	=	ti_hdmi_5xxx_configure_range,
-	.set_phy		=	ti_hdmi_4xxx_set_phy_on_hpd,
-#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
-	.audio_enable		=       ti_hdmi_5xxx_wp_audio_enable,
-	.audio_start		=       ti_hdmi_5xxx_audio_start,
-	.audio_config		=	ti_hdmi_5xxx_audio_config,
-#endif
-	.cec_get_rx_cmd                 =       ti_hdmi_5xxx_cec_get_rx_cmd,
-	.cec_read_rx_cmd                =       ti_hdmi_5xxx_cec_read_rx_cmd,
-	.cec_transmit_cmd               =       ti_hdmi_5xxx_cec_transmit_cmd,
-	.power_on_cec                   =       ti_hdmi_5xxx_power_on_cec,
-	.power_off_cec			=	ti_hdmi_5xxx_power_off_cec,
-	.cec_int_handler		=	ti_hdmi_5xxx_cec_int_handler,
-	.cec_clr_rx_int                 =       ti_hdmi_5xxx_cec_clr_rx_int,
-	.cec_get_reg_device_list        =       ti_hdmi_5xxx_cec_get_reg_device_list,
-	.cec_add_reg_device             =       ti_hdmi_5xxx_cec_add_reg_device,
-	.cec_set_reg_device_list        =       ti_hdmi_5xxx_cec_set_reg_device_list,
-	.hdcp_init			=	ti_hdmi_5xxx_hdcp_init,
-	.hdcp_enable			=	ti_hdmi_5xxx_hdcp_enable,
-	.hdcp_disable			=	ti_hdmi_5xxx_hdcp_disable,
-	.hdcp_status			=	ti_hdmi_5xxx_hdcp_status,
-	.hdcp_int_handler		=	ti_hdmi_5xxx_hdcp_int_handler,
-	.reset_wrapper			=	hdmi_ti_4xxx_set_wait_soft_reset,
-};
-
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data)
 {
 	if (cpu_is_omap44xx())
 		ip_data->ops = &omap4_hdmi_functions;
-	else if (cpu_is_omap54xx())
-		ip_data->ops = &omap5_hdmi_functions;
 }
 #endif
 
@@ -1046,20 +743,10 @@ void dss_features_init(void)
 		omap_current_dss_features = &omap3430_dss_features;
 	else if (omap_rev() == OMAP4430_REV_ES1_0)
 		omap_current_dss_features = &omap4430_es1_0_dss_features;
-	else if (omap_rev() == OMAP4430_REV_ES2_0 ||
-		omap_rev() == OMAP4430_REV_ES2_1 ||
-		omap_rev() == OMAP4430_REV_ES2_2)
-		omap_current_dss_features = &omap4430_es2_0_1_2_dss_features;
 	else if (cpu_is_omap447x())
 		omap_current_dss_features = &omap4470_dss_features;
 	else if (cpu_is_omap44xx())
 		omap_current_dss_features = &omap4_dss_features;
-	else if (cpu_is_omap54xx() && ((omap_rev() == OMAP5430_REV_ES1_0) ||
-		(omap_rev() == OMAP5432_REV_ES1_0)))
-		omap_current_dss_features = &omap5_dss_features;
-	else if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0 ||
-					omap_rev() == OMAP5432_REV_ES2_0))
-		omap_current_dss_features = &omap5_es2_0_dss_features;
 	else
 		DSSWARN("Unsupported OMAP version");
 }
