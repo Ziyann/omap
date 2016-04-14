@@ -4077,7 +4077,7 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	}
 
 	r = dsi_read_reg(dsidev, DSI_CTRL);
-#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
 	r = FLD_MOD(r, 0, 1, 1);	/* CS_RX_EN */
 	r = FLD_MOD(r, 0, 2, 2);	/* ECC_RX_EN */
 #else
@@ -4930,7 +4930,7 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
-#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
 static int _dsi_wait_reset(struct platform_device *dsidev)
 {
 	int t = 0;
@@ -4977,7 +4977,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	if (!dssdev->skip_init) {
 		dsi_enable_pll_clock(dsidev, 1);
-#if defined(CONFIG_MACH_OMAP4_BOWSER) || defined(CONFIG_MACH_TUNA)
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
 		REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 		_dsi_wait_reset(dsidev);
 
