@@ -3798,7 +3798,7 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, to ? 1 : 0, 31, 31);	/* TA_TO */
+	r = FLD_MOD(r, 0, 31, 31);	/* TA_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 30, 30);	/* TA_TO_X16 */
 	r = FLD_MOD(r, x8 ? 1 : 0, 29, 29);	/* TA_TO_X8 */
 	r = FLD_MOD(r, ticks, 28, 16);	/* TA_TO_COUNTER */
@@ -3911,7 +3911,7 @@ static void dsi_config_vp_num_line_buffers(struct omap_dss_device *dssdev)
 	}
 
 	/* LINE_BUFFER */
-	REG_FLD_MOD(dsidev, DSI_CTRL, dsi->num_line_buffers, 13, 12);
+	REG_FLD_MOD(dsidev, DSI_CTRL, 2, 13, 12);
 }
 
 static void dsi_config_vp_sync_events(struct omap_dss_device *dssdev)
@@ -3925,13 +3925,13 @@ static void dsi_config_vp_sync_events(struct omap_dss_device *dssdev)
 	u32 r;
 
 	r = dsi_read_reg(dsidev, DSI_CTRL);
-	r = FLD_MOD(r, de_pol, 9, 9);		/* VP_DE_POL */
-	r = FLD_MOD(r, hsync_pol, 10, 10);	/* VP_HSYNC_POL */
-	r = FLD_MOD(r, vsync_pol, 11, 11);	/* VP_VSYNC_POL */
+	r = FLD_MOD(r, 1, 9, 9);		/* VP_DE_POL */
+	r = FLD_MOD(r, 0, 10, 10);	/* VP_HSYNC_POL */
+	r = FLD_MOD(r, 1, 11, 11);	/* VP_VSYNC_POL */
 	r = FLD_MOD(r, 1, 15, 15);		/* VP_VSYNC_START */
 	r = FLD_MOD(r, vsync_end, 16, 16);	/* VP_VSYNC_END */
 	r = FLD_MOD(r, 1, 17, 17);		/* VP_HSYNC_START */
-	r = FLD_MOD(r, hsync_end, 18, 18);	/* VP_HSYNC_END */
+	r = FLD_MOD(r, 0, 18, 18);	/* VP_HSYNC_END */
 	dsi_write_reg(dsidev, DSI_CTRL, r);
 }
 
@@ -4050,12 +4050,14 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 
 	/* XXX what values for the timeouts? */
 	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
+		printk("%s: OMAP_DSS_DSI_VIDEO_MODE\n", __func__);
 		dsi_set_stop_state_counter(dsidev, 0x1fff, true, true, false);
 		dsi_set_ta_timeout(dsidev, 0x1fff, true, true, true);
 		dsi_set_lp_rx_timeout(dsidev, 0x1fff, true, true, false);
 		dsi_set_hs_tx_timeout(dsidev, 0x1fff, true, true, true);
-	}
-	else {
+		dsi_write_reg(dsidev, DSI_TIMING1, 0xffff7fff); // hack
+	} else {
+		printk("%s: OMAP_DSS_DSI_CMD_MODE\n", __func__);
 		dsi_set_stop_state_counter(dsidev, 0x1000, false, false, true);
 		dsi_set_ta_timeout(dsidev, 0x1fff, true, true, true);
 		dsi_set_lp_rx_timeout(dsidev, 0x1fff, true, true, true);
@@ -4076,18 +4078,15 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 		BUG();
 	}
 
+#if 0
 	r = dsi_read_reg(dsidev, DSI_CTRL);
-#if defined(CONFIG_MACH_OMAP4_BOWSER)
-	r = FLD_MOD(r, 0, 1, 1);	/* CS_RX_EN */
-	r = FLD_MOD(r, 0, 2, 2);	/* ECC_RX_EN */
-#else
-	r = FLD_MOD(r, 1, 1, 1);	/* CS_RX_EN */
-	r = FLD_MOD(r, 1, 2, 2);	/* ECC_RX_EN */
-#endif
+	//r = FLD_MOD(r, 1, 1, 1);	/* CS_RX_EN */
+	//r = FLD_MOD(r, 1, 2, 2);	/* ECC_RX_EN */
 	r = FLD_MOD(r, 1, 3, 3);	/* TX_FIFO_ARBITRATION */
 	r = FLD_MOD(r, 1, 4, 4);	/* VP_CLK_RATIO, always 1, see errata*/
 	r = FLD_MOD(r, buswidth, 7, 6); /* VP_DATA_BUS_WIDTH */
 	r = FLD_MOD(r, 0, 8, 8);	/* VP_CLK_POL */
+	r = FLD_MOD(r, 2, 13, 12);	/* LINE_BUFFER, 2 lines */
 	r = FLD_MOD(r, 1, 14, 14);	/* TRIGGER_RESET_MODE */
 	r = FLD_MOD(r, 1, 19, 19);	/* EOT_ENABLE */
 	if (!dss_has_feature(FEAT_DSI_DCS_CMD_CONFIG_VC)) {
@@ -4096,7 +4095,9 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 		r = FLD_MOD(r, 0, 25, 25);
 	}
 
+
 	dsi_write_reg(dsidev, DSI_CTRL, r);
+#endif
 
 	dsi_config_vp_num_line_buffers(dssdev);
 
@@ -4104,6 +4105,44 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 		dsi_config_vp_sync_events(dssdev);
 		dsi_config_blanking_modes(dssdev);
 		dsi_check_dispc_hsync_period(dssdev);
+	}
+
+	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_CMD_MODE) {
+		r = dsi_read_reg(dsidev, DSI_CTRL);
+		r = FLD_MOD(r, 1, 1, 1);	/* CS_RX_EN */
+		r = FLD_MOD(r, 1, 2, 2);	/* ECC_RX_EN */
+		r = FLD_MOD(r, 1, 3, 3);	/* TX_FIFO_ARBITRATION */
+		r = FLD_MOD(r, 1, 4, 4);	/* VP_CLK_RATIO, always 1, see errata*/
+		r = FLD_MOD(r, buswidth, 7, 6); /* VP_DATA_BUS_WIDTH */
+		r = FLD_MOD(r, 0, 8, 8);	/* VP_CLK_POL */
+		r = FLD_MOD(r, 2, 13, 12);	/* LINE_BUFFER, 2 lines */
+		r = FLD_MOD(r, 1, 14, 14);	/* TRIGGER_RESET_MODE */
+		r = FLD_MOD(r, 1, 19, 19);	/* EOT_ENABLE */
+		if (!dss_has_feature(FEAT_DSI_DCS_CMD_CONFIG_VC)) {
+			r = FLD_MOD(r, 1, 24, 24);	/* DCS_CMD_ENABLE */
+			/* DCS_CMD_CODE, 1=start, 0=continue */
+			r = FLD_MOD(r, 0, 25, 25);
+		}
+	} else {
+		r = dsi_read_reg(dsidev, DSI_CTRL);
+		r = FLD_MOD(r, 1, 3, 3);	/* TX_FIFO_ARBITRATION */
+		r = FLD_MOD(r, 1, 4, 4);	/* VP_CLK_RATIO, always 1, see errata*/
+		r = FLD_MOD(r, buswidth, 7, 6);	/* VP_DATA_BUS_WIDTH */
+		r = FLD_MOD(r, 0, 8, 8);	/* VP_CLK_POL */
+		r = FLD_MOD(r, 1, 9, 9);	/* VP_DE_POL */
+		r = FLD_MOD(r, 0, 10, 10);	/* VP_HSYNC_POL */
+		r = FLD_MOD(r, 1, 11, 11);	/* VP_VSYNC_POL */
+		r = FLD_MOD(r, 2, 13, 12);	/* LINE_BUFFER */
+		r = FLD_MOD(r, 1, 14, 14);	/* TRIGGER_RESET_MODE */
+		r = FLD_MOD(r, 1, 15, 15);	/* VP_VSYNC_START */
+		r = FLD_MOD(r, 1, 17, 17);	/* VP_HSYNC_START */
+		r = FLD_MOD(r, 1, 19, 19);	/* EOT_ENABLE */
+		if (dssdev->clocks.dsi.offset_ddr_clk > 0)
+			r = FLD_MOD(r, 1, 20, 20);	/* BLANKING_MODE */
+		r = FLD_MOD(r, 1, 21, 21);	/* HFP_BLANKING */
+		r = FLD_MOD(r, 1, 22, 22);	/* HBP_BLANKING */
+		r = FLD_MOD(r, 1, 23, 23);	/* HSA_BLANKING */
+		dsi_write_reg(dsidev, DSI_CTRL, r);
 	}
 
 	if (!dssdev->skip_init) {
@@ -4114,6 +4153,11 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	}
 
 	return 0;
+}
+
+static int dispc_to_dsi_clock(int val, int pixel_size, int lanes)
+{
+	return (val * pixel_size / 8) / lanes;
 }
 
 static void dsi_proto_timings(struct omap_dss_device *dssdev)
@@ -4127,7 +4171,7 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 	unsigned ddr_clk_pre, ddr_clk_post;
 	unsigned enter_hs_mode_lat, exit_hs_mode_lat;
 	unsigned ths_eot;
-	int ndl = dsi->num_lanes_used - 1;
+	int ndl = dsi->num_lanes_used - 1, line;
 	unsigned offset_ddr_clk;
 	u32 r;
 
@@ -4227,25 +4271,29 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 		width_bytes = DIV_ROUND_UP(timings->x_res * bpp, 8);
 
 		/* TL = t_HS + HSA + t_HE + HFP + ceil((WC + 6) / NDL) + HBP */
-		tl = DIV_ROUND_UP(4, ndl) + (hsync_end ? hsa : 0) + t_he + hfp +
-			DIV_ROUND_UP(width_bytes + 6, ndl) + hbp;
+		/*tl = DIV_ROUND_UP(4, ndl) + (hsync_end ? hsa : 0) + t_he + hfp +
+			DIV_ROUND_UP(width_bytes + 6, ndl) + hbp;*/
+		line = timings->hbp + timings->hfp + timings->hsw + timings->x_res;
+		tl = dispc_to_dsi_clock(line, dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt), ndl);
 
 		DSSDBG("HBP: %d, HFP: %d, HSA: %d, TL: %d TXBYTECLKHS\n", hbp,
 			hfp, hsync_end ? hsa : 0, tl);
 		DSSDBG("VBP: %d, VFP: %d, VSA: %d, VACT: %d lines\n", vbp, vfp,
 			vsa, timings->y_res);
 
+		
 		r = dsi_read_reg(dsidev, DSI_VM_TIMING1);
 		r = FLD_MOD(r, hbp, 11, 0);	/* HBP */
 		r = FLD_MOD(r, hfp, 23, 12);	/* HFP */
-		r = FLD_MOD(r, hsync_end ? hsa : 0, 31, 24);	/* HSA */
+		r = FLD_MOD(r, 0, 31, 24);	/* HSA */
+		r = FLD_VAL(0x01076077, 31, 0);
 		dsi_write_reg(dsidev, DSI_VM_TIMING1, r);
 
 		r = dsi_read_reg(dsidev, DSI_VM_TIMING2);
 		r = FLD_MOD(r, vbp, 7, 0);	/* VBP */
 		r = FLD_MOD(r, vfp, 15, 8);	/* VFP */
 		r = FLD_MOD(r, vsa, 23, 16);	/* VSA */
-		r = FLD_MOD(r, window_sync, 27, 24);	/* WINDOW_SYNC */
+		r = FLD_MOD(r, 4, 27, 24);	/* WINDOW_SYNC */
 		dsi_write_reg(dsidev, DSI_VM_TIMING2, r);
 
 		r = dsi_read_reg(dsidev, DSI_VM_TIMING3);
@@ -4253,62 +4301,24 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 		r = FLD_MOD(r, tl, 31, 16);		/* TL */
 		dsi_write_reg(dsidev, DSI_VM_TIMING3, r);
 
-		/* Command mode interleave configuration */
-
-		hsa_interleave_hs = dsi_compute_interleave_hs(hsa, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hfp_interleave_hs = dsi_compute_interleave_hs(hfp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hbp_interleave_hs = dsi_compute_interleave_hs(hbp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		hsa_interleave_lp = dsi_compute_interleave_lp(hsa,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		hfp_interleave_lp = dsi_compute_interleave_lp(hfp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		hbp_interleave_lp = dsi_compute_interleave_lp(hbp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		/*
-		 * BLLP gap is between HE and HS short packets during vertical
-		 * blanking
-		 */
-		bllp = hbp + hfp + DIV_ROUND_UP(width_bytes + 6, ndl);
-
-		bl_interleave_hs = dsi_compute_interleave_hs(bllp, ddr_alwon,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					ddr_clk_pre, ddr_clk_post);
-
-		bl_interleave_lp = dsi_compute_interleave_lp(bllp,
-					enter_hs_mode_lat, exit_hs_mode_lat,
-					lp_clk_div, regm_dsi);
-
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING4);
-		r = FLD_MOD(r, hsa_interleave_hs, 23, 16);
-		r = FLD_MOD(r, hfp_interleave_hs, 15, 8);
-		r = FLD_MOD(r, hbp_interleave_hs, 7, 0);
+		/* TODO: either calculate these values or make them configurable */
+		r = FLD_VAL(72, 23, 16) |       /* HSA_HS_INTERLEAVING */
+			FLD_VAL(114, 15, 8) |   /* HFB_HS_INTERLEAVING */
+			FLD_VAL(150, 7, 0);     /* HbB_HS_INTERLEAVING */
 		dsi_write_reg(dsidev, DSI_VM_TIMING4, r);
 
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING5);
-		r = FLD_MOD(r, hsa_interleave_lp, 23, 16);
-		r = FLD_MOD(r, hfp_interleave_lp, 15, 8);
-		r = FLD_MOD(r, hbp_interleave_lp, 7, 0);
+		r = FLD_VAL(130, 23, 16) |      /* HSA_LP_INTERLEAVING */
+			FLD_VAL(223, 15, 8) |   /* HFB_LP_INTERLEAVING */
+			FLD_VAL(59, 7, 0);      /* HBB_LP_INTERLEAVING */
 		dsi_write_reg(dsidev, DSI_VM_TIMING5, r);
 
-		r = dsi_read_reg(dsidev, DSI_VM_TIMING6);
-		r = FLD_MOD(r, bl_interleave_hs, 31, 15);
-		r = FLD_MOD(r, bl_interleave_lp, 16, 0);
+		r = FLD_VAL(0x7A67, 31, 16) |   /* BL_HS_INTERLEAVING */
+			FLD_VAL(0x31D1, 15, 0); /* BL_LP_INTERLEAVING */
 		dsi_write_reg(dsidev, DSI_VM_TIMING6, r);
+
+		r = FLD_VAL(18, 31, 16) |       /* ENTER_HS_MODE_LATENCY */
+			FLD_VAL(15, 15, 0);	/* EXIT_HS_MODE_LATENCY */
+		dsi_write_reg(dsidev, DSI_VM_TIMING7, r);
 	}
 }
 
@@ -4441,6 +4451,8 @@ int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 
 	dsi_handle_lcd_en_timing_pre(dssdev, true);
 	r = dss_mgr_enable(dssdev->manager);
+	/* FORCE_TX_STOP_MODE_IO */
+	REG_FLD_MOD(dsidev, DSI_TIMING1, 0, 15, 15);
 	if (r) {
 		if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
 			dsi_if_enable(dsidev, false);
@@ -5403,121 +5415,6 @@ void dsi_uninit_platform_driver(void)
 
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 {
-	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
-
-	DSSDBG("%s\n", __func__);
-
-	dsi_vc_enable(dsidev, 0, false);
-	dsi_vc_enable(dsidev, 1, false);
-	dsi_if_enable(dsidev, false);
-
-	/* configure timings */
-#if defined (CONFIG_PANEL_SAMSUNG_LTL089CL01)
-	/* HSA=0, HFP=24, HBP=0 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x00018000);
-	/* WINDOW_SIZE=4, VSA=1, VFP=10, VBP=9 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04010A09);
-	/* TL(31:16)=1107, VACT(15:0)=1200 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x045304B0);
-	/*
-	 *HSA_HS_INTERLEAVING(23:16)=0, HFP_HS_INTERLEAVING(15:8)=0,
-	 * HBP_HS_INTERLEAVING(7:0)=0
-	 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
-#elif defined (CONFIG_PANEL_NT71391_HYDIS)
-	/* HSA=0, HFP=27, HBP=6 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x0001B006);
-	/* WINDOW_SIZE=4, VSA=1, VFP=10, VBP=9 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04010A09);
-	/* TL(31:16)=1116, VACT(15:0)=1200 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x045C04B0);
-	/*
-	 * HSA_HS_INTERLEAVING(23:16)=0, HFP_HS_INTERLEAVING(15:8)=0,
-	 * HBP_HS_INTERLEAVING(7:0)=0
-	 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
-#elif defined (CONFIG_PANEL_NT51012_LG)
-	/* HSA=0, HFP=23, HBP=58 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x0001703A);
-	/* WINDOW_SIZE=4, VSA=1, VFP=10, VBP=10 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04010A0A);
-	/* TL(31:16)=684, VACT(15:0)=1280 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x02AC0500);
-	/*
-	 * HSA_HS_INTERLEAVING(23:16)=0, HFP_HS_INTERLEAVING(15:8)=0,
-	 * HBP_HS_INTERLEAVING(7:0)=0
-	 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
-#elif defined (CONFIG_PANEL_S6E8AA0)
-	/* HSA=1, HFP=118, HBP=119 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x01076077);
-	/* WINDOW_SIZE=4, VSA=1, VFP=13, VBP=2 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04010d02);
-	/* TL(31:16)=780, VACT(15:0)=1280 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x030c0500);
-        /*
-         * HSA_HS_INTERLEAVING(23:16)=0, HFP_HS_INTERLEAVING(15:8)=0,
-         * HBP_HS_INTERLEAVING(7:0)=0
-         */
-        dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00000000);
-#else
-	/* HSA=1, HFP=24, HBP=20 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x01018014);
-	/* WINDOW_SIZE=4, VSA=6, VFP=3, VBP=13 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x0406030D);
-	/* TL(31:16)=1008, VACT(15:0)=768 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x03F00300);
-	/*
-	 * HSA_HS_INTERLEAVING(23:16)=72, HFP_HS_INTERLEAVING(15:8)=114,
-	 * HBP_HS_INTERLEAVING(7:0)=150
-	 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00487296);
-#endif
-
-	/*
-	 * HSA_LP_INTERLEAVING(23:16)=130, HFP_HS_INTERLEAVING(15:8)=223,
-	 * HBP_HS_INTERLEAVING(7:0)=59
-	 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING5, 0x0082DF3B);
-
-#if defined(CONFIG_PANEL_SAMSUNG_LTL089CL01)
-	/* BL_HS_INTERLEAVING(23:16)=23, BL_LP_INTERLEAVING(15:0)=0 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x040E0000);
-	/* ENTER_HS_MODE_LATENCY(31:16)=23 EXIT_HS_MODE_LATENCY(15:0)=20 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x00170014);
-#elif defined(CONFIG_PANEL_NT71391_HYDIS)
-	/* BL_HS_INTERLEAVING(23:16)=23, BL_LP_INTERLEAVING(15:0)=0 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x04170000);
-	/* ENTER_HS_MODE_LATENCY(31:16)=29 EXIT_HS_MODE_LATENCY(15:0)=25 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x00170014);
-	/* STOPCLK_LATENCY(7:0)=6 */
-	dsi_write_reg(dsidev, DSI_STOPCLK_TIMING, 0x06);
-#elif defined(CONFIG_PANEL_NT51012_LG)
-	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x00000005);
-	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x0017000E);
-	dsi_write_reg(dsidev, DSI_STOPCLK_TIMING, 0x07);
-#elif defined (CONFIG_PANEL_S6E8AA0)
-        /* BL_HS_INTERLEAVING(23:16)=31335, BL_LP_INTERLEAVING(15:0)=12753 */
-        dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);
-        /* ENTER_HS_MODE_LATENCY(31:16)=14 EXIT_HS_MODE_LATENCY(15:0)=19 */
-        dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x00170014);
-#else
-	/* BL_HS_INTERLEAVING(23:16)=31335, BL_LP_INTERLEAVING(15:0)=12753 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);
-	/* ENTER_HS_MODE_LATENCY(31:16)=14 EXIT_HS_MODE_LATENCY(15:0)=19 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x000E0013);
-#endif
-
-	dsi_vc_enable(dsidev, 1, true);
-	dsi_vc_enable(dsidev, 0, true);
-	dsi_if_enable(dsidev, true);
-
-	/* Send null packet to start DDR clock	*/
-#if !(defined(CONFIG_PANEL_NT71391_HYDIS) || defined(CONFIG_PANEL_NT51012_LG))
-	dsi_write_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(0), 0);
-	msleep(1);
-#endif
-
 	return;
 }
 EXPORT_SYMBOL(dsi_videomode_panel_preinit);

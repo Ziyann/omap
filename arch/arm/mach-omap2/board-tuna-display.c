@@ -976,7 +976,7 @@ static struct omap_dss_device tuna_oled_device = {
 			/* DSI video mode blanking data */
 
 			/* Unit: byte clock cycles */
-			.hsa					= 1,
+			.hsa					= 0,
 			.hfp					= 118,
 			.hbp					= 119,
 
@@ -996,9 +996,9 @@ static struct omap_dss_device tuna_oled_device = {
 			.vp_hsync_pol			= 0,
 			.vp_vsync_pol			= 1,
 			.vp_vsync_end			= 0,
-			.vp_hsync_end			= 0,
+			.vp_hsync_end			= 1,
 
-			.ddr_clk_always_on		= 0,
+			.ddr_clk_always_on		= 1,
 			.window_sync			= 4,
 		},
 		.dsi_cio_data = {
@@ -1010,7 +1010,6 @@ static struct omap_dss_device tuna_oled_device = {
 			.tclk_trail			= 17,
 			.tclk_zero			= 62,
 			.tclk_prepare			= 16,
-			.reg_ttaget			= 2,
 		},
 	},
 	.clocks = {

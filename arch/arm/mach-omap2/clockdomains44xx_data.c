@@ -371,7 +371,7 @@ static struct clockdomain l3_dss_443x_446x_clkdm = {
 	.dep_bit	  = OMAP4430_DSS_STATDEP_SHIFT,
 	.wkdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.sleepdep_srcs	  = l3_dss_wkup_sleep_deps,
-	.flags		  = CLKDM_CAN_SWSUP,
+	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
 };
 
 /*

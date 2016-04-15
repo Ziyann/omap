@@ -150,7 +150,7 @@ static void __init omap4_hdmi_mux_pads(enum omap_hdmi_flags flags)
 
 static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
 {
-	u32 enable_mask, enable_shift;
+	/*u32 enable_mask, enable_shift;
 	u32 pipd_mask, pipd_shift;
 	u32 reg;
 
@@ -176,7 +176,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
 	reg |= (lanes << enable_shift) & enable_mask;
 	reg |= (lanes << pipd_shift) & pipd_mask;
 
-	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
+	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);*/
 
 	return 0;
 }
