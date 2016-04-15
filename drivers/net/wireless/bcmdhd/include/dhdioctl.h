@@ -5,9 +5,9 @@
  *
  * Definitions subject to change without notice.
  *
- * Copyright (C) 1999-2011, Broadcom Corporation
+ * Copyright (C) 1999-2012, Broadcom Corporation
  * 
- *         Unless you and Broadcom execute a separate written software license
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -25,7 +25,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhdioctl.h 323572 2012-03-26 06:28:14Z $
+ * $Id: dhdioctl.h 321498 2012-03-15 12:54:13Z $
  */
 
 #ifndef _dhdioctl_h_
@@ -85,10 +85,14 @@ enum {
 #define DHD_GLOM_VAL	0x0400
 #define DHD_EVENT_VAL	0x0800
 #define DHD_BTA_VAL	0x1000
+#if defined(NDIS630)
+#define DHD_SCAN_VAL	0x2000
+#else
 #define DHD_ISCAN_VAL	0x2000
+#endif
 #define DHD_ARPOE_VAL	0x4000
-#define DHD_REORDER_VAL 0x8000
-#define DHD_WL_VAL	0x10000
+#define DHD_REORDER_VAL	0x8000
+#define DHD_WL_VAL		0x10000
 
 #ifdef SDTEST
 /* For pktgen iovar */

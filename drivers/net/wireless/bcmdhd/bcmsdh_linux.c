@@ -1,9 +1,9 @@
 /*
  * SDIO access interface for drivers - linux specific (pci only)
  *
- * Copyright (C) 1999-2011, Broadcom Corporation
+ * Copyright (C) 1999-2012, Broadcom Corporation
  * 
- *         Unless you and Broadcom execute a separate written software license
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_linux.c 352863 2012-08-24 04:48:50Z $
+ * $Id: bcmsdh_linux.c 312788 2012-02-03 23:06:32Z $
  */
 
 /**
@@ -404,10 +404,6 @@ bcmsdh_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* match this pci device with what we support */
 	/* we can't solely rely on this to believe it is our SDIO Host Controller! */
 	if (!bcmsdh_chipmatch(pdev->vendor, pdev->device)) {
-		if (pdev->vendor == VENDOR_BROADCOM) {
-			SDLX_MSG(("%s: Unknown Broadcom device (vendor: %#x, device: %#x).\n",
-				__FUNCTION__, pdev->vendor, pdev->device));
-		}
 		return -ENODEV;
 	}
 
@@ -515,6 +511,21 @@ bcmsdh_pci_remove(struct pci_dev *pdev)
 #endif /* BCMPLATFORM_BUS */
 
 extern int sdio_function_init(void);
+
+extern int sdio_func_reg_notify(void* semaphore);
+extern void sdio_func_unreg_notify(void);
+
+#if defined(BCMLXSDMMC)
+int bcmsdh_reg_sdio_notify(void* semaphore)
+{
+	return sdio_func_reg_notify(semaphore);
+}
+
+void bcmsdh_unreg_sdio_notify(void)
+{
+	sdio_func_unreg_notify();
+}
+#endif /* defined(BCMLXSDMMC) */
 
 int
 bcmsdh_register(bcmsdh_driver_t *driver)
@@ -686,11 +697,6 @@ module_param(sd_f2_blocksize, int, 0);
 #ifdef BCMSDIOH_STD
 extern int sd_uhsimode;
 module_param(sd_uhsimode, int, 0);
-#endif
-
-#ifdef BCMSDIOH_TXGLOM
-extern uint sd_txglom;
-module_param(sd_txglom, uint, 0);
 #endif
 
 #ifdef BCMSDH_MODULE
