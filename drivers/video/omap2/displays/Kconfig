@@ -100,4 +100,12 @@ config PANEL_LP_101
         depends on OMAP2_DSS_DPI
         help
           LCD Panel used in TI's OMAP5 uevm board attachable on LCD2 interface
+
+config PANEL_LTN
+	tristate "Samsung LTN070NL01/LTN101AL03 Panel"
+	depends on OMAP2_DSS_DPI
+	default n
+	help
+	  This enables support for Samsung LTN070NL01/LTN101AL03 LCD panel
+
 endmenu
