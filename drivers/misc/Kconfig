@@ -572,6 +572,15 @@ config UID_CPUTIME
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
+config SEC_30PIN_CON
+	bool "Samsung 30-pin connector support for tablet devices"
+	help
+	  This feature add an infratructure to control and detecting 30-pin
+	  connector for Samsung Tablet devices. Many optional devices can be
+	  connected throu out this connector for example TA/USB/DOCK etc. to
+	  support accessary devices for Samsunt Tablet device this feature
+	  must be enabled.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
