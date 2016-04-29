@@ -572,6 +572,15 @@ config UID_CPUTIME
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
+config SAMSUNG_JACK
+	bool "3.5MM ear jack driver for Samsung devices"
+	depends on INPUT
+	default n
+	---help---
+	 This is 3.5MM ear jack driver for Samsung devices.
+
+	 If unsure, say N.
+
 config SEC_30PIN_CON
 	bool "Samsung 30-pin connector support for tablet devices"
 	help
