@@ -69,3 +69,4 @@ obj-$(CONFIG_INPUT_HMC5843)		+= hmc5843.o
 obj-$(CONFIG_INPUT_TSL2771)             += tsl2771.o
 obj-$(CONFIG_INPUT_SFH7741)		+= sfh7741.o
 obj-$(CONFIG_INPUT_AK8975)		+= ak8975.o
+obj-$(CONFIG_OPTICAL_GP2A)		+= gp2a.o
