@@ -163,6 +163,15 @@ struct wm8994_pdata {
 	int num_micd_rates;
 	struct wm8958_micd_rate *micd_rates;
 
+#ifdef CONFIG_SND_OMAP_SOC_ESPRESSO
+	bool use_submic;
+	int submic_gpio;
+
+	int ear_select_gpio;
+	int main_mic_bias_gpio;
+	int mclk_gpio;
+#endif
+
         /* LINEOUT can be differential or single ended */
         unsigned int lineout1_diff:1;
         unsigned int lineout2_diff:1;

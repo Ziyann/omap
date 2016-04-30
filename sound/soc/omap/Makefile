@@ -22,6 +22,7 @@ obj-$(CONFIG_SND_OMAP_SOC_ABE_ECHO) += snd-soc-omap-abe-echo.o
 obj-$(CONFIG_SND_OMAP_SOC_ABE) += snd-soc-omap-abe.o abe/
 
 # OMAP Machine Support
+snd-soc-espresso-objs := espresso.o
 snd-soc-n810-objs := n810.o
 snd-soc-rx51-objs := rx51.o
 snd-soc-ams-delta-objs := ams-delta.o
@@ -51,4 +52,5 @@ obj-$(CONFIG_SND_OMAP_SOC_OMAP3_PANDORA) += snd-soc-omap3pandora.o
 obj-$(CONFIG_SND_OMAP_SOC_OMAP3_BEAGLE) += snd-soc-omap3beagle.o
 obj-$(CONFIG_SND_OMAP_SOC_ZOOM2) += snd-soc-zoom2.o
 obj-$(CONFIG_SND_OMAP_SOC_IGEP0020) += snd-soc-igep0020.o
+obj-$(CONFIG_SND_OMAP_SOC_ESPRESSO) += snd-soc-espresso.o
 obj-$(CONFIG_SND_OMAP_SOC_OMAP_HDMI) += snd-soc-omap-hdmi-card.o
