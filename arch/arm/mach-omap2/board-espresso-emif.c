@@ -10,22 +10,25 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/init.h>
-
-#include <mach/emif.h>
-#include <mach/lpddr2-jedec.h>
+#include "common.h"
 #include "board-espresso.h"
 
-struct lpddr2_device_info lpddr2_samsung_4G_S4_dev = {
-	.device_timings = {
-		&lpddr2_jedec_timings_200_mhz,
-		&lpddr2_jedec_timings_400_mhz
-	},
-	.min_tck	= &lpddr2_jedec_min_tck,
-	.type		= LPDDR2_TYPE_S4,
-	.density	= LPDDR2_DENSITY_4Gb,
-	.io_width	= LPDDR2_IO_WIDTH_32,
-	.emif_ddr_selfrefresh_cycles = 262144,
+struct ddr_device_info lpddr2_samsung_4G_S4_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= false,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Samsung"
+};
+
+static struct __devinitdata emif_custom_configs custom_configs = {
+	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
+	.lpmode	= EMIF_LP_MODE_SELF_REFRESH,
+	.lpmode_timeout_performance = 512,
+	.lpmode_timeout_power = 512,
+	/* only at OPP100 should we use performance value */
+	.lpmode_freq_threshold = 400000000,
 };
 
 /*
@@ -38,11 +41,15 @@ struct lpddr2_device_info lpddr2_samsung_4G_S4_dev = {
  *
  * Same devices installed on EMIF1 and EMIF2
  */
-static __initdata struct emif_device_details emif_devices = {
-	.cs0_device = &lpddr2_samsung_4G_S4_dev,
-};
 
 void __init omap4_espresso_emif_init(void)
 {
-	omap_emif_setup_device_details(&emif_devices, &emif_devices);
+	omap_emif_set_device_details(1, &lpddr2_samsung_4G_S4_info,
+			lpddr2_jedec_timings,
+			ARRAY_SIZE(lpddr2_jedec_timings),
+			&lpddr2_jedec_min_tck, &custom_configs);
+	omap_emif_set_device_details(2, &lpddr2_samsung_4G_S4_info,
+			lpddr2_jedec_timings,
+			ARRAY_SIZE(lpddr2_jedec_timings),
+			&lpddr2_jedec_min_tck, &custom_configs);
 }
