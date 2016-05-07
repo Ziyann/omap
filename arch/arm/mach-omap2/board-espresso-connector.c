@@ -34,8 +34,11 @@
 #include <linux/battery.h>
 #include <linux/bat_manager.h>
 #include <linux/irq.h>
+#include <linux/usb/omap4_usb_phy.h>
 
 #include <plat/usb.h>
+
+#include <asm/system_info.h>
 
 #include "board-espresso.h"
 #include "mux.h"
@@ -81,7 +84,7 @@ static char *device_names[] = {
 };
 
 struct omap4_otg {
-	struct otg_transceiver otg;
+	struct usb_phy phy;
 	struct device dev;
 
 	struct regulator *vusb;
@@ -299,35 +302,35 @@ static void espresso_ap_usb_attach(struct omap4_otg *otg)
 {
 	omap4_vusb_enable(otg, true);
 
-	otg->otg.default_a = false;
-	otg->otg.state = OTG_STATE_B_IDLE;
-	otg->otg.last_event = USB_EVENT_VBUS_CHARGER;
+	otg->phy.otg->default_a = false;
+	otg->phy.state = OTG_STATE_B_IDLE;
+	otg->phy.last_event = USB_EVENT_VBUS_CHARGER;
 
-	atomic_notifier_call_chain(&otg->otg.notifier,
+	atomic_notifier_call_chain(&otg->phy.notifier,
 			USB_EVENT_VBUS_CHARGER,
-			otg->otg.gadget);
+			otg->phy.otg->gadget);
 }
 
 static void espresso_ap_usb_detach(struct omap4_otg *otg)
 {
 	omap4_vusb_enable(otg, false);
 
-	otg->otg.default_a = false;
-	otg->otg.state = OTG_STATE_B_IDLE;
+	otg->phy.otg->default_a = false;
+	otg->phy.state = OTG_STATE_B_IDLE;
 
-	if (otg->otg.last_event != USB_EVENT_VBUS_CHARGER) {
-		otg->otg.last_event = USB_EVENT_NONE;
-		atomic_notifier_call_chain(&otg->otg.notifier,
+	if (otg->phy.last_event != USB_EVENT_VBUS_CHARGER) {
+		otg->phy.last_event = USB_EVENT_NONE;
+		atomic_notifier_call_chain(&otg->phy.notifier,
 				USB_EVENT_NONE,
-				otg->otg.gadget);
+				otg->phy.otg->gadget);
 	} else {
-		otg->otg.last_event = USB_EVENT_NONE;
+		otg->phy.last_event = USB_EVENT_NONE;
 		pr_info("VBUS OFF before detecting the cable type\n");
 	}
 
-	atomic_notifier_call_chain(&otg->otg.notifier,
+	atomic_notifier_call_chain(&otg->phy.notifier,
 				USB_EVENT_CHARGER_NONE,
-				otg->otg.gadget);
+				otg->phy.otg->gadget);
 }
 
 static void espresso_usb_host_attach(struct omap4_otg *otg)
@@ -338,24 +341,24 @@ static void espresso_usb_host_attach(struct omap4_otg *otg)
 
 	omap4_vusb_enable(otg, true);
 
-	otg->otg.state = OTG_STATE_A_IDLE;
-	otg->otg.default_a = true;
-	otg->otg.last_event = USB_EVENT_ID;
+	otg->phy.state = OTG_STATE_A_IDLE;
+	otg->phy.otg->default_a = true;
+	otg->phy.last_event = USB_EVENT_ID;
 
-	atomic_notifier_call_chain(&otg->otg.notifier,
+	atomic_notifier_call_chain(&otg->phy.notifier,
 			USB_EVENT_ID,
-			otg->otg.gadget);
+			otg->phy.otg->gadget);
 }
 
 static void espresso_usb_host_detach(struct omap4_otg *otg)
 {
-	otg->otg.state = OTG_STATE_B_IDLE;
-	otg->otg.default_a = false;
-	otg->otg.last_event = USB_EVENT_NONE;
+	otg->phy.state = OTG_STATE_B_IDLE;
+	otg->phy.otg->default_a = false;
+	otg->phy.last_event = USB_EVENT_NONE;
 
-	atomic_notifier_call_chain(&otg->otg.notifier,
+	atomic_notifier_call_chain(&otg->phy.notifier,
 			USB_EVENT_HOST_NONE,
-			otg->otg.gadget);
+			otg->phy.otg->gadget);
 
 	espresso_set_vbus_drive(false);
 	omap4_vusb_enable(otg, false);
@@ -465,12 +468,12 @@ static void espresso_con_usb_charger_attached(struct omap4_otg *otg)
 	}
 
 	if (!val) { /* connected */
-		otg->otg.default_a = false;
-		otg->otg.state = OTG_STATE_B_IDLE;
-		otg->otg.last_event = USB_EVENT_VBUS;
+		otg->phy.otg->default_a = false;
+		otg->phy.state = OTG_STATE_B_IDLE;
+		otg->phy.last_event = USB_EVENT_VBUS;
 
-		atomic_notifier_call_chain(&otg->otg.notifier,
-			USB_EVENT_VBUS, otg->otg.gadget);
+		atomic_notifier_call_chain(&otg->phy.notifier,
+			USB_EVENT_VBUS, otg->phy.otg->gadget);
 	} else {  /* disconnected */
 		pr_info("%s, VBUS OFF : USB_EVENT_VBUS is not sent\n",
 						__func__);
@@ -491,13 +494,13 @@ static void espresso_con_ta_charger_attached(struct omap4_otg *otg)
 	}
 
 	if (!val) { /* connected */
-		otg->otg.default_a = false;
-		otg->otg.state = OTG_STATE_B_IDLE;
-		otg->otg.last_event = USB_EVENT_CHARGER;
+		otg->phy.otg->default_a = false;
+		otg->phy.state = OTG_STATE_B_IDLE;
+		otg->phy.last_event = USB_EVENT_CHARGER;
 
-		atomic_notifier_call_chain(&otg->otg.notifier,
+		atomic_notifier_call_chain(&otg->phy.notifier,
 			USB_EVENT_CHARGER,
-			otg->otg.gadget);
+			otg->phy.otg->gadget);
 	} else { /* disconnected */
 		pr_info("%s, VBUS OFF : USB_EVENT_CHARGER is not sent\n",
 						__func__);
@@ -836,21 +839,20 @@ static ssize_t espresso_adc_show(struct device *dev,
 	return sprintf(buf, "%x\n", key_string_on);
 }
 
-static int espresso_otg_set_host(struct otg_transceiver *otg,
-				 struct usb_bus *host)
+static int espresso_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
 {
 	otg->host = host;
 	if (!host)
-		otg->state = OTG_STATE_UNDEFINED;
+		otg->phy->state = OTG_STATE_UNDEFINED;
 	return 0;
 }
 
-static int espresso_otg_set_peripheral(struct otg_transceiver *otg,
+static int espresso_otg_set_peripheral(struct usb_otg *otg,
 				       struct usb_gadget *gadget)
 {
 	otg->gadget = gadget;
 	if (!gadget)
-		otg->state = OTG_STATE_UNDEFINED;
+		otg->phy->state = OTG_STATE_UNDEFINED;
 	return 0;
 }
 
@@ -877,11 +879,13 @@ static void espresso_otg_work(struct work_struct *data)
 	mutex_unlock(&espresso_otg->lock);
 }
 
-static int espresso_otg_set_vbus(struct otg_transceiver *otg, bool enabled)
+static int espresso_otg_set_vbus(struct usb_otg *otg, bool enabled)
 {
+	struct usb_phy *phy = otg->phy;
 	struct omap4_otg *espresso_otg =
-	    container_of(otg, struct omap4_otg, otg);
-	dev_dbg(otg->dev, "vbus %s\n", enabled ? "on" : "off");
+		container_of(phy, struct omap4_otg, phy);
+
+	dev_dbg(phy->dev, "vbus %s\n", enabled ? "on" : "off");
 
 	espresso_otg->need_vbus_drive = enabled;
 	schedule_work(&espresso_otg->set_vbus_work);
@@ -889,23 +893,18 @@ static int espresso_otg_set_vbus(struct otg_transceiver *otg, bool enabled)
 	return 0;
 }
 
-static int espresso_otg_phy_init(struct otg_transceiver *otg)
+static int espresso_otg_phy_init(struct usb_phy *phy)
 {
-	if (otg->last_event == USB_EVENT_ID)
-		omap4430_phy_power(otg->dev, 1, 1);
+	if (phy->last_event == USB_EVENT_ID)
+		omap4_usb_phy_power(phy->dev, 1);
 	else
-		omap4430_phy_power(otg->dev, 0, 1);
+		omap4_usb_phy_power(phy->dev, 1);
 	return 0;
 }
 
-static void espresso_otg_phy_shutdown(struct otg_transceiver *otg)
+static void espresso_otg_phy_shutdown(struct usb_phy *phy)
 {
-	omap4430_phy_power(otg->dev, 0, 0);
-}
-
-static int espresso_otg_set_suspend(struct otg_transceiver *otg, int suspend)
-{
-	return omap4430_phy_suspend(otg->dev, suspend);
+	omap4_usb_phy_power(phy->dev, 0);
 }
 
 static irqreturn_t ta_nconnected_irq(int irq, void *_otg)
@@ -1095,6 +1094,7 @@ fs_initcall(espresso_plugged_usb_cable_init);
 void __init omap4_espresso_connector_init(void)
 {
 	struct omap4_otg *espresso_otg = &espresso_otg_xceiv;
+	struct usb_otg *otg;
 	int ret;
 #ifndef CONFIG_BATTERY_MANAGER
 	int cable_type;
@@ -1114,24 +1114,29 @@ void __init omap4_espresso_connector_init(void)
 
 	dev_set_drvdata(&espresso_otg->dev, espresso_otg);
 
-	espresso_otg->otg.dev			= &espresso_otg->dev;
-	espresso_otg->otg.label			= "espresso_otg_xceiv";
-	espresso_otg->otg.set_host		= espresso_otg_set_host;
-	espresso_otg->otg.set_peripheral	= espresso_otg_set_peripheral;
-	espresso_otg->otg.set_suspend		= espresso_otg_set_suspend;
-	espresso_otg->otg.set_vbus		= espresso_otg_set_vbus;
-	espresso_otg->otg.init			= espresso_otg_phy_init;
-	espresso_otg->otg.shutdown		= espresso_otg_phy_shutdown;
+	otg = devm_kzalloc(&espresso_otg->dev, sizeof(*otg), GFP_KERNEL);
+	if (!otg) {
+		dev_err(&espresso_otg->dev, "unable to allocate memory for USB OTG\n");
+		return;
+	}
+	espresso_otg->phy.otg		= otg;
 
-	ATOMIC_INIT_NOTIFIER_HEAD(&espresso_otg->otg.notifier);
+	espresso_otg->phy.dev		= &espresso_otg->dev;
+	espresso_otg->phy.label		= "espresso_otg_xceiv";
+	espresso_otg->phy.init		= espresso_otg_phy_init;
+	espresso_otg->phy.shutdown	= espresso_otg_phy_shutdown;
 
-	ret = otg_set_transceiver(&espresso_otg->otg);
+	otg->phy			= &espresso_otg->phy;
+	otg->set_host			= espresso_otg_set_host;
+	otg->set_peripheral		= espresso_otg_set_peripheral;
+	otg->set_vbus			= espresso_otg_set_vbus;
+
+	ATOMIC_INIT_NOTIFIER_HEAD(&espresso_otg->phy.notifier);
+
+	ret = usb_add_phy(&espresso_otg->phy, USB_PHY_TYPE_UNDEFINED);
 	if (ret)
-		pr_err("espresso_otg: cannot set transceiver (%d)\n", ret);
+		pr_err("espresso_otg: cannot add transceiver (%d)\n", ret);
 
-	omap4430_phy_init(&espresso_otg->dev);
-
-	espresso_otg_set_suspend(&espresso_otg->otg, 0);
 	espresso_vbus_detect_init(espresso_otg);
 
 	sec_switch_dev = device_create(sec_class, NULL, 0, NULL, "switch");
