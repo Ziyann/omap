@@ -15,7 +15,9 @@
 
 #include <linux/delay.h>
 #include <linux/gpio.h>
+
 #include <asm/mach-types.h>
+#include <asm/system_info.h>
 
 #include "mux.h"
 #include "board-espresso.h"

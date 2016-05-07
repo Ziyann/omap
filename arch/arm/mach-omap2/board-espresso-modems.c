@@ -19,8 +19,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <asm/system_info.h>
 
-#include <mach/omap4-common.h>
 #include <linux/platform_data/modem_v2.h>
 
 #include "board-espresso.h"

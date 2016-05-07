@@ -24,6 +24,8 @@
 #include <linux/yas.h>
 #include <linux/al3201.h>
 
+#include <asm/system_info.h>
+
 #include "board-espresso.h"
 
 #define GPIO_ALS_INT		33

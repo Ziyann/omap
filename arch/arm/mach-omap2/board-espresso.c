@@ -36,7 +36,6 @@
 #include <plat/omap_hsi.h>
 #endif
 
-#include <mach/omap4-common.h>
 #include <mach/id.h>
 #ifdef CONFIG_ION_OMAP
 #include <mach/omap4_ion.h>
@@ -46,6 +45,9 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+
+#include <asm/system_info.h>
+#include <asm/system_misc.h>
 
 #include "board-espresso.h"
 #include "common.h"
