@@ -37,9 +37,6 @@
 #endif
 
 #include <mach/id.h>
-#ifdef CONFIG_ION_OMAP
-#include <mach/omap4_ion.h>
-#endif
 
 #include <asm/hardware/gic.h>
 
@@ -49,11 +46,14 @@
 #include <asm/system_info.h>
 #include <asm/system_misc.h>
 
+#include "mach/omap-secure.h"
+
 #include "board-espresso.h"
 #include "common.h"
 #include "control.h"
 #include "mux.h"
 #include "omap_ram_console.h"
+#include "omap4_ion.h"
 #include "omap4-sar-layout.h"
 
 #include "sec_muxtbl.h"
@@ -78,8 +78,6 @@
 #define REBOOT_FLAG_RECOVERY	(1 << 1)
 #define REBOOT_FLAG_POWER_OFF	(1 << 4)
 #define REBOOT_FLAG_DOWNLOAD	(1 << 5)
-
-#define ESPRESSO_RAM_CONSOLE_START	(PLAT_PHYS_OFFSET + SZ_512M)
 
 #define ESPRESSO_ATTR_RO(_type, _name, _show) \
 	struct kobj_attribute espresso_##_type##_prop_attr_##_name = \
@@ -421,43 +419,14 @@ static void __init espresso_init(void)
 #endif
 }
 
-static void omap4_espresso_init_carveout_sizes(
-		struct omap_ion_platform_data *ion)
-{
-	ion->tiler1d_size = (SZ_1M * 14);
-	/* WFD is not supported in espresso So the size is zero */
-	ion->secure_output_wfdhdcp_size = 0;
-	ion->ducati_heap_size = (SZ_1M * 65);
-#ifndef CONFIG_ION_OMAP_TILER_DYNAMIC_ALLOC
-	if (board_is_espresso10())
-		ion->nonsecure_tiler2d_size = (SZ_1M * 19);
-	else
-		ion->nonsecure_tiler2d_size = (SZ_1M * 8);
-	ion->tiler2d_size = (SZ_1M * 81);
-#endif
-}
-
 static void __init espresso_reserve(void)
 {
-#ifdef CONFIG_ION_OMAP
-	omap_init_ram_size();
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	omap4_espresso_memory_display_init();
-	omap4_espresso_init_carveout_sizes(get_omap_ion_platform_data());
-	omap_ion_init();
-#endif
-	/* do the static reservations first */
-#ifdef CONFIG_OMAP_RAM_CONSOLE
-	omap_ram_console_init(ESPRESSO_RAM_CONSOLE_START,
-				OMAP_RAM_CONSOLE_SIZE_DEFAULT);
-#endif
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-
-	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
-				    PHYS_ADDR_DUCATI_SIZE +
-				    OMAP4_ION_HEAP_SECURE_INPUT_SIZE +
-				    OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
+	omap4_ion_init();
+	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
 
