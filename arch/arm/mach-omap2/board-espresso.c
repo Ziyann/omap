@@ -396,8 +396,8 @@ static void __init espresso_init(void)
 
 	/* initialize each drivers */
 	omap4_espresso_serial_init();
-	omap4_espresso_charger_init();
 	omap4_espresso_pmic_init();
+	omap4_espresso_charger_init();
 #ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
 #endif
