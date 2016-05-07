@@ -28,6 +28,7 @@
 #include <plat/board.h>
 #include <plat/common.h>
 #include <plat/cpu.h>
+#include <plat/drm.h>
 #include <plat/remoteproc.h>
 #include <plat/usb.h>
 
@@ -35,7 +36,6 @@
 #include <plat/omap_hsi.h>
 #endif
 
-#include <mach/dmm.h>
 #include <mach/omap4-common.h>
 #include <mach/id.h>
 #ifdef CONFIG_ION_OMAP
@@ -405,7 +405,7 @@ static void __init espresso_init(void)
 	omap4_register_ion();
 #endif
 	platform_add_devices(espresso_devices, ARRAY_SIZE(espresso_devices));
-	omap_dmm_init();
+	omap_init_dmm_tiler();
 	omap4_espresso_sdio_init();
 	usb_musb_init(&musb_board_data);
 	omap4_espresso_connector_init();
