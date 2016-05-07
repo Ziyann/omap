@@ -21,9 +21,12 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/hwspinlock.h>
+
 #include <plat/common.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap-serial.h>
+
+#include <asm/system_info.h>
 
 #include "board-espresso.h"
 #include "mux.h"
@@ -43,7 +46,6 @@ static struct i2c_board_info __initdata espresso_i2c_board_info[] = {
 	{
 		I2C_BOARD_INFO("ducati", 0x20),
 		.irq		= OMAP44XX_IRQ_I2C2,
-		.ext_master	= true,
 	},
 };
 
@@ -52,9 +54,10 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 	/* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id,
+							USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
@@ -223,15 +226,51 @@ static struct omap_device_pad espresso_uart4_pads[] __initdata = {
 	},
 };
 
-static struct omap_uart_port_info espresso_uart2_info __initdata = {
-	.use_dma		= 0,
-	.dma_rx_buf_size	= DEFAULT_RXDMA_BUFSIZE,
-	.dma_rx_poll_rate	= DEFAULT_RXDMA_POLLRATE,
-	.dma_rx_timeout		= DEFAULT_RXDMA_TIMEOUT,
-	.auto_sus_timeout	= 0,
+static struct omap_board_data uart1_board_data __initdata = {
+	.id = 0,
+	.pads = espresso_uart1_pads,
+	.pads_cnt = ARRAY_SIZE(espresso_uart1_pads),
+};
+
+static struct omap_board_data uart2_board_data __initdata = {
+	.id = 1,
+	.pads = espresso_uart2_pads,
+	.pads_cnt = ARRAY_SIZE(espresso_uart2_pads),
+};
+
+static struct omap_board_data uart3_board_data __initdata = {
+	.id = 2,
+	.pads = espresso_uart3_pads,
+	.pads_cnt = ARRAY_SIZE(espresso_uart3_pads),
+};
+
+static struct omap_board_data uart4_board_data __initdata = {
+	.id = 3,
+	.pads = espresso_uart4_pads,
+	.pads_cnt = ARRAY_SIZE(espresso_uart4_pads),
+};
+
+static struct omap_uart_port_info uart2_info __initdata = {
+	.dma_enabled		= 0,
+	.dma_rx_buf_size	= 4096,
+	.dma_rx_poll_rate	= 1,
+	.dma_rx_timeout		= 3 * HZ,
+	.autosuspend_timeout	= 0,
+#if 0
 	.wake_peer		= bcm_bt_lpm_exit_lpm_locked,
 	.rts_mux_driver_control	= 1,
+#endif
 };
+
+static void __init espresso_uart_init(void)
+{
+	omap_serial_init_port(&uart1_board_data, NULL);
+	omap_serial_init_port(&uart2_board_data, &uart2_info);
+	omap_serial_init_port(&uart3_board_data, NULL);
+	omap_serial_init_port(&uart4_board_data, NULL);
+
+	espresso_bcmgps_init();
+}
 
 static void __init omap_serial_none_pads_cfg_mux(void)
 {
@@ -243,21 +282,6 @@ static void __init omap_serial_none_pads_cfg_mux(void)
 	omap_mux_write(core,
 		OMAP_MUX_MODE7 | OMAP_PIN_INPUT_PULLDOWN,
 		OMAP4_CTRL_MODULE_PAD_UART3_TX_IRTX_OFFSET);
-}
-
-static void __init espresso_uart_init(void)
-{
-	omap_serial_init_port_pads(0, espresso_uart1_pads,
-				   ARRAY_SIZE(espresso_uart1_pads), NULL);
-	omap_serial_init_port_pads(1, espresso_uart2_pads,
-				   ARRAY_SIZE(espresso_uart2_pads),
-				   &espresso_uart2_info);
-	omap_serial_init_port_pads(2, espresso_uart3_pads,
-				   ARRAY_SIZE(espresso_uart3_pads), NULL);
-	omap_serial_init_port_pads(3, espresso_uart4_pads,
-				   ARRAY_SIZE(espresso_uart4_pads), NULL);
-
-	espresso_bcmgps_init();
 }
 
 static struct platform_device *espresso_serial_devices[] __initdata = {
