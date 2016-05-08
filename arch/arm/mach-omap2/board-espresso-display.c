@@ -18,7 +18,6 @@
 #include <linux/gpio.h>
 #include <linux/kernel.h>
 #include <linux/omapfb.h>
-#include <linux/regulator/consumer.h>
 #include <linux/platform_data/panel-ltn.h>
 
 #include <plat/omap_hwmod.h>
@@ -32,14 +31,21 @@
 #define GPIO_LCD_EN			135
 #define GPIO_LVDS_NSHDN		136
 
-static void espresso_lcd_set_power(bool enable)
+static int espresso_lcd_enable(struct omap_dss_device *dssdev)
 {
-	pr_debug("%s: %d\n", __func__, enable);
-	gpio_set_value(GPIO_LCD_EN, enable);
+	pr_debug("%s\n", __func__);
+	gpio_set_value(GPIO_LCD_EN, 1);
+
+	return 0;
+}
+
+static void espresso_lcd_disable(struct omap_dss_device *dssdev)
+{
+	pr_debug("%s\n", __func__);
+	gpio_set_value(GPIO_LCD_EN, 0);
 }
 
 static struct ltn_panel_data espresso_panel_data = {
-	.set_power			= espresso_lcd_set_power,
 	.lvds_nshdn_gpio		= GPIO_LVDS_NSHDN,
 	.led_backlight_reset_gpio	= GPIO_LED_BACKLIGHT_RESET,
 	.backlight_gptimer_num		= 10,
@@ -57,7 +63,8 @@ static struct omap_dss_device espresso_lcd_device = {
 	.phy.dpi.data_lines	= 24,
 	.data			= &espresso_panel_data,
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
-	.skip_init		= false,
+	.platform_enable	= espresso_lcd_enable,
+	.platform_disable	= espresso_lcd_disable,
 	.panel = {
 		.timings	= {
 			.x_res		= 1024,
@@ -103,9 +110,21 @@ static struct omap_dss_board_info espresso_dss_data = {
 	.default_device	= &espresso_lcd_device,
 };
 
+static struct sgx_omaplfb_config espresso_omaplfb_config[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+};
+
+static struct sgx_omaplfb_platform_data espresso_omaplfb_plat_data = {
+	.num_configs = ARRAY_SIZE(espresso_omaplfb_config),
+	.configs = espresso_omaplfb_config,
+};
+
 static struct omapfb_platform_data espresso_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(espresso_omaplfb_config),
 	},
 };
 
@@ -116,9 +135,8 @@ void __init omap4_espresso_memory_display_init(void)
 
 	omap_android_display_setup(&espresso_dss_data,
 				   NULL,
-				   NULL,
-				   &espresso_fb_pdata,
-				   get_omap_ion_platform_data());
+				   &espresso_omaplfb_plat_data,
+				   &espresso_fb_pdata);
 }
 
 void __init omap4_espresso_display_init(void)
@@ -135,6 +153,8 @@ void __init omap4_espresso_display_init(void)
 		pr_err("%s: gpio_request %d failed!\n", __func__, GPIO_LCD_EN);
 
 	gpio_direction_output(GPIO_LCD_EN, 1);
+
+	omapfb_set_platform_data(&espresso_fb_pdata);
 
 	omap_display_init(&espresso_dss_data);
 }
