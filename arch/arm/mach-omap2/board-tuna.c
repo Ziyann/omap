@@ -548,7 +548,9 @@ static struct twl6040_codec_data twl6040_codec = {
 	.hs_right_step  = 0x0f,
 	.hf_left_step   = 0x1d,
 	.hf_right_step  = 0x1d,
+#if 0
 	.ep_step	= 0x0f,
+#endif
 };
 
 static struct twl6040_platform_data twl6040_data = {
