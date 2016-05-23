@@ -150,7 +150,6 @@ static struct i2c_board_info __initdata tuna_i2c3_boardinfo_final[] = {
 		I2C_BOARD_INFO("mms_ts", 0x48),
 		.flags = I2C_CLIENT_WAKE,
 		.platform_data = &mms_ts_pdata,
-		.irq = OMAP_GPIO_IRQ(GPIO_TOUCH_IRQ),
 	},
 };
 
@@ -174,6 +173,8 @@ void __init omap4_tuna_input_init(void)
 		mms_ts_pdata.fw_name = "mms144_ts_rev32.fw";
 	else
 		mms_ts_pdata.fw_name = "mms144_ts_rev31.fw";
+
+	tuna_i2c3_boardinfo_final[0].irq = gpio_to_irq(GPIO_TOUCH_IRQ);
 
 	i2c_register_board_info(3, tuna_i2c3_boardinfo_final,
 		ARRAY_SIZE(tuna_i2c3_boardinfo_final));
