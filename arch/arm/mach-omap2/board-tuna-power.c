@@ -22,6 +22,7 @@
 #include <linux/moduleparam.h>
 #include <linux/pda_power.h>
 #include <linux/platform_device.h>
+#include <linux/stat.h>
 
 #if defined(CONFIG_TWL6030_GPADC)
 #include <linux/i2c/twl6030-gpadc.h>
@@ -424,7 +425,7 @@ static char *tuna_charger_supplied_to[] = {
 	"battery",
 };
 
-static const __initdata struct pda_power_pdata charger_pdata = {
+static __initdata struct pda_power_pdata charger_pdata = {
 	.init = charger_init,
 	.exit = charger_exit,
 	.set_charge = charger_set_charge,
@@ -453,11 +454,10 @@ static struct max17040_platform_data max17043_pdata = {
 	.limit_recharging_time = 5400, /* 90 min */
 };
 
-static const __initdata struct i2c_board_info max17043_i2c[] = {
+static __initdata struct i2c_board_info max17043_i2c[] = {
 	{
 		I2C_BOARD_INFO("max17040", (0x6C >> 1)),
 		.platform_data = &max17043_pdata,
-		.irq = OMAP_GPIO_IRQ(GPIO_FUEL_ALERT),
 	}
 };
 
@@ -533,6 +533,7 @@ void __init omap4_tuna_power_init(void)
 		pr_err("cannot register pda-power\n");
 
 	max17043_pdata.use_fuel_alert = !is_charging_mode;
+	max17043_i2c[0].irq = gpio_to_irq(GPIO_FUEL_ALERT);
 	i2c_register_board_info(4, max17043_i2c, ARRAY_SIZE(max17043_i2c));
 
 	if (enable_sr)
