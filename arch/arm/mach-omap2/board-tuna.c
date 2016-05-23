@@ -74,7 +74,8 @@
 #include "mux.h"
 #include "board-tuna.h"
 #include "omap_ram_console.h"
-#include "resetreason.h"
+#include "common.h"
+#include "common-board-devices.h"
 
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
@@ -292,14 +293,6 @@ static int uart1_rts_ctrl_write(struct file *file, const char __user *buffer,
 		return -EINVAL;
 	if (copy_from_user(buf, buffer, count))
 		return -EFAULT;
-
-	if (!strncmp(buf, "1", 1)) {
-		omap_rts_mux_write(OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
-							UART_NUM_FOR_GPS);
-	} else if (!strncmp(buf, "0", 1)) {
-		omap_rts_mux_write(OMAP_PIN_OUTPUT | OMAP_MUX_MODE1,
-							UART_NUM_FOR_GPS);
-	}
 
 	return count;
 }
@@ -592,14 +585,6 @@ static void tuna_audio_init(void)
 	omap_mux_init_signal("kpd_col3.gpio_171", OMAP_PIN_OUTPUT | OMAP_MUX_MODE3);
 }
 
-static struct i2c_board_info __initdata tuna_i2c1_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("twl6030", 0x48),
-		.flags = I2C_CLIENT_WAKE,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-	},
-};
-
 static struct i2c_board_info __initdata tuna_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("ducati", 0x20),
@@ -618,9 +603,10 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 /* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id,
+			USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
@@ -675,12 +661,8 @@ static int __init tuna_i2c_init(void)
 	 */
 	regulator_has_full_constraints();
 
-	/*
-	 * Phoenix Audio IC needs I2C1 to
-	 * start with 400 KHz or less
-	 */
-	omap_register_i2c_bus(1, 400, tuna_i2c1_boardinfo,
-			      ARRAY_SIZE(tuna_i2c1_boardinfo));
+	omap4_pmic_init("twl6030", &tuna_twldata,
+			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	omap_register_i2c_bus(2, 400, tuna_i2c2_boardinfo,
                               ARRAY_SIZE(tuna_i2c2_boardinfo));
 	omap_register_i2c_bus(3, 400, NULL, 0);
