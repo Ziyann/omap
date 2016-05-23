@@ -522,6 +522,7 @@ static struct regulator_init_data tuna_vdac = {
 };
 
 static struct regulator_consumer_supply tuna_vusb_supply[] = {
+	REGULATOR_SUPPLY("vusb", "twl6030_usb"),
 	REGULATOR_SUPPLY("vusb", "tuna_otg"),
 };
 
