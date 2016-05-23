@@ -18,6 +18,7 @@
 #include <linux/gpio.h>
 #include <linux/wakelock.h>
 #include <linux/mutex.h>
+#include <linux/stat.h>
 #include <asm/mach-types.h>
 #include <plat/dmtimer.h>
 
