@@ -1153,7 +1153,7 @@ static void __init tuna_init(void)
 	platform_add_devices(tuna_devices, ARRAY_SIZE(tuna_devices));
 	board_serial_init();
 	tuna_bt_init();
-	omap2_hsmmc_init(mmc);
+	omap_hsmmc_init(mmc);
 	usb_musb_init(&musb_board_data);
 	omap4_tuna_create_board_props();
 	if (TUNA_TYPE_TORO == omap4_tuna_get_type()) {
