@@ -31,7 +31,9 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/omap4_usb_phy.h>
 #include <linux/delay.h>
+#ifdef CONFIG_SII9234
 #include <linux/sii9234.h>
+#endif
 #include <linux/i2c/twl.h>
 #include <linux/mutex.h>
 #include <linux/switch.h>
@@ -754,6 +756,7 @@ static ssize_t tuna_otg_uart_switch_store(struct device *dev,
 	return size;
 }
 
+#ifdef CONFIG_SII9234
 static struct wake_lock sii9234_wake_lock;
 
 #define OMAP_HDMI_HPD_ADDR	0x4A100098
@@ -826,8 +829,8 @@ static void sii9234_connect(bool on, u8 *devcap)
 	atomic_notifier_call_chain(&tuna_otg->phy.notifier,
 				   val, tuna_otg->phy.otg->gadget);
 	tuna_otg_set_dock_switch(dock);
-
 }
+#endif
 
 void tuna_otg_pogo_charger(enum pogo_power_state pogo_state)
 {
@@ -861,6 +864,7 @@ void tuna_otg_set_dock_switch(int enable)
 	switch_set_state(&tuna_otg->dock_switch, enable);
 }
 
+#ifdef CONFIG_SII9234
 static struct sii9234_platform_data sii9234_pdata = {
 	.prio = TUNA_OTG_ID_SII9234_PRIO,
 	.enable = tuna_mux_usb_to_mhl,
@@ -887,6 +891,7 @@ static struct i2c_board_info __initdata tuna_i2c5_boardinfo[] = {
 		.platform_data = &sii9234_pdata,
 	},
 };
+#endif
 
 int __init omap4_tuna_connector_init(void)
 {
@@ -931,8 +936,6 @@ int __init omap4_tuna_connector_init(void)
 	omap_mux_init_gpio(GPIO_JACK_INT_N,
 			   OMAP_PIN_INPUT_PULLUP |
 			   OMAP_PIN_OFF_INPUT_PULLUP);
-
-	wake_lock_init(&sii9234_wake_lock, WAKE_LOCK_SUSPEND, "sii9234(mhl)");
 
 	mutex_init(&tuna_otg->lock);
 
@@ -997,12 +1000,15 @@ int __init omap4_tuna_connector_init(void)
 	omap_mux_init_gpio(TUNA_GPIO_HDMI_HPD, OMAP_PIN_INPUT | OMAP_PULL_ENA);
 	gpio_direction_input(TUNA_GPIO_HDMI_HPD);
 
+	tuna_otg->dock_switch.name = "dock";
+	switch_dev_register(&tuna_otg->dock_switch);
+
+#ifdef CONFIG_SII9234
+	wake_lock_init(&sii9234_wake_lock, WAKE_LOCK_SUSPEND, "sii9234(mhl)");
 	tuna_i2c5_boardinfo[0].irq = gpio_to_irq(GPIO_MHL_INT);
 	i2c_register_board_info(5, tuna_i2c5_boardinfo,
 			ARRAY_SIZE(tuna_i2c5_boardinfo));
-
-	tuna_otg->dock_switch.name = "dock";
-	switch_dev_register(&tuna_otg->dock_switch);
+#endif
 
 	return 0;
 }
