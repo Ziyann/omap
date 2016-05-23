@@ -1392,10 +1392,10 @@ static void __init tuna_reserve(void)
 	omap_init_ram_size();
 
 #ifdef CONFIG_ION_OMAP
-	tuna_android_display_setup(get_omap_ion_platform_data());
+	tuna_android_display_setup();
 	omap_ion_init();
 #else
-	tuna_android_display_setup(NULL);
+	tuna_android_display_setup();
 #endif
 
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,

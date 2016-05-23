@@ -999,7 +999,7 @@ static struct omap_dss_device tuna_oled_device = {
 
 			.ddr_clk_always_on		= 0,
 			.window_sync			= 4,
-		}
+		},
 	},
 	.clocks = {
 		.dispc		= {
@@ -1087,12 +1087,6 @@ static struct omap_dss_board_info tuna_dss_data = {
 	.default_device	= &tuna_oled_device,
 };
 
-static struct omapfb_platform_data tuna_fb_pdata = {
-	.mem_desc = {
-		.region_cnt = 1,
-	},
-};
-
 #if defined(CONFIG_FB_OMAP2_NUM_FBS)
 #define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
 #else
@@ -1101,7 +1095,7 @@ static struct omapfb_platform_data tuna_fb_pdata = {
 
 static struct sgx_omaplfb_config omaplfb_config_tuna[OMAPLFB_NUM_DEV] = {
 	{
-		.vram_buffers = 2,
+		.vram_buffers = 4,
 		.swap_chain_length = 2,
 	}
 };
@@ -1111,13 +1105,22 @@ static struct sgx_omaplfb_platform_data tuna_omaplfb_plat_data = {
 	.configs = omaplfb_config_tuna,
 };
 
-void tuna_android_display_setup(struct omap_ion_platform_data *ion)
+static struct omapfb_platform_data tuna_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = ARRAY_SIZE(omaplfb_config_tuna),
+	},
+};
+
+static struct dsscomp_platform_data dsscomp_config_tuna = {
+	.tiler1d_slotsz = ( 16 * SZ_1M ),
+};
+
+void tuna_android_display_setup(void)
 {
 	omap_android_display_setup(&tuna_dss_data,
-				   NULL,
+				   &dsscomp_config_tuna,
 				   &tuna_omaplfb_plat_data,
-				   &tuna_fb_pdata,
-				   ion);
+				   &tuna_fb_pdata);
 }
 
 void __init omap4_tuna_display_init(void)
