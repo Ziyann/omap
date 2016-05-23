@@ -555,7 +555,6 @@ static struct fsa9480_platform_data tuna_fsa9480_pdata = {
 static struct i2c_board_info __initdata tuna_connector_i2c4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("fsa9480", 0x4A >> 1),
-		.irq = OMAP_GPIO_IRQ(GPIO_JACK_INT_N),
 		.platform_data = &tuna_fsa9480_pdata,
 	},
 };
@@ -873,7 +872,6 @@ static struct sii9234_platform_data sii9234_pdata = {
 static struct i2c_board_info __initdata tuna_i2c5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("sii9234_mhl_tx", 0x72>>1),
-		.irq = OMAP_GPIO_IRQ(GPIO_MHL_INT),
 		.platform_data = &sii9234_pdata,
 	},
 	{
@@ -974,6 +972,7 @@ int __init omap4_tuna_connector_init(void)
 	if (ret)
 		pr_err("tuna_otg: cannot add transceiver (%d)\n", ret);
 
+	tuna_connector_i2c4_boardinfo[0].irq = gpio_to_irq(GPIO_JACK_INT_N);
 	i2c_register_board_info(4, tuna_connector_i2c4_boardinfo,
 				ARRAY_SIZE(tuna_connector_i2c4_boardinfo));
 
@@ -998,6 +997,7 @@ int __init omap4_tuna_connector_init(void)
 	omap_mux_init_gpio(TUNA_GPIO_HDMI_HPD, OMAP_PIN_INPUT | OMAP_PULL_ENA);
 	gpio_direction_input(TUNA_GPIO_HDMI_HPD);
 
+	tuna_i2c5_boardinfo[0].irq = gpio_to_irq(GPIO_MHL_INT);
 	i2c_register_board_info(5, tuna_i2c5_boardinfo,
 			ARRAY_SIZE(tuna_i2c5_boardinfo));
 
