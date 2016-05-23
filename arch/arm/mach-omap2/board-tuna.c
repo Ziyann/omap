@@ -79,6 +79,8 @@
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
 
+#define TPS62361_GPIO		7
+
 /* For LTE(CMC221) */
 #define OMAP_GPIO_LTE_ACTIVE	47
 #define OMAP_GPIO_CMC2AP_INT1	61
@@ -371,8 +373,8 @@ static int __init sec_common_init(void)
 
 static void __init tuna_init_early(void)
 {
-	omap2_init_common_infrastructure();
-	omap2_init_common_devices(NULL, NULL);
+	omap4430_init_early();
+	omap_tps6236x_gpio_no_reset_wa(TPS62361_GPIO, -1, 32);
 }
 
 static struct omap_musb_board_data musb_board_data = {
