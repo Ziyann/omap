@@ -441,23 +441,6 @@ static struct regulator_init_data tuna_vaux1 = {
 	},
 };
 
-static struct regulator_init_data tuna_vaux2 = {
-	.constraints = {
-		.min_uV			= 1200000,
-		.max_uV			= 2800000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-};
-
 static struct regulator_consumer_supply tuna_vaux3_supplies[] = {
 	{
 		.supply = "vlcd",
@@ -500,23 +483,6 @@ static struct regulator_init_data tuna_vmmc = {
 	.consumer_supplies = tuna_vmmc_supply,
 };
 
-static struct regulator_init_data tuna_vpp = {
-	.constraints = {
-		.min_uV			= 1800000,
-		.max_uV			= 2500000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-};
-
 static struct regulator_consumer_supply tuna_vusim_supplies[] = {
 	{
 		.supply = "vlcd-iovcc",
@@ -537,43 +503,6 @@ static struct regulator_init_data tuna_vusim = {
 	},
 	.num_consumer_supplies = ARRAY_SIZE(tuna_vusim_supplies),
 	.consumer_supplies = tuna_vusim_supplies,
-};
-
-static struct regulator_init_data tuna_vana = {
-	.constraints = {
-		.min_uV			= 2100000,
-		.max_uV			= 2100000,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
-		.state_mem = {
-			.disabled	= true,
-		},
-	},
-};
-
-static struct regulator_consumer_supply tuna_vcxio_supply[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
-};
-
-static struct regulator_init_data tuna_vcxio = {
-	.constraints = {
-		.min_uV			= 1800000,
-		.max_uV			= 1800000,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-	},
-	.num_consumer_supplies	= ARRAY_SIZE(tuna_vcxio_supply),
-	.consumer_supplies	= tuna_vcxio_supply,
-
 };
 
 static struct regulator_consumer_supply tuna_vdac_supply[] = {
@@ -619,72 +548,6 @@ static struct regulator_init_data tuna_vusb = {
 	.consumer_supplies	= tuna_vusb_supply,
 };
 
-/* clk32kg is a twl6030 32khz clock modeled as a regulator, used by GPS */
-static struct regulator_init_data tuna_clk32kg = {
-	.constraints = {
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
-	},
-};
-
-static struct regulator_consumer_supply tuna_clk32kaudio_supply[] = {
-	{
-		.supply = "clk32kaudio",
-	},
-	{
-		.supply = "twl6040_clk32k",
-	}
-};
-
-static struct regulator_init_data tuna_clk32kaudio = {
-	.constraints = {
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.boot_on                = true,
-	},
-	.num_consumer_supplies  = ARRAY_SIZE(tuna_clk32kaudio_supply),
-	.consumer_supplies      = tuna_clk32kaudio_supply,
-};
-
-
-static struct regulator_init_data tuna_vdd3 = {
-	.constraints = {
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-};
-
-/*
- * VMEM is unused. Register it to regulator framework and let it
- * be in disabled state.
- */
-static struct regulator_init_data tuna_vmem = {
-	.constraints = {
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-};
-
-static struct regulator_init_data tuna_v2v1 = {
-	.constraints = {
-		.min_uV			= 2100000,
-		.max_uV			= 2100000,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
-		.state_mem = {
-			.disabled	= true,
-		},
-	},
-};
-
 static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step   = 0x0f,
@@ -699,31 +562,13 @@ static struct twl6040_platform_data twl6040_data = {
 };
 
 static struct twl4030_platform_data tuna_twldata = {
-	.irq_base	= TWL6030_IRQ_BASE,
-	.irq_end	= TWL6030_IRQ_END,
-
 	/* Regulators */
 	.vmmc		= &tuna_vmmc,
-	.vpp		= &tuna_vpp,
 	.vusim		= &tuna_vusim,
-	.vana		= &tuna_vana,
-	.vcxio		= &tuna_vcxio,
 	.vdac		= &tuna_vdac,
 	.vusb		= &tuna_vusb,
 	.vaux1		= &tuna_vaux1,
-	.vaux2		= &tuna_vaux2,
 	.vaux3		= &tuna_vaux3,
-	.clk32kg	= &tuna_clk32kg,
-	.clk32kaudio	= &tuna_clk32kaudio,
-
-	/* children */
-	.codec		= &twl6040_data,
-	.madc		= &twl6030_madc,
-
-	/* SMPS */
-	.vdd3		= &tuna_vdd3,
-	.vmem		= &tuna_vmem,
-	.v2v1		= &tuna_v2v1,
 };
 
 static void tuna_audio_init(void)
@@ -752,7 +597,6 @@ static struct i2c_board_info __initdata tuna_i2c1_boardinfo[] = {
 		I2C_BOARD_INFO("twl6030", 0x48),
 		.flags = I2C_CLIENT_WAKE,
 		.irq = OMAP44XX_IRQ_SYS_1N,
-		.platform_data = &tuna_twldata,
 	},
 };
 
@@ -810,6 +654,20 @@ static int __init tuna_i2c_init(void)
 						OMAP_WAKEUP_EN);
 	omap_mux_init_signal("i2c1_scl.i2c1_scl", OMAP_PIN_INPUT_PULLUP);
 	omap_mux_init_signal("i2c1_sda.i2c1_sda", OMAP_PIN_INPUT_PULLUP);
+
+	omap4_pmic_get_config(&tuna_twldata, TWL_COMMON_PDATA_USB |
+			TWL_COMMON_PDATA_MADC |
+			TWL_COMMON_PDATA_THERMAL,
+			TWL_COMMON_REGULATOR_VAUX2 |
+			TWL_COMMON_REGULATOR_VPP |
+			TWL_COMMON_REGULATOR_VANA |
+			TWL_COMMON_REGULATOR_VCXIO |
+			TWL_COMMON_REGULATOR_CLK32KG |
+			TWL_COMMON_REGULATOR_V1V8 |
+			TWL_COMMON_REGULATOR_V2V1 |
+			TWL_COMMON_REGULATOR_SYSEN |
+			TWL_COMMON_REGULATOR_CLK32KAUDIO |
+			TWL_COMMON_REGULATOR_REGEN1);
 
 	/*
 	 * This will allow unused regulator to be shutdown. This flag
