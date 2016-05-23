@@ -1115,7 +1115,7 @@ static struct dsscomp_platform_data dsscomp_config_tuna = {
 	.tiler1d_slotsz = ( 16 * SZ_1M ),
 };
 
-void tuna_android_display_setup(void)
+void __init tuna_android_display_setup(void)
 {
 	omap_android_display_setup(&tuna_dss_data,
 				   &dsscomp_config_tuna,

@@ -805,31 +805,31 @@ static struct omap_device_pad tuna_uart4_pads[] __initdata = {
 	},
 };
 
-static struct omap_board_data tuna_uart1_board_data_sample4 = {
+static struct omap_board_data tuna_uart1_board_data_sample4 __initdata = {
 	.id = 0,
 	.pads = tuna_uart1_pads_sample4,
 	.pads_cnt = ARRAY_SIZE(tuna_uart1_pads_sample4),
 };
 
-static struct omap_board_data tuna_uart1_board_data = {
+static struct omap_board_data tuna_uart1_board_data __initdata = {
 	.id = 0,
 	.pads = tuna_uart1_pads,
 	.pads_cnt = ARRAY_SIZE(tuna_uart1_pads),
 };
 
-static struct omap_board_data tuna_uart2_board_data = {
+static struct omap_board_data tuna_uart2_board_data __initdata = {
 	.id = 1,
 	.pads = tuna_uart2_pads,
 	.pads_cnt = ARRAY_SIZE(tuna_uart2_pads),
 };
 
-static struct omap_board_data tuna_uart3_board_data = {
+static struct omap_board_data tuna_uart3_board_data __initdata = {
 	.id = 2,
 	.pads = tuna_uart3_pads,
 	.pads_cnt = ARRAY_SIZE(tuna_uart3_pads),
 };
 
-static struct omap_board_data tuna_uart4_board_data = {
+static struct omap_board_data tuna_uart4_board_data __initdata = {
 	.id = 3,
 	.pads = tuna_uart4_pads,
 	.pads_cnt = ARRAY_SIZE(tuna_uart4_pads),
