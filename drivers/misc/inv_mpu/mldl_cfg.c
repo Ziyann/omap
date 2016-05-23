@@ -27,6 +27,7 @@
 
 /* -------------------------------------------------------------------------- */
 #include <linux/delay.h>
+#include <linux/bug.h>
 
 #include <stddef.h>
 
