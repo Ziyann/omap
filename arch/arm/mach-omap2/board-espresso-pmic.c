@@ -245,6 +245,7 @@ static struct regulator_init_data espresso_vcxio = {
 };
 
 static struct regulator_consumer_supply espresso_vusb_supply[] = {
+	REGULATOR_SUPPLY("vusb", "twl6030_usb"),
 	REGULATOR_SUPPLY("vusb", "espresso_otg"),
 };
 
