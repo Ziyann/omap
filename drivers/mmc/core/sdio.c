@@ -1222,7 +1222,7 @@ err:
 	return err;
 }
 
-static int sdio_reset_comm(struct mmc_card *card)
+int sdio_reset_comm(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	u32 ocr;
