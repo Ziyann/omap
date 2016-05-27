@@ -9,6 +9,7 @@
  *  option) any later version.
  */
 
+#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
@@ -36,7 +37,6 @@
 #include <plat/hardware.h>
 #include <plat/mcbsp.h>
 #include <linux/gpio.h>
-#include <linux/pm_qos_params.h>
 
 #include "omap-pcm.h"
 #include "omap-mcbsp.h"
@@ -53,7 +53,7 @@
 struct snd_soc_codec *the_codec;
 int dock_status;
 
-static struct pm_qos_request_list pm_qos_handle;
+static struct pm_qos_request pm_qos_handle;
 
 static struct gpio mclk = {
 	.flags = GPIOF_OUT_INIT_LOW,
@@ -495,7 +495,7 @@ int omap4_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 
 	set_mclk(true); /* enable 26M CLK */
 
-	ret = snd_soc_add_controls(codec, omap4_controls,
+	ret = snd_soc_add_card_controls(dapm->card, omap4_controls,
 				ARRAY_SIZE(omap4_controls));
 
 	if (wm8994->pdata->use_submic) {
@@ -508,7 +508,7 @@ int omap4_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 		}
 		gpio_direction_output(sub_mic_bias.gpio, 0);
 
-		snd_soc_add_controls(codec, omap4_submic_controls,
+		snd_soc_add_card_controls(dapm->card, omap4_submic_controls,
 					ARRAY_SIZE(omap4_submic_controls));
 	}
 submic_error:
@@ -628,7 +628,7 @@ static struct snd_soc_dai_link omap4_dai[] = {
 {
 	.name = "MCBSP AIF1",
 	.stream_name = "HIFI MCBSP Tx/RX",
-	.cpu_dai_name = "omap-mcbsp-dai.2",
+	.cpu_dai_name = "omap-mcbsp.3",
 	.codec_dai_name = "wm8994-aif1",
 	.platform_name = "omap-pcm-audio",
 	.codec_name = "wm8994-codec",
@@ -713,55 +713,56 @@ static struct snd_soc_card omap4_wm8994 = {
 	.resume_post = wm8994_resume_post,
 };
 
-static struct platform_device *omap4_wm8994_snd_device;
-
-static int __init omap4_audio_init(void)
+static int __devinit espresso_audio_probe(struct platform_device *pdev)
 {
+	struct snd_soc_card *card = &omap4_wm8994;
 	int ret;
+
+	card->dev = &pdev->dev;
 
 	pm_qos_add_request(&pm_qos_handle, PM_QOS_CPU_DMA_LATENCY,
 						PM_QOS_DEFAULT_VALUE);
 
-	omap4_wm8994_snd_device = platform_device_alloc("soc-audio",  -1);
-	if (!omap4_wm8994_snd_device) {
-		pr_err("Platform device allocation failed\n");
-		ret = -ENOMEM;
-		goto device_err;
-	}
-
-	ret = snd_soc_register_dais(&omap4_wm8994_snd_device->dev,
+	ret = snd_soc_register_dais(&pdev->dev,
 				ext_dai, ARRAY_SIZE(ext_dai));
 	if (ret != 0) {
-		pr_err("Failed to register external DAIs: %d\n", ret);
-		goto dai_err;
-	}
-
-	platform_set_drvdata(omap4_wm8994_snd_device, &omap4_wm8994);
-
-	ret = platform_device_add(omap4_wm8994_snd_device);
-	if (ret) {
-		pr_err("Platform device allocation failed\n");
+		pr_err("%s: failed to register external DAIs: %d\n",
+			__func__, ret);
 		goto err;
 	}
-	return ret;
+
+	ret = snd_soc_register_card(card);
+	if (ret)
+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
+			ret);
 
 err:
-	snd_soc_unregister_dais(&omap4_wm8994_snd_device->dev,
-				ARRAY_SIZE(ext_dai));
-dai_err:
-	platform_device_put(omap4_wm8994_snd_device);
-device_err:
 	return ret;
 }
-module_init(omap4_audio_init);
 
-static void __exit omap4_audio_exit(void)
+static int __devexit espresso_audio_remove(struct platform_device *pdev)
 {
-	platform_device_unregister(omap4_wm8994_snd_device);
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+
+	snd_soc_unregister_card(card);
+
 	pm_qos_remove_request(&pm_qos_handle);
+
+	return 0;
 }
-module_exit(omap4_audio_exit);
+
+static struct platform_driver espresso_audio_driver = {
+	.driver		= {
+		.name	= "espresso-audio",
+		.owner	= THIS_MODULE,
+	},
+	.probe		= espresso_audio_probe,
+	.remove		= __devexit_p(espresso_audio_remove),
+};
+
+module_platform_driver(espresso_audio_driver);
 
 MODULE_AUTHOR("Quartz.Jang <quartz.jang@samsung.com");
 MODULE_DESCRIPTION("ALSA Soc WM8994 omap4");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:espresso-audio");

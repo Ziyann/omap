@@ -152,6 +152,11 @@ static struct wm8994_pdata wm1811_pdata = {
 	.main_mic_bias_gpio = GPIO_MICBIAS_EN,
 	.mclk_gpio = GPIO_CODEC_CLK_REQ,
 };
+
+static struct platform_device espresso_audio_device = {
+	.name		= "espresso-audio",
+	.id		= -1,
+};
 #endif
 
 static struct regulator_init_data espresso_vaux1 = {
@@ -544,6 +549,8 @@ static void __init espresso_audio_init(void)
 		wm1811_pdata.use_submic = true;
 		wm1811_pdata.submic_gpio = GPIO_SUB_MICBIAS_EN;
 	}
+
+	platform_device_register(&espresso_audio_device);
 #endif
 }
 
