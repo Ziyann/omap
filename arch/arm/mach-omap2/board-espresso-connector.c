@@ -648,7 +648,6 @@ static void omap4_espresso_usb_detected(int cable_type)
 	default:
 		pr_warning("wrong usb detected information!\n");
 		break;
-
 	}
 }
 
@@ -940,6 +939,7 @@ static irqreturn_t ta_nconnected_irq(int irq, void *_otg)
 	}
 
 	omap4_espresso_usb_detected(espresso_cable_type);
+	omap4_espresso_update_charger(espresso_cable_type);
 	omap4_espresso_tsp_ta_detect(espresso_cable_type);
 
 	return IRQ_HANDLED;
@@ -1091,6 +1091,7 @@ static int __init espresso_usb_cable_detect(void)
 	}
 
 	omap4_espresso_usb_detected(espresso_cable_type);
+	omap4_espresso_update_charger(espresso_cable_type);
 	omap4_espresso_tsp_ta_detect(espresso_cable_type);
 
 	return 0;
