@@ -23,6 +23,10 @@
 #include <linux/power/smb347-charger.h>
 #include <linux/seq_file.h>
 #include <linux/delay.h>
+#ifdef CONFIG_MACH_OMAP4_ESPRESSO
+#include <linux/battery.h>
+#include "../../arch/arm/mach-omap2/board-espresso.h"
+#endif
 
 /*
  * Configuration registers. These are mirrored to volatile RAM and can be
@@ -265,6 +269,10 @@ static int smb347_update_status(struct smb347_charger *smb)
 	bool dc = false;
 	int ret;
 
+#ifdef CONFIG_MACH_OMAP4_ESPRESSO
+	dc = (espresso_cable_type == CABLE_TYPE_AC ? 1 : 0);
+	usb = (espresso_cable_type == CABLE_TYPE_USB ? 1 : 0);
+#else
 	ret = smb347_read(smb, IRQSTAT_E);
 	if (ret < 0)
 		return ret;
@@ -277,6 +285,7 @@ static int smb347_update_status(struct smb347_charger *smb)
 		dc = !(ret & IRQSTAT_E_DCIN_UV_STAT);
 	if (smb->pdata->use_usb)
 		usb = !(ret & IRQSTAT_E_USBIN_UV_STAT);
+#endif
 
 	mutex_lock(&smb->lock);
 	ret = smb->mains_online != dc || smb->usb_online != usb;
@@ -1029,6 +1038,7 @@ static int smb347_mains_set_property(struct power_supply *psy,
 
 		smb347_set_writable(smb, true);
 
+#ifndef CONFIG_MACH_OMAP4_ESPRESSO
 		ret = smb347_read(smb, CMD_A);
 		if (ret < 0)
 			return -EINVAL;
@@ -1038,6 +1048,7 @@ static int smb347_mains_set_property(struct power_supply *psy,
 			ret |= CMD_A_SUSPEND_ENABLED;
 
 		ret = smb347_write(smb, CMD_A, ret);
+#endif
 
 		smb347_hw_init(smb);
 
