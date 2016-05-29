@@ -18,6 +18,7 @@
 #include <linux/serial_core.h>
 
 extern struct class *sec_class;
+extern int espresso_cable_type;
 
 #define SEC_MACHINE_ESPRESSO			0x01
 #define SEC_MACHINE_ESPRESSO10			0x02
@@ -61,7 +62,6 @@ void omap4_espresso_set_chager_type(int type);
 /** @category mUSB-IC, MHL */
 void omap4_espresso_connector_init(void);
 int omap4_espresso_get_adc(enum espresso_adc_ch ch);
-void omap4_espresso_usb_detected(int cable_type);
 
 /** @category LPDDR2 */
 void omap4_espresso_emif_init(void);

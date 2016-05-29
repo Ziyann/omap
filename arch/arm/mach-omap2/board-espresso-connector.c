@@ -86,6 +86,8 @@ static char *device_names[] = {
 	[P30_TA]			= "TA",
 };
 
+int espresso_cable_type = CABLE_TYPE_NONE;
+
 struct omap4_otg {
 	struct usb_phy phy;
 	struct device dev;
@@ -626,7 +628,7 @@ static void espresso_30pin_detected(int device, bool connected)
 	}
 }
 
-void omap4_espresso_usb_detected(int cable_type)
+static void omap4_espresso_usb_detected(int cable_type)
 {
 	struct omap4_otg *espresso_otg = &espresso_otg_xceiv;
 
@@ -914,9 +916,6 @@ static irqreturn_t ta_nconnected_irq(int irq, void *_otg)
 {
 	struct omap4_otg *otg = _otg;
 	int val;
-#ifndef CONFIG_BATTERY_MANAGER
-	int cable_type;
-#endif
 
 	val = gpio_get_value(GPIO_TA_NCONNECTED);
 	if (val < 0) {
@@ -934,16 +933,14 @@ static irqreturn_t ta_nconnected_irq(int irq, void *_otg)
 	else      /* disconnected */
 		espresso_ap_usb_detach(otg);
 
-#ifndef CONFIG_BATTERY_MANAGER
 	if (!val) {
-		cable_type = check_charger_type();
+		espresso_cable_type = check_charger_type();
 	} else {
-		cable_type = CABLE_TYPE_NONE;
+		espresso_cable_type = CABLE_TYPE_NONE;
 	}
 
-	omap4_espresso_usb_detected(cable_type);
-	omap4_espresso_tsp_ta_detect(cable_type);
-#endif
+	omap4_espresso_usb_detected(espresso_cable_type);
+	omap4_espresso_tsp_ta_detect(espresso_cable_type);
 
 	return IRQ_HANDLED;
 }
@@ -1082,26 +1079,29 @@ static void connector_gpio_init(void)
 	gpio_request_array(uart_sw_gpios, ARRAY_SIZE(uart_sw_gpios));
 }
 
-static int __init espresso_plugged_usb_cable_init(void)
+static int __init espresso_usb_cable_detect(void)
 {
 	struct omap4_otg *espresso_otg = &espresso_otg_xceiv;
 
-	/* USB connected */
-	if (gpio_get_value(GPIO_TA_NCONNECTED) == 0)
+	if (!gpio_get_value(GPIO_TA_NCONNECTED)) {
 		omap4_vusb_enable(espresso_otg, true);
+		espresso_cable_type = check_charger_type();;
+	} else {
+		espresso_cable_type = CABLE_TYPE_NONE;
+	}
+
+	omap4_espresso_usb_detected(espresso_cable_type);
+	omap4_espresso_tsp_ta_detect(espresso_cable_type);
 
 	return 0;
 }
-fs_initcall(espresso_plugged_usb_cable_init);
+late_initcall(espresso_usb_cable_detect);
 
 void __init omap4_espresso_connector_init(void)
 {
 	struct omap4_otg *espresso_otg = &espresso_otg_xceiv;
 	struct usb_otg *otg;
 	int ret;
-#ifndef CONFIG_BATTERY_MANAGER
-	int cable_type;
-#endif
 
 	connector_gpio_init();
 	mutex_init(&espresso_otg->lock);
@@ -1183,15 +1183,4 @@ switch_dev_fail:
 	switch_dev_register(&espresso_otg->audio_switch);
 
 	espresso_otg->current_device = 0;
-
-#ifndef CONFIG_BATTERY_MANAGER
-	if (!gpio_get_value(GPIO_TA_NCONNECTED)) {
-		cable_type = CABLE_TYPE_USB;
-	} else {
-		cable_type = CABLE_TYPE_NONE;
-	}
-
-	omap4_espresso_usb_detected(cable_type);
-	omap4_espresso_tsp_ta_detect(cable_type);
-#endif
 }
