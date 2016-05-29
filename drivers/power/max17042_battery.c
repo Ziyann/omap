@@ -62,6 +62,8 @@
 #define dP_ACC_100	0x1900
 #define dP_ACC_200	0x3200
 
+#define MAX17042_VMAX_TOLERANCE		50 /* 50 mV */
+
 struct max17042_chip {
 	struct i2c_client *client;
 	struct power_supply battery;
@@ -111,9 +113,80 @@ static enum power_supply_property max17042_battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_AVG,
 };
+
+static int max17042_get_temperature(struct max17042_chip *chip, int *temp)
+{
+	int ret;
+
+	ret = max17042_read_reg(chip->client, MAX17042_TEMP);
+	if (ret < 0)
+		return ret;
+
+	*temp = ret;
+	/* The value is signed. */
+	if (*temp & 0x8000) {
+		*temp = (0x7fff & ~*temp) + 1;
+		*temp *= -1;
+	}
+
+	/* The value is converted into deci-centigrade scale */
+	/* Units of LSB = 1 / 256 degree Celsius */
+	*temp = *temp * 10 / 256;
+	return 0;
+}
+
+static int max17042_get_battery_health(struct max17042_chip *chip, int *health)
+{
+	int temp, vavg, vbatt, ret;
+
+	ret = max17042_read_reg(chip->client, MAX17042_AvgVCELL);
+	if (ret < 0)
+		goto health_error;
+
+	vavg = ret * 625 / 8;
+
+	ret = max17042_read_reg(chip->client, MAX17042_VCELL);
+	if (ret < 0)
+		goto health_error;
+
+	vbatt = ret * 625 / 8;
+
+	if (vavg < chip->pdata->vmin) {
+		*health = POWER_SUPPLY_HEALTH_DEAD;
+		goto out;
+	}
+
+	if (vbatt > chip->pdata->vmax + MAX17042_VMAX_TOLERANCE) {
+		*health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+		goto out;
+	}
+
+	ret = max17042_get_temperature(chip, &temp);
+	if (ret < 0)
+		goto health_error;
+
+	if (temp <= chip->pdata->temp_min) {
+		*health = POWER_SUPPLY_HEALTH_COLD;
+		goto out;
+	}
+
+	if (temp >= chip->pdata->temp_max) {
+		*health = POWER_SUPPLY_HEALTH_OVERHEAT;
+		goto out;
+	}
+
+	*health = POWER_SUPPLY_HEALTH_GOOD;
+
+out:
+	return 0;
+
+health_error:
+	return ret;
+}
 
 static int max17042_get_property(struct power_supply *psy,
 			    enum power_supply_property psp,
@@ -203,20 +276,15 @@ static int max17042_get_property(struct power_supply *psy,
 		val->intval = ret * 1000 / 2;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		ret = max17042_read_reg(chip->client, MAX17042_TEMP);
+		ret = max17042_get_temperature(chip, &val->intval);
 		if (ret < 0)
 			return ret;
-
-		val->intval = ret;
-		/* The value is signed. */
-		if (val->intval & 0x8000) {
-			val->intval = (0x7fff & ~val->intval) + 1;
-			val->intval *= -1;
-		}
-		/* The value is converted into deci-centigrade scale */
-		/* Units of LSB = 1 / 256 degree Celsius */
-		val->intval = val->intval * 10 / 256;
 		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		ret = max17042_get_battery_health(chip, &val->intval);
+ 		if (ret < 0)
+ 			return ret;
+ 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		if (chip->pdata->enable_current_sense) {
 			ret = max17042_read_reg(chip->client, MAX17042_Current);
