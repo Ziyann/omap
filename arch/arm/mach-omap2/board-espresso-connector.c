@@ -32,7 +32,6 @@
 #include <linux/mfd/stmpe811.h>
 #include <linux/sec_dock_keyboard.h>
 #include <linux/battery.h>
-#include <linux/bat_manager.h>
 #include <linux/irq.h>
 #include <linux/usb/omap4_usb_phy.h>
 
@@ -70,6 +69,10 @@
 
 #define MASK_SWITCH_USB_AP	0x01
 #define MASK_SWITCH_UART_AP	0x02
+
+#define USB_EVENT_HOST_NONE	0x10	/* usb host disconnected */
+#define USB_EVENT_VBUS_CHARGER	0x11	/* ta/usb event */
+#define USB_EVENT_CHARGER_NONE	0x12	/* TA disconnected */
 
 static char *device_names[] = {
 	[P30_OTG]			= "otg",
