@@ -32,10 +32,6 @@
 #include <plat/remoteproc.h>
 #include <plat/usb.h>
 
-#ifdef CONFIG_OMAP_HSI_DEVICE
-#include <plat/omap_hsi.h>
-#endif
-
 #include <mach/id.h>
 
 #include <asm/hardware/gic.h>
@@ -412,12 +408,7 @@ static void __init espresso_init(void)
 	omap4_espresso_wifi_init();
 	omap4_espresso_sensors_init();
 	omap4_espresso_jack_init();
-	omap4_espresso_none_modem_init();
-
-#ifdef CONFIG_OMAP_HSI_DEVICE
-	/* Allow HSI omap_device to be registered later */
-	omap_hsi_allow_registration();
-#endif
+	omap4_espresso_modem_init();
 }
 
 static void __init espresso_reserve(void)
