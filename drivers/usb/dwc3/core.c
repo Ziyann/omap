@@ -736,11 +736,6 @@ static int __devexit dwc3_remove(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	if (!pm_runtime_suspended(&pdev->dev))
-		pm_runtime_put(&pdev->dev);
-
-	pm_runtime_disable(&pdev->dev);
-
 	dwc3_debugfs_exit(dwc);
 
 	switch (dwc->mode) {
@@ -761,38 +756,13 @@ static int __devexit dwc3_remove(struct platform_device *pdev)
 
 	dwc3_core_exit(dwc);
 
+	if (!pm_runtime_suspended(&pdev->dev))
+		pm_runtime_put(&pdev->dev);
+
+	pm_runtime_disable(&pdev->dev);
+
 	usb_put_phy(dwc->usb3_phy);
 	usb_put_phy(dwc->usb2_phy);
-
-	return 0;
-}
-
-#ifdef CONFIG_PM
-
-static int dwc3_suspend(struct device *dev)
-{
-	struct dwc3		*dwc = dev_get_drvdata(dev);
-	unsigned long		flags;
-	int			ret = 0;
-
-	spin_lock_irqsave(&dwc->lock, flags);
-	if (dwc->is_connected) {
-		dev_err(dwc->dev, "can't suspend dwc3, device is connected\n");
-		ret = -EBUSY;
-		goto err0;
-	}
-
-err0:
-	spin_unlock_irqrestore(&dwc->lock, flags);
-	return ret;
-}
-
-static int dwc3_runtime_suspend(struct device *dev)
-{
-	struct dwc3		*dwc = dev_get_drvdata(dev);
-	struct dwc3_context_regs *context = &dwc->context;
-
-	context->gctl = dwc3_readl(dwc->regs, DWC3_GCTL);
 
 	return 0;
 }
