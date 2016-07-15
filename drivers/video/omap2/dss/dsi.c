@@ -1584,7 +1584,7 @@ int dsi_pll_set_clock_div(struct platform_device *dsidev,
 	l = FLD_MOD(l, 1, 13, 13);		/* DSI_PLL_REFEN */
 	l = FLD_MOD(l, 0, 14, 14);		/* DSIPHY_CLKINEN */
 	l = FLD_MOD(l, 1, 20, 20);		/* DSI_HSDIVBYPASS */
-	if (dss_has_feature(FEAT_DSI_PLL_REFSEL))
+	if (cpu_is_omap44xx())
 		l = FLD_MOD(l, 3, 22, 21);	/* REF_SYSCLK */
 	dsi_write_reg(dsidev, DSI_PLL_CONFIGURATION2, l);
 
@@ -2047,6 +2047,10 @@ static int dsi_cio_power(struct platform_device *dsidev,
 	/* PWR_CMD */
 	REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG1, state, 28, 27);
 
+	if (cpu_is_omap44xx())
+		/*bit 30 has to be set to 1 to GO in omap4*/
+		REG_FLD_MOD(dsidev, DSI_COMPLEXIO_CFG1, 1, 30, 30);
+
 	/* PWR_STATUS */
 	while (FLD_GET(dsi_read_reg(dsidev, DSI_COMPLEXIO_CFG1),
 			26, 25) != state) {
@@ -2418,6 +2422,9 @@ static int dsi_cio_init(struct omap_dss_device *dssdev)
 	if (r)
 		return r;
 
+	/* HS_AUTO_STOP_ENABLE */
+	REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 18, 18);
+
 	dsi_enable_scp_clk(dsidev);
 
 	/* A dummy read using the SCP interface to any DSIPHY register is
@@ -2777,6 +2784,15 @@ static void dsi_vc_initial_config(struct platform_device *dsidev, int channel)
 	r = FLD_MOD(r, 0, 9, 9); /* MODE_SPEED, high speed on/off */
 	if (dss_has_feature(FEAT_DSI_VC_OCP_WIDTH))
 		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH = 32 bit */
+
+	/* TO DO: This is a HACK as performing this command on blaze
+	 * causes DSI errors and does not allow blaze to display anything
+	 * for now cause it to skip on blaze but allow this on tablet video
+	 * displays */
+	if (1 /* !omap_is_board_version(OMAP4_BLAZE) */) {
+		if (channel == 0)
+			r = FLD_MOD(r, 1, 11, 10); /* OCP_WIDTH = 32 bit */
+	}
 
 	r = FLD_MOD(r, 4, 29, 27); /* DMA_RX_REQ_NB = no dma */
 	r = FLD_MOD(r, 4, 23, 21); /* DMA_TX_REQ_NB = no dma */
@@ -3924,8 +3940,8 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	}
 
 	r = dsi_read_reg(dsidev, DSI_CTRL);
-	r = FLD_MOD(r, 1, 1, 1);	/* CS_RX_EN */
-	r = FLD_MOD(r, 1, 2, 2);	/* ECC_RX_EN */
+	r = FLD_MOD(r, 0, 1, 1);	/* CS_RX_EN */
+	r = FLD_MOD(r, 0, 2, 2);	/* ECC_RX_EN */
 	r = FLD_MOD(r, 1, 3, 3);	/* TX_FIFO_ARBITRATION */
 	r = FLD_MOD(r, 1, 4, 4);	/* VP_CLK_RATIO, always 1, see errata*/
 	r = FLD_MOD(r, buswidth, 7, 6); /* VP_DATA_BUS_WIDTH */
@@ -4019,6 +4035,12 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 		DIV_ROUND_UP(ths_zero + 3, 4);
 
 	exit_hs_mode_lat = DIV_ROUND_UP(ths_trail + ths_exit, 4) + 1 + ths_eot;
+
+#ifdef CONFIG_MACH_TUNA
+	/* hardcoded values like on kernel 3.0 */
+	exit_hs_mode_lat = 15;
+	enter_hs_mode_lat = 18;
+#endif
 
 	r = FLD_VAL(enter_hs_mode_lat, 31, 16) |
 		FLD_VAL(exit_hs_mode_lat, 15, 0);
@@ -4120,6 +4142,19 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 					enter_hs_mode_lat, exit_hs_mode_lat,
 					lp_clk_div, regm_dsi);
 
+#ifdef CONFIG_MACH_TUNA
+		/* hardcoded values like on kernel 3.0 */
+		hsa_interleave_hs = 72;
+		hfp_interleave_hs = 114;
+		hbp_interleave_hs = 150;
+
+		hsa_interleave_lp = 130;
+		hfp_interleave_lp = 223;
+		hbp_interleave_lp = 59;
+
+		bl_interleave_hs = 0xf4ce;
+		bl_interleave_lp = 0x131d1;
+#endif
 		r = dsi_read_reg(dsidev, DSI_VM_TIMING4);
 		r = FLD_MOD(r, hsa_interleave_hs, 23, 16);
 		r = FLD_MOD(r, hfp_interleave_hs, 15, 8);

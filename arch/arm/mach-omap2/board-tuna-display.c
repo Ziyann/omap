@@ -962,6 +962,8 @@ static struct omap_dss_device tuna_oled_device = {
 		.data3_pol	= 0,
 		.data4_lane	= 5,
 		.data4_pol	= 0,
+
+		.module		= 0,
 	},
 	.panel = {
 		.timings = {
@@ -975,9 +977,9 @@ static struct omap_dss_device tuna_oled_device = {
 			/* DSI video mode blanking data */
 
 			/* Unit: byte clock cycles */
-			.hsa					= 1,
-			.hfp					= 118,
-			.hbp					= 119,
+			.hsa					= 121,
+			.hfp					= 117,
+			.hbp					= 120,
 
 			/* Unit: line clocks */
 			.vsa					= 1,
@@ -991,13 +993,13 @@ static struct omap_dss_device tuna_oled_device = {
 			.hfp_blanking_mode		= 1,
 
 			/* Video port sync events */
-			.vp_de_pol				= 1,
-			.vp_hsync_pol			= 0,
-			.vp_vsync_pol			= 1,
-			.vp_vsync_end			= 0,
-			.vp_hsync_end			= 0,
+			.vp_de_pol		= true,
+			.vp_vsync_pol		= true,
+			.vp_hsync_pol		= false,
+			.vp_hsync_end		= false,
+			.vp_vsync_end		= false,
 
-			.ddr_clk_always_on		= 0,
+			.ddr_clk_always_on		= false,
 			.window_sync			= 4,
 		},
 	},
@@ -1024,6 +1026,9 @@ static struct omap_dss_device tuna_oled_device = {
 
 			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
 		},
+	},
+	.ctrl = {
+		.pixel_size = 24,
 	},
 
 	.channel		= OMAP_DSS_CHANNEL_LCD,
@@ -1095,7 +1100,7 @@ static struct omap_dss_board_info tuna_dss_data = {
 
 static struct sgx_omaplfb_config omaplfb_config_tuna[OMAPLFB_NUM_DEV] = {
 	{
-		.vram_buffers = 4,
+		.tiler2d_buffers = 2,
 		.swap_chain_length = 2,
 	}
 };
