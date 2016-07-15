@@ -286,6 +286,7 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
 
 obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
 obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
+
 obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8168evm.o
 obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 					   board-54xx-sevm-dock.o \
@@ -301,6 +302,25 @@ obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o \
 ifeq ($(CONFIG_OMAP_HSI_DEVICE),y)
 obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-54xx-sevm-modem.o
 endif
+
+obj-$(CONFIG_MACH_OMAP4_ESPRESSO)	+= hsmmc.o \
+					   omap_phy_internal.o \
+					   board-espresso.o \
+					   board-espresso-emif.o \
+					   board-espresso-serial.o \
+					   board-espresso-pmic.o \
+					   board-espresso-sdio.o \
+					   board-espresso-connector.o \
+					   board-espresso-display.o \
+					   board-espresso-input.o \
+					   board-espresso-wifi.o \
+					   board-espresso-modems.o \
+					   board-espresso-sensors.o \
+					   board-espresso-bluetooth.o \
+					   board-espresso-jack.o \
+					   board-espresso-power.o \
+					   board-espresso-vibrator.o \
+					   board-espresso-irled.o
 
 # Platform specific device init code
 
