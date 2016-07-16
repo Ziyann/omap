@@ -26,7 +26,6 @@
 #include "ion_priv.h"
 
 #include <asm/mach/map.h>
-#include <asm/cacheflush.h>
 
 struct ion_carveout_heap {
 	struct ion_heap heap;
@@ -85,84 +84,74 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
 	buffer->priv_phys = ION_CARVEOUT_ALLOCATE_FAIL;
 }
 
-static void __iomem *ion_carveout_heap_map_kernel(struct ion_heap *heap,
-				   struct ion_buffer *buffer)
+struct sg_table *ion_carveout_heap_map_dma(struct ion_heap *heap,
+					      struct ion_buffer *buffer)
 {
-	return __arm_ioremap(buffer->priv_phys, buffer->size,
-			      MT_MEMORY_NONCACHED);
+	struct sg_table *table;
+	int ret;
+
+	table = kzalloc(sizeof(struct sg_table), GFP_KERNEL);
+	if (!table)
+		return ERR_PTR(-ENOMEM);
+	ret = sg_alloc_table(table, 1, GFP_KERNEL);
+	if (ret) {
+		kfree(table);
+		return ERR_PTR(ret);
+	}
+	sg_set_page(table->sgl, phys_to_page(buffer->priv_phys), buffer->size,
+		    0);
+	return table;
 }
 
-static void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
+void ion_carveout_heap_unmap_dma(struct ion_heap *heap,
+				 struct ion_buffer *buffer)
+{
+	sg_free_table(buffer->sg_table);
+}
+
+void *ion_carveout_heap_map_kernel(struct ion_heap *heap,
+				   struct ion_buffer *buffer)
+{
+	void *ret;
+	int mtype = MT_MEMORY_NONCACHED;
+
+	if (buffer->flags & ION_FLAG_CACHED)
+		mtype = MT_MEMORY;
+
+	ret = __arm_ioremap(buffer->priv_phys, buffer->size,
+			      mtype);
+	if (ret == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	return ret;
+}
+
+void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
 				    struct ion_buffer *buffer)
 {
-	__arm_iounmap((void __iomem *)buffer->vaddr);
+	__arm_iounmap(buffer->vaddr);
 	buffer->vaddr = NULL;
 	return;
 }
 
-static int ion_carveout_heap_map_user(struct ion_heap *heap,
-				struct ion_buffer *buffer,
-				struct vm_area_struct *vma)
+int ion_carveout_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
+			       struct vm_area_struct *vma)
 {
 	return remap_pfn_range(vma, vma->vm_start,
 			       __phys_to_pfn(buffer->priv_phys) + vma->vm_pgoff,
-			       buffer->size,
-			       (buffer->cached ? (vma->vm_page_prot)
-			       : pgprot_writecombine(vma->vm_page_prot)));
-}
-
-static void per_cpu_cache_flush_arm(void *arg)
-{
-	flush_cache_all();
-}
-
-static int ion_carveout_heap_cache_operation(struct ion_buffer *buffer,
-		size_t len, unsigned long vaddr, enum cache_operation cacheop)
-{
-	if (!buffer || !buffer->cached) {
-		pr_err("%s(): buffer not mapped as cacheable\n", __func__);
-		return -EINVAL;
-	}
-
-	if (len > FULL_CACHE_FLUSH_THRESHOLD) {
-		on_each_cpu(per_cpu_cache_flush_arm, NULL, 1);
-		outer_flush_all();
-		return 0;
-	}
-
-	 __cpuc_coherent_user_range((vaddr) & PAGE_MASK, PAGE_ALIGN(vaddr+len));
-
-	if (cacheop == CACHE_FLUSH)
-		outer_flush_range(buffer->priv_phys, buffer->priv_phys+len);
-	else
-		outer_inv_range(buffer->priv_phys, buffer->priv_phys+len);
-
-	return 0;
-}
-
-static int ion_carveout_heap_flush_user(struct ion_buffer *buffer, size_t len,
-			unsigned long vaddr)
-{
-	return ion_carveout_heap_cache_operation(buffer, len,
-			vaddr, CACHE_FLUSH);
-}
-
-static int ion_carveout_heap_inval_user(struct ion_buffer *buffer, size_t len,
-			unsigned long vaddr)
-{
-	return ion_carveout_heap_cache_operation(buffer, len,
-			vaddr, CACHE_INVALIDATE);
+			       vma->vm_end - vma->vm_start,
+			       pgprot_noncached(vma->vm_page_prot));
 }
 
 static struct ion_heap_ops carveout_heap_ops = {
 	.allocate = ion_carveout_heap_allocate,
 	.free = ion_carveout_heap_free,
 	.phys = ion_carveout_heap_phys,
+	.map_dma = ion_carveout_heap_map_dma,
+	.unmap_dma = ion_carveout_heap_unmap_dma,
 	.map_user = ion_carveout_heap_map_user,
-	.map_kernel = (void *)ion_carveout_heap_map_kernel,
+	.map_kernel = ion_carveout_heap_map_kernel,
 	.unmap_kernel = ion_carveout_heap_unmap_kernel,
-	.flush_user = ion_carveout_heap_flush_user,
-	.inval_user = ion_carveout_heap_inval_user,
 };
 
 struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)

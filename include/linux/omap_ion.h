@@ -51,25 +51,33 @@ int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 /* given a handle in the tiler, return a list of tiler pages that back it */
 int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 		     int *n, u32 **tiler_pages);
-int omap_ion_fd_to_handles(int fd, struct ion_client **client,
-		struct ion_handle **handles,
-		int *num_handles);
+int omap_ion_share_fd_to_handles(int fd, struct ion_client *client,
+				struct ion_handle **handles, int *num_handles);
 int omap_tiler_vinfo(struct ion_client *client,
 			struct ion_handle *handle, unsigned int *vstride,
 			unsigned int *vsize);
-int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
-					int *num_handles);
-
-extern struct ion_device *omap_ion_device;
 #endif /* __KERNEL__ */
 
 /* additional heaps used only on omap */
 enum {
-	OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
-	OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
+	OMAP_ION_HEAP_SYSTEM = ION_HEAP_TYPE_CUSTOM + 1,
+	OMAP_ION_HEAP_SECURE_INPUT,
+	OMAP_ION_HEAP_TILER,
+	OMAP_ION_HEAP_NONSECURE_TILER,
+	OMAP_ION_HEAP_TILER_RESERVATION,
 };
 
-#define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
+#define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TILER)
+#define OMAP_ION_HEAP_NONSECURE_TILER_MASK (1 << OMAP_ION_HEAP_NONSECURE_TILER)
+#define OMAP_ION_HEAP_TILER_RESERVATION_MASK (1 << OMAP_ION_HEAP_TILER_RESERVATION)
+
+/**
+ * allocation flags - the lower 16 bits are used by core ion, the upper 16
+ * bits are reserved for use by the heaps themselves.
+ */
+
+/*use this flag to distinguish either omap_tiler_alloc() is calling from ION core or OMAP IOCTL */
+#define OMAP_ION_FLAG_NO_ALLOC_TILER_HEAP	(1<<16)
 
 enum {
 	OMAP_ION_TILER_ALLOC,
@@ -85,17 +93,6 @@ enum {
 	TILER_PIXEL_FMT_32BIT = 2,
 	TILER_PIXEL_FMT_PAGE  = 3,
 	TILER_PIXEL_FMT_MAX   = 3
-};
-
-/**
- * List of heaps in the system
- */
-enum {
-	OMAP_ION_HEAP_SYSTEM,
-	OMAP_ION_HEAP_TILER,
-	OMAP_ION_HEAP_SECURE_INPUT,
-	OMAP_ION_HEAP_NONSECURE_TILER,
-	OMAP_ION_HEAP_TILER_RESERVATION,
 };
 
 #endif /* _LINUX_ION_H */

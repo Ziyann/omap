@@ -23,6 +23,7 @@
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <linux/module.h>
+#include <linux/syscalls.h>
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -67,6 +68,7 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 		ret = omap_ion_tiler_alloc(client, &data);
 		if (ret)
 			return ret;
+		data.handle = (struct ion_handle *)data.handle->id;
 		if (copy_to_user((void __user *)arg, &data,
 				 sizeof(data)))
 			return -EFAULT;
@@ -99,14 +101,14 @@ static int omap_ion_probe(struct platform_device *pdev)
 	for (i = 0; i < num_heaps; i++) {
 		struct ion_platform_heap *heap_data = &pdata->heaps[i];
 
-		if (heap_data->type == OMAP_ION_HEAP_TYPE_TILER) {
+		if (heap_data->type == OMAP_ION_HEAP_TILER) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 			if (heap_data->id == OMAP_ION_HEAP_NONSECURE_TILER)
 				nonsecure_tiler_heap = heaps[i];
 			else
 				tiler_heap = heaps[i];
 		} else if (heap_data->type ==
-				OMAP_ION_HEAP_TYPE_TILER_RESERVATION) {
+				OMAP_ION_HEAP_TILER_RESERVATION) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 		} else {
 			heaps[i] = ion_heap_create(heap_data);
@@ -127,7 +129,7 @@ static int omap_ion_probe(struct platform_device *pdev)
 err:
 	for (i = 0; i < num_heaps; i++) {
 		if (heaps[i]) {
-			if (heaps[i]->type == OMAP_ION_HEAP_TYPE_TILER)
+			if (heaps[i]->type == OMAP_ION_HEAP_TILER)
 				omap_tiler_heap_destroy(heaps[i]);
 			else
 				ion_heap_destroy(heaps[i]);
@@ -144,7 +146,7 @@ static int omap_ion_remove(struct platform_device *pdev)
 
 	ion_device_destroy(idev);
 	for (i = 0; i < num_heaps; i++)
-		if (heaps[i]->type == OMAP_ION_HEAP_TYPE_TILER)
+		if (heaps[i]->type == OMAP_ION_HEAP_TILER)
 			omap_tiler_heap_destroy(heaps[i]);
 		else
 			ion_heap_destroy(heaps[i]);
@@ -152,7 +154,7 @@ static int omap_ion_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void (*export_fd_to_ion_handles)(int fd,
+static int (*export_fd_to_ion_handles)(int fd,
 		struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles);
@@ -163,40 +165,79 @@ void omap_ion_register_pvr_export(void *pvr_export_fd)
 }
 EXPORT_SYMBOL(omap_ion_register_pvr_export);
 
-int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
-		int *num_handles)
+int omap_ion_share_fd_to_handles(int fd, struct ion_client *client,
+				 struct ion_handle **handles, int *num_handles)
 {
-	struct ion_handle **handles;
-	struct ion_client *client;
-	int i = 0, ret = 0;
+	struct ion_handle **export_handles;
+	struct ion_client *export_client;
+	int i = 0, ret = 0, shared_fd = 0;
 
-	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+	export_handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
 			  GFP_KERNEL);
-	if (!handles)
+	if (!export_handles)
 		return -ENOMEM;
 
 	if (export_fd_to_ion_handles) {
-		export_fd_to_ion_handles(fd,
-				&client,
-				handles,
+		ret = export_fd_to_ion_handles(fd,
+				&export_client,
+				export_handles,
 				num_handles);
+		if (ret) {
+			pr_err("%s: export_fd_to_ion_handles failed\n",
+			       __func__);
+			goto exit;
+		}
 	} else {
-		pr_err("%s: export_fd_to_ion_handles not initialized",
+		pr_err("%s: export_fd_to_ion_handles not initialized\n",
 				__func__);
 		ret = -EINVAL;
 		goto exit;
 	}
 
 	for (i = 0; i < *num_handles; i++) {
-		if (handles[i])
-			buffers[i] = ion_share(client, handles[i]);
+		handles[i] = NULL;
+		if (export_handles[i]) {
+			shared_fd = ion_share_dma_buf_fd(export_client,
+							 export_handles[i]);
+			if (shared_fd < 0) {
+				pr_err("%s: Failed to get buf fd, err = %d\n",
+				       __func__, shared_fd);
+				ret = shared_fd;
+				goto err;
+			}
+
+			handles[i] = ion_import_dma_buf(client, shared_fd);
+			if (IS_ERR(handles[i])) {
+				ret = PTR_ERR(handles[i]);
+				pr_err("%s: Failed to import buf, err = %d\n",
+				       __func__, ret);
+				sys_close(shared_fd);
+				handles[i] = NULL;
+				goto err;
+			}
+			sys_close(shared_fd);
+		}
 	}
 
 exit:
-	kfree(handles);
+	kfree(export_handles);
 	return ret;
+
+err:
+	/* Clear allocated handles on error */
+	while (i) {
+		if (handles[--i]) {
+			ion_free(client, handles[i]);
+			handles[i] = NULL;
+		}
+	}
+
+	kfree(export_handles);
+	return ret;
+
 }
-EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
+EXPORT_SYMBOL(omap_ion_share_fd_to_handles);
+
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
