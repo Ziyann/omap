@@ -4639,6 +4639,10 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
+	/* The SCPClk is required for PLL and complexio registers on OMAP4 */
+	if (cpu_is_omap44xx())
+		REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 14, 14);
+
 	r = dsi_pll_init(dsidev, true, true);
 	if (r)
 		goto err0;
@@ -4762,6 +4766,21 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
+static int _dsi_wait_reset(struct platform_device *dsidev)
+{
+	int t = 0;
+
+	while (REG_GET(dsidev, DSI_SYSSTATUS, 0, 0) == 0) {
+		if (++t > 5) {
+			DSSERR("soft reset failed\n");
+			return -ENODEV;
+		}
+		udelay(1);
+	}
+
+	return 0;
+}
+
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -4792,6 +4811,11 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	dsi_enable_pll_clock(dsidev, 1);
 
+	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
+	_dsi_wait_reset(dsidev);
+
+	/* ENWAKEUP */
+	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 2, 2);
 	_dsi_initialize_irq(dsidev);
 
 	r = dsi_display_init_dispc(dssdev);

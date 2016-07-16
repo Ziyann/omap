@@ -1622,6 +1622,8 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 
 	mutex_init(&s6->lock);
 
+	dev_set_drvdata(&dssdev->dev, s6);
+
 	ret = omap_dsi_request_vc(dssdev, &s6->channel0);
 	if (ret)
 		dev_err(&dssdev->dev, "failed to get virtual channel 0\n");
@@ -1639,8 +1641,6 @@ static int s6e8aa0_probe(struct omap_dss_device *dssdev)
 		dev_err(&dssdev->dev, "failed to set VC_ID1\n");
 
 	atomic_set(&s6->do_update, 0);
-
-	dev_set_drvdata(&dssdev->dev, s6);
 
 	/* Register DSI backlight  control */
 	s6->bldev = backlight_device_register("s6e8aa0", &dssdev->dev, dssdev,
