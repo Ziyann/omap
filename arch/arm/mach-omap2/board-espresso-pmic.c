@@ -191,25 +191,6 @@ static struct regulator_init_data espresso_vaux2 = {
 	.consumer_supplies	= espresso_vaux2_supplies,
 };
 
-static struct regulator_consumer_supply espresso_vmmc_supply[] = {
-	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
-};
-
-static struct regulator_init_data espresso_vmmc = {
-	.constraints = {
-		.min_uV			= 1200000,
-		.max_uV			= 3000000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-	},
-	.num_consumer_supplies	= ARRAY_SIZE(espresso_vmmc_supply),
-	.consumer_supplies	= espresso_vmmc_supply,
-};
-
 static struct regulator_init_data espresso_vusim = {
 	.constraints = {
 		.min_uV			= 3300000,
@@ -484,8 +465,28 @@ static struct i2c_board_info espresso_i2c1_board_info[] __initdata = {
 #endif
 };
 
+static struct regulator_consumer_supply espresso_vmmc_supply = {
+	.supply		= "vmmc",
+	.dev_name	= "omap_hsmmc.0",
+};
+
+static struct regulator_init_data espresso_vmmc = {
+	.constraints = {
+		.min_uV			= 1200000,
+		.max_uV			= 3000000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies	= &espresso_vmmc_supply,
+};
+
 static struct fixed_voltage_config espresso_vmmc_config = {
-	.supply_name		= "vmmc",
+	.supply_name		= "vmmc1",
 	.microvolts		= 2800000, /* 2.8V */
 	.gpio			= GPIO_TF_EN,
 	.startup_delay		= 0,
@@ -516,7 +517,7 @@ static struct regulator_init_data espresso_vmmc_external_data = {
 };
 
 static struct fixed_voltage_config espresso_vmmc_external = {
-	.supply_name		= "eMMC_LDO",
+	.supply_name		= "vmmc2",
 	.gpio			= GPIO_EMMC_EN,
 	.microvolts		= 1800000, /* 1.8V */
 	.startup_delay		= 100000, /* 100 ms */
