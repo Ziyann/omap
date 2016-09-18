@@ -27,6 +27,7 @@
 #ifndef __ASSEMBLER__
 
 #include <linux/delay.h>
+#include <linux/i2c/twl.h>
 #include <plat/common.h>
 #include <asm/proc-fns.h>
 #include <linux/platform_data/emif_plat.h>
@@ -290,6 +291,8 @@ static inline bool omap_wakeupgen_check_interrupts(char *report_string)
 struct omap_sdrc_params;
 extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 				      struct omap_sdrc_params *sdrc_cs1);
+struct omap2_hsmmc_info;
+extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
 
 #if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
 void __init omap_emif_set_device_details(u32 emif_nr,

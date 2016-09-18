@@ -533,6 +533,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
 	mmc->slots[0].caps |= omap_hsmmc_si_spec_caps(c);
+	mmc->slots[0].caps2 = c->caps2;
 	mmc->slots[0].caps2 |= omap_hsmmc_si_spec_caps2(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
@@ -588,6 +589,13 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 
 	if (c->vcc_aux_disable_is_sleep)
 		mmc->slots[0].vcc_aux_disable_is_sleep = 1;
+
+	if (c->mmc_data) {
+		memcpy(&mmc->slots[0].mmc_data, c->mmc_data,
+				sizeof(struct mmc_platform_data));
+		mmc->slots[0].card_detect =
+				(mmc_card_detect_func)c->mmc_data->status;
+	}
 
 	/*
 	 * NOTE:  MMC slots should have a Vcc regulator set up.

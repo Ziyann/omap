@@ -6,12 +6,17 @@
  * published by the Free Software Foundation.
  */
 
+#include <asm/mach/mmc.h>
+
 struct mmc_card;
+
+typedef int (*mmc_card_detect_func)(struct device *dev, int slot);
 
 struct omap2_hsmmc_info {
 	u8	mmc;		/* controller 1/2/3 */
 	u32	caps;		/* 4/8 wires and any additional host
 				 * capabilities OR'd (ref. linux/mmc/host.h) */
+	u32	caps2;		/* More host capabilities */
 	u32	pm_caps;	/* PM capabilities */
 	bool	transceiver;	/* MMC-2 option */
 	bool	ext_clock;	/* use external pin for input clock */
@@ -36,6 +41,7 @@ struct omap2_hsmmc_info {
 	 * or 0 for default
 	 */
 	unsigned long	max_freq;
+	struct mmc_platform_data *mmc_data;
 	/* Remux (pad configuration) when powering on/off */
 	void (*remux)(struct device *dev, int slot, int power_on);
 	/* init some special card */
