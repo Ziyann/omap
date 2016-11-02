@@ -175,6 +175,10 @@ static void dispc_save_context(void)
 		}
 	}
 
+	if (dss_has_feature(FEAT_MFLAG))
+		SR(GLOBAL_MFLAG);
+
+
 	for (i = 0; i < dss_feat_get_num_ovls(); i++) {
 		SR(OVL_BA0(i));
 		SR(OVL_BA1(i));
@@ -189,6 +193,8 @@ static void dispc_save_context(void)
 		if (i == OMAP_DSS_GFX) {
 			SR(OVL_WINDOW_SKIP(i));
 			SR(OVL_TABLE_BA(i));
+		if (dss_has_feature(FEAT_MFLAG))
+			SR(OVL_MFLAG_THRESHOLD(i));
 			continue;
 		}
 		SR(OVL_FIR(i));
@@ -266,6 +272,9 @@ static void dispc_restore_context(void)
 	if (dss_has_feature(FEAT_MGR_LCD2))
 		RR(CONFIG2);
 
+	if (dss_has_feature(FEAT_MFLAG))
+		RR(GLOBAL_MFLAG);
+
 	for (i = 0; i < dss_feat_get_num_mgrs(); i++) {
 		RR(DEFAULT_COLOR(i));
 		RR(TRANS_COLOR(i));
@@ -341,6 +350,8 @@ static void dispc_restore_context(void)
 		}
 		if (dss_has_feature(FEAT_ATTR2))
 			RR(OVL_ATTRIBUTES2(i));
+		if (dss_has_feature(FEAT_MFLAG))
+			RR(OVL_MFLAG_THRESHOLD(i));
 	}
 
 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
@@ -446,11 +457,24 @@ bool dispc_mgr_go_busy(enum omap_channel channel)
 	else
 		return REG_GET(DISPC_CONTROL, bit, bit) == 1;
 }
+void dispc_set_dithering(enum omap_channel channel)
+{
+	int temp;
+
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+	{
+		temp = 2;
+		REG_FLD_MOD(DISPC_CONTROL, temp, 31, 30);
+		temp = 1;
+		REG_FLD_MOD(DISPC_CONTROL, temp, 7, 7);
+	}
+}
 
 void dispc_mgr_go(enum omap_channel channel)
 {
 	int bit;
 	bool enable_bit, go_bit;
+	DSSDBG("%s\n",__FUNCTION__);
 
 	if (dispc_mgr_is_lcd(channel))
 		bit = 0; /* LCDENABLE */
@@ -1072,7 +1096,7 @@ static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
 
 void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 {
-	u32 fifosize;
+	u32 fifosize, unit;
 	u8 bit;
 
 	/* Set the ARBITRATION bit to give
@@ -1092,14 +1116,17 @@ void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 	  * frame even if the DMA buffer is empty */
 	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
 
-	 fifosize = dispc_ovl_get_fifo_size(plane);
-	 /* As per the simultaion team suggestion, below thesholds are set:
-	  * HT = fifosize * 5/8;
-	  * LT = fifosize * 4/8;
-	  */
-	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
-		FLD_VAL((fifosize*5)/8, 31, 16) |
-		FLD_VAL((fifosize*4)/8, 15, 0));
+	 if (dss_has_feature(FEAT_MFLAG)) {
+		fifosize = dispc_ovl_get_fifo_size(plane);
+		unit = dss_feat_get_buffer_size_unit();
+		/* As per the simultaion team suggestion, below thesholds are set:
+		* HT = fifosize * 5/8;
+		* LT = fifosize * 4/8;
+		*/
+		dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+			FLD_VAL((fifosize * 5) / (8 * unit), 31, 16) |
+			FLD_VAL((fifosize * 4) / (8 * unit), 15, 0));
+	 }
 }
 
 void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
@@ -1139,6 +1166,9 @@ void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
+
+	if (plane == OMAP_DSS_GFX)
+		dispc_ovl_set_global_mflag(OMAP_DSS_GFX, true);
 }
 
 void dispc_enable_fifomerge(bool enable)
@@ -2394,6 +2424,15 @@ skip_errata:
 
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
+
+	if (plane == OMAP_DSS_GFX) {
+		if (channel == OMAP_DSS_CHANNEL_DIGIT ||
+			omap_rev() == OMAP5430_REV_ES1_0 ||
+			omap_rev() == OMAP5432_REV_ES1_0)
+			dispc_enable_arbitration(plane, true);
+		else
+			dispc_enable_arbitration(plane, false);
+	}
 
 	return 0;
 }
@@ -3722,8 +3761,12 @@ int omap_dispc_unregister_isr_nosync(omap_dispc_isr_t isr, void *arg, u32 mask)
 		break;
 	}
 
-	if (ret == 0)
-		_omap_dispc_set_irqs();
+	if (ret == 0) {
+		if (pm_runtime_suspended(&dispc.pdev->dev))
+			DSSERR("Trying to disable IRQ while DSS is off!\n");
+		else
+			_omap_dispc_set_irqs();
+	}
 
 	spin_unlock_irqrestore(&dispc.irq_lock, flags);
 

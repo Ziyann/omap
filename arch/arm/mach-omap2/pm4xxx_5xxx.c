@@ -44,6 +44,9 @@
 #include "voltage.h"
 #include "prcm-debug.h"
 #include "control.h"
+#if defined(CONFIG_AMAZON_METRICS_LOG)
+#include <linux/metricslog.h>
+#endif
 
 #define EMIF_SDRAM_CONFIG_OFFSET	0x8
 #define EMIF_SDRAM_CONFIG2_OFFSET	0xc
@@ -173,6 +176,21 @@ static char *power_state_names[] = {
 	[PWRDM_POWER_OSWR] = "OSWR",
 };
 
+#ifdef CONFIG_AMAZON_METRICS_LOG
+static struct work_struct metrics_work_offmode;
+static char metrics_buf_offmode[50];
+static char metrics_buf_pwrdm_state[128];
+static int suspend_success = 0;
+
+static void wokeup_metrics_offmode(struct work_struct *work)
+{
+	/* Log suspend state failure or success */
+	log_to_metrics(ANDROID_LOG_INFO, "kernel", metrics_buf_offmode);
+	if (! suspend_success)
+		log_to_metrics(ANDROID_LOG_INFO, "kernel", metrics_buf_pwrdm_state);
+}
+#endif
+
 static int omap4_5_pm_suspend(void)
 {
 	struct power_state *pwrst;
@@ -247,6 +265,13 @@ static int omap4_5_pm_suspend(void)
 				power_state_names[prev_state],
 				power_state_names[curr_state],
 				power_state_names[pwrst->saved_state]);
+#if defined(CONFIG_AMAZON_METRICS_LOG)
+			       snprintf(metrics_buf_pwrdm_state, sizeof(metrics_buf_pwrdm_state),
+					"system_resume:pwrdm=%s;DV;1,lowpower_target_failed_target=%s;DV;1,achieved=%s;DV;1:NR",
+					pwrst->pwrdm->name,
+					power_state_names[pwrst->next_state],
+					power_state_names[prev_state]);
+#endif
 			ret = -1;
 		}
 		/*
@@ -275,6 +300,14 @@ static int omap4_5_pm_suspend(void)
 		pr_crit("Could not enter target state in pm_suspend\n");
 	else
 		pr_info("Successfully put all powerdomains to target state\n");
+
+#if defined(CONFIG_AMAZON_METRICS_LOG)
+	suspend_success = (ret == 0) ? 1 : 0;
+	snprintf(metrics_buf_offmode, sizeof(metrics_buf_offmode),
+		"system_resume:off_mode:%s=1;CT;1:NR",
+		ret == 0 ? "success" : "fail");
+	schedule_work(&metrics_work_offmode);
+#endif
 
 	return 0;
 }
@@ -1213,6 +1246,9 @@ int __init omap4_pm_init(void)
 	if (!gpu_pd)
 		pr_err("%s: Unable to get GPU power domain\n", __func__);
 
+#if defined(CONFIG_AMAZON_METRICS_LOG)
+	INIT_WORK(&metrics_work_offmode, wokeup_metrics_offmode);
+#endif
 	/*
 	 * HACK for EMIF and DDR3 on OMAP5
 	 * Currently we see that anytime EMIF clock idle, we get DDR3
@@ -1238,7 +1274,6 @@ int __init omap4_pm_init(void)
 			     __func__);
 		}
 	}
-
 
 err2:
 	return ret;

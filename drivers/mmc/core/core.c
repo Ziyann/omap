@@ -27,6 +27,7 @@
 #include <linux/fault-inject.h>
 #include <linux/random.h>
 #include <linux/wakelock.h>
+#include <linux/reboot.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -43,6 +44,7 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+static int mmc_shutdown;
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -75,6 +77,9 @@ MODULE_PARM_DESC(
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+	if (mmc_shutdown)
+		return -EFAULT;
+
 	return queue_delayed_work(workqueue, work, delay);
 }
 
@@ -269,14 +274,16 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 	struct mmc_command *cmd;
 
 	while (1) {
-		wait_for_completion(&mrq->completion);
+		while (!wait_for_completion_timeout(&mrq->completion, 30*HZ))
+			dev_err(&host->class_dev, "Can't complete cmd %d %p\n",
+				mrq->cmd->opcode, mrq);
 
 		cmd = mrq->cmd;
 		if (!cmd->error || !cmd->retries ||
 		    mmc_card_removed(host->card))
 			break;
 
-		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
+		pr_err("%s: req failed (CMD%u): %d, retrying...\n",
 			 mmc_hostname(host), cmd->opcode, cmd->error);
 		cmd->retries--;
 		cmd->error = 0;
@@ -347,6 +354,11 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	int start_err = 0;
 	struct mmc_async_req *data = host->areq;
 
+	/* This is the first time mmc block code sees this request.
+	 * Enforce data->dma_len = 0 */
+	if (areq && areq->mrq && areq->mrq->data)
+		areq->mrq->data->dma_len = 0;
+
 	/* Prepare a new request */
 	if (areq)
 		mmc_pre_req(host, areq->mrq, !host->areq);
@@ -388,6 +400,9 @@ EXPORT_SYMBOL(mmc_start_req);
  */
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
+	/* Enforce data->dma_len =0 for internally generated request */
+	if (mrq && mrq->data)
+		mrq->data->dma_len = 0;
 	__mmc_start_req(host, mrq);
 	mmc_wait_for_req_done(host, mrq);
 }
@@ -1101,48 +1116,6 @@ void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
 	mmc_host_clk_release(host);
 }
 
-static void mmc_poweroff_notify(struct mmc_host *host)
-{
-	struct mmc_card *card;
-	unsigned int timeout;
-	unsigned int notify_type = EXT_CSD_NO_POWER_NOTIFICATION;
-	int err = 0;
-
-	card = host->card;
-	mmc_claim_host(host);
-
-	/*
-	 * Send power notify command only if card
-	 * is mmc and notify state is powered ON
-	 */
-	if (card && mmc_card_mmc(card) &&
-	    (card->poweroff_notify_state == MMC_POWERED_ON)) {
-
-		if (host->power_notify_type == MMC_HOST_PW_NOTIFY_SHORT) {
-			notify_type = EXT_CSD_POWER_OFF_SHORT;
-			timeout = card->ext_csd.generic_cmd6_time;
-			card->poweroff_notify_state = MMC_POWEROFF_SHORT;
-		} else {
-			notify_type = EXT_CSD_POWER_OFF_LONG;
-			timeout = card->ext_csd.power_off_longtime;
-			card->poweroff_notify_state = MMC_POWEROFF_LONG;
-		}
-
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_POWER_OFF_NOTIFICATION,
-				 notify_type, timeout);
-
-		if (err && err != -EBADMSG)
-			pr_err("Device failed to respond within %d poweroff "
-			       "time. Forcefully powering down the device\n",
-			       timeout);
-
-		/* Set the card state to no notification after the poweroff */
-		card->poweroff_notify_state = MMC_NO_POWER_NOTIFICATION;
-	}
-	mmc_release_host(host);
-}
-
 /*
  * Apply power to the MMC stack.  This is a two-stage process.
  * First, we enable power to the card without the clock running.
@@ -1199,28 +1172,11 @@ static void mmc_power_up(struct mmc_host *host)
 
 void mmc_power_off(struct mmc_host *host)
 {
-	int err = 0;
 	mmc_host_clk_hold(host);
 
 	host->ios.clock = 0;
 	host->ios.vdd = 0;
 
-	/*
-	 * For eMMC 4.5 device send AWAKE command before
-	 * POWER_OFF_NOTIFY command, because in sleep state
-	 * eMMC 4.5 devices respond to only RESET and AWAKE cmd
-	 */
-	if (host->card && mmc_card_is_sleep(host->card) &&
-	    host->bus_ops->resume) {
-		err = host->bus_ops->resume(host);
-
-		if (!err)
-			mmc_poweroff_notify(host);
-		else
-			pr_warning("%s: error %d during resume "
-				   "(continue with poweroff sequence)\n",
-				   mmc_hostname(host), err);
-	}
 
 	/*
 	 * Reset ocr mask to be the highest possible voltage supported for
@@ -1737,16 +1693,18 @@ int mmc_can_sanitize(struct mmc_card *card)
 {
 	if (!mmc_can_trim(card) && !mmc_can_erase(card))
 		return 0;
-	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
+	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE) {
 		return 1;
+	}
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_sanitize);
 
 int mmc_can_secure_erase_trim(struct mmc_card *card)
 {
-	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN)
+	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN) {
 		return 1;
+	}
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_secure_erase_trim);
@@ -2436,7 +2394,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 			break;
 		}
 		host->rescan_disable = 1;
-		host->power_notify_type = MMC_HOST_PW_NOTIFY_SHORT;
 		spin_unlock_irqrestore(&host->lock, flags);
 		if (cancel_delayed_work_sync(&host->detect))
 			wake_unlock(&host->detect_wake_lock);
@@ -2465,7 +2422,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 			break;
 		}
 		host->rescan_disable = 0;
-		host->power_notify_type = MMC_HOST_PW_NOTIFY_LONG;
 		spin_unlock_irqrestore(&host->lock, flags);
 		mmc_detect_change(host, 0);
 
@@ -2491,6 +2447,19 @@ void mmc_set_embedded_sdio_data(struct mmc_host *host,
 EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
 #endif
 
+static int mmc_reboot_notifier(struct notifier_block *this,
+		unsigned long code, void *cmd)
+{
+	mmc_shutdown = 1;
+	mmc_flush_scheduled_work();
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block mmc_reboot_notifier_block = {
+	.notifier_call = mmc_reboot_notifier,
+};
+
 static int __init mmc_init(void)
 {
 	int ret;
@@ -2510,6 +2479,8 @@ static int __init mmc_init(void)
 	ret = sdio_register_bus();
 	if (ret)
 		goto unregister_host_class;
+
+	register_reboot_notifier(&mmc_reboot_notifier_block);
 
 	return 0;
 

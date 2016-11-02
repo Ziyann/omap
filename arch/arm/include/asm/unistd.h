@@ -123,7 +123,9 @@
 #define __NR_fchown			(__NR_SYSCALL_BASE+ 95)
 #define __NR_getpriority		(__NR_SYSCALL_BASE+ 96)
 #define __NR_setpriority		(__NR_SYSCALL_BASE+ 97)
-					/* 98 was sys_profil */
+#ifdef CONFIG_TRAPZ
+#define __NR_trapz			(__NR_SYSCALL_BASE+ 98)                 /* 98 was sys_profil */
+#endif
 #define __NR_statfs			(__NR_SYSCALL_BASE+ 99)
 #define __NR_fstatfs			(__NR_SYSCALL_BASE+100)
 					/* 101 was sys_ioperm */

@@ -18,10 +18,19 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/mmc.h>
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/dev_info.h>
+#endif
+
 #include "core.h"
+#include "host.h"
 #include "bus.h"
 #include "mmc_ops.h"
 #include "sd_ops.h"
+#include <linux/logger.h>
+#include <linux/metricslog.h>
+#define LMK_METRIC_TAG "kernel"
+#define METRICS_emmc_data_LEN 128
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -83,6 +92,9 @@ static int mmc_decode_cid(struct mmc_card *card)
 		card->cid.serial	= UNSTUFF_BITS(resp, 16, 24);
 		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
 		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		devinfo_set_emmc_id(card->cid.manfid);
+#endif
 		break;
 
 	case 2: /* MMC v2.0 - v2.2 */
@@ -99,6 +111,9 @@ static int mmc_decode_cid(struct mmc_card *card)
 		card->cid.serial	= UNSTUFF_BITS(resp, 16, 32);
 		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
 		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		devinfo_set_emmc_id(card->cid.manfid);
+#endif
 		break;
 
 	default:
@@ -284,6 +299,11 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
 			mmc_card_set_blockaddr(card);
 	}
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	devinfo_set_emmc_size(card->ext_csd.sectors);
+#endif
+
 	card->ext_csd.raw_card_type = ext_csd[EXT_CSD_CARD_TYPE];
 	switch (ext_csd[EXT_CSD_CARD_TYPE] & EXT_CSD_CARD_TYPE_MASK) {
 	case EXT_CSD_CARD_TYPE_SDR_ALL:
@@ -479,6 +499,12 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.boot_ro_lockable = true;
 	}
 
+#ifdef CONFIG_LAB126_DIAG_MODE
+	card->ext_csd.sec_feature_support &= ~EXT_CSD_SEC_ER_EN;
+#else
+	card->ext_csd.sec_feature_support &= ~(EXT_CSD_SEC_ER_EN | EXT_CSD_SEC_SANITIZE);
+#endif
+
 	if (card->ext_csd.rev >= 5) {
 		/* check whether the eMMC card supports HPI */
 		if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
@@ -607,6 +633,21 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+static ssize_t mmc_samsung_smart(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (card->quirks & MMC_QUIRK_SAMSUNG_SMART)
+		return mmc_samsung_smart_handle(card, buf);
+
+	/* There is no information available for this card. */
+	return 0;
+}
+static DEVICE_ATTR(samsung_smart, S_IRUGO, mmc_samsung_smart, NULL);
+#endif /* CONFIG_MMC_SAMSUNG_SMART */
+
 MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
 MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
@@ -638,6 +679,9 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+	&dev_attr_samsung_smart.attr,
+#endif
 	NULL,
 };
 
@@ -811,6 +855,137 @@ static int mmc_select_hs200(struct mmc_card *card)
 err:
 	return err;
 }
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+static int emmcmetrics_read(struct mmc_host *host)
+{
+	int err = -1;
+	int ret = 0;
+	char logcatemmc_data[METRICS_emmc_data_LEN];
+	u32 *emmc_report;
+	unsigned int *samsung_data;
+	tsb_wear_info *hbblk;
+	struct mmc_card *card;
+	unsigned int minReservedBlocks;
+
+	card = host->card;
+
+	printk(KERN_INFO "Trying to read eMMC stats...\n");
+
+	emmc_report = kmalloc(512, GFP_KERNEL);
+	if (!emmc_report) {
+		pr_err("Failed to alloc memory for Smart Report\n");
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	// check if Toshiba eMMC??
+	if (card->cid.manfid == TOSHIBA_EMMC_MFID) {
+		ret = mmc_toshiba_report(card, (u8 *)emmc_report);
+		hbblk = (void*) emmc_report;
+
+		if (hbblk->status == 0xa0)
+		{
+			/*report max-avg write/erase cnt as metrics*/
+			snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
+                                "emmcTSB:def:monitor=1;CT;1,mlc_max=%d;CT;1,"
+                                "mlc_avg:%d;CT;1:NR",
+				__swap32gen(hbblk->mlc_write_erase_max),
+				__swap32gen(hbblk->mlc_write_erase_avg));
+
+			log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG,
+				logcatemmc_data);
+		}
+		goto clean_up;
+	}
+
+	if (card->quirks & MMC_QUIRK_SAMSUNG_SMART)
+		err = mmc_samsung_report(card, (u8 *)emmc_report);
+
+	if (!err) {
+		int i;
+
+		samsung_data = (unsigned int *)emmc_report;
+		printk(KERN_INFO "Samsung data [20 dwords]:");
+		for (i = 0; i < 10; ++i)
+			printk(KERN_INFO " %08X", samsung_data[i]);
+		printk("\n");
+		for (i = 10; i < 20; ++i)
+			printk(KERN_INFO " %08X", samsung_data[i]);
+		printk("\n");
+		for (i = 20; i < 30; ++i)
+			printk(KERN_INFO " %08X", samsung_data[i]);
+		printk("\n");
+		for (i = 30; i < 36; ++i)
+			printk(KERN_INFO " %08X", samsung_data[i]);
+		printk("\n");
+
+	} else {
+		printk(KERN_INFO "...Read Samsung eMMC stats failed...");
+		ret = -1;
+		goto clean_up;
+	}
+
+	minReservedBlocks = samsung_data[7];          /*bank0*/
+	if (minReservedBlocks > samsung_data[10] && samsung_data[10] > 0)
+		minReservedBlocks = samsung_data[10]; /*bank1*/
+	if (minReservedBlocks > samsung_data[13] && samsung_data[13] > 0)
+		minReservedBlocks = samsung_data[13]; /*bank2*/
+	if (minReservedBlocks > samsung_data[16] && samsung_data[16] > 0)
+		minReservedBlocks = samsung_data[16]; /*bank3*/
+
+	card->minReservedBlocks = minReservedBlocks;
+
+	/*report minReservedBlocks as metrics*/
+	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
+		"emmcSMG:def:monitor=1;CT;1,minReservedBlocks:%d;1;CT;1:NR",
+		card->minReservedBlocks);
+	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
+
+	card->maxEraseCountMLC = samsung_data[33];
+	card->avgEraseCountMLC = samsung_data[35];
+
+	/*report max- avg EraseCount MLC as metrics*/
+	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
+		"emmcSMG:def:monitor=1;CT;1,mlc max_erase:%d;CT;1,"
+		" avg_erase:%d;1;CT;1:NR",card->maxEraseCountMLC,
+		card->avgEraseCountMLC);
+	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
+
+	card->maxEraseCountSLC = samsung_data[30];
+	card->avgEraseCountSLC = samsung_data[32];
+
+	/*report max- avg EraseCount SLC as metrics*/
+	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
+		"emmcSMG:def:monitor=1;CT;1,slc max_erase:%d;CT;1,"
+		"avg_erase:%d;1;CT;1:NR",card->maxEraseCountSLC,
+		card->avgEraseCountSLC);
+	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
+
+clean_up:
+	kfree(emmc_report);
+
+fail:
+	return ret;
+}
+
+/*
+ * Internal work. Work to output metrics at some later point.
+ */
+void mmc_host_metrics_work(struct work_struct *work)
+{
+	struct mmc_host *host = container_of(work, struct mmc_host,
+						metrics_delay_work.work);
+	emmcmetrics_read(host);
+}
+
+static void metrics_delaywork_queue(struct mmc_host *host)
+{
+	/* delay 5 seconds to output metrics */
+	queue_delayed_work(system_nrt_wq, &host->metrics_delay_work,
+				msecs_to_jiffies(5000));
+}
+#endif /* CONFIG_AMAZON_METRICS_LOG */
 
 /*
  * Handle the detection and initialisation of a card.
@@ -1016,7 +1191,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		 * so check for success and update the flag
 		 */
 		if (!err)
-			card->poweroff_notify_state = MMC_POWERED_ON;
+			card->ext_csd.power_off_notification = EXT_CSD_POWER_ON;
 	}
 
 	/*
@@ -1280,6 +1455,35 @@ err:
 	return err;
 }
 
+static int mmc_can_poweroff_notify(const struct mmc_card *card)
+{
+	return card &&
+		mmc_card_mmc(card) &&
+		(card->ext_csd.power_off_notification == EXT_CSD_POWER_ON);
+}
+
+static int mmc_poweroff_notify(struct mmc_card *card, unsigned int notify_type)
+{
+	unsigned int timeout = card->ext_csd.generic_cmd6_time;
+	int err;
+
+	/* Use EXT_CSD_POWER_OFF_SHORT as default notification type. */
+	if (notify_type == EXT_CSD_POWER_OFF_LONG)
+		timeout = card->ext_csd.power_off_longtime;
+
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			 EXT_CSD_POWER_OFF_NOTIFICATION,
+			 notify_type, timeout);
+	if (err)
+		pr_err("%s: Power Off Notification timed out, %u\n",
+		       mmc_hostname(card->host), timeout);
+
+	/* Disable the power off notification after the switch operation. */
+	card->ext_csd.power_off_notification = EXT_CSD_NO_POWER_NOTIFICATION;
+
+	return err;
+}
+
 /*
  * Host is being removed. Free up the current card.
  */
@@ -1340,11 +1544,11 @@ static int mmc_suspend(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	mmc_claim_host(host);
-	if (mmc_card_can_sleep(host)) {
+	if (mmc_can_poweroff_notify(host->card))
+		err = mmc_poweroff_notify(host->card, EXT_CSD_POWER_OFF_SHORT);
+	else if (mmc_card_can_sleep(host))
 		err = mmc_card_sleep(host);
-		if (!err)
-			mmc_card_set_sleep(host->card);
-	} else if (!mmc_host_is_spi(host))
+	else if (!mmc_host_is_spi(host))
 		mmc_deselect_cards(host);
 	host->card->state &= ~(MMC_STATE_HIGHSPEED | MMC_STATE_HIGHSPEED_200);
 	mmc_release_host(host);
@@ -1366,11 +1570,7 @@ static int mmc_resume(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	mmc_claim_host(host);
-	if (mmc_card_is_sleep(host->card)) {
-		err = mmc_card_awake(host);
-		mmc_card_clr_sleep(host->card);
-	} else
-		err = mmc_init_card(host, host->ocr, host->card);
+	err = mmc_init_card(host, host->ocr, host->card);
 	mmc_release_host(host);
 
 	return err;
@@ -1381,7 +1581,6 @@ static int mmc_power_restore(struct mmc_host *host)
 	int ret;
 
 	host->card->state &= ~(MMC_STATE_HIGHSPEED | MMC_STATE_HIGHSPEED_200);
-	mmc_card_clr_sleep(host->card);
 	mmc_claim_host(host);
 	ret = mmc_init_card(host, host->ocr, host->card);
 	mmc_release_host(host);
@@ -1511,6 +1710,10 @@ int mmc_attach_mmc(struct mmc_host *host)
 	err = mmc_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	metrics_delaywork_queue(host);
+#endif
 
 	mmc_release_host(host);
 	err = mmc_add_card(host->card);

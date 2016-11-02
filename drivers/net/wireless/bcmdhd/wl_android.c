@@ -678,7 +678,7 @@ int wl_android_init(void)
 		memset(iface_name, 0, IFNAMSIZ);
 		bcm_strncpy_s(iface_name, IFNAMSIZ, "wlan", IFNAMSIZ);
 	}
-#endif
+#endif /* CUSTOMER_HW2 */
 	return ret;
 }
 

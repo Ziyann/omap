@@ -41,14 +41,14 @@ struct omap_iommu {
 	struct iommu_domain *domain;
 
 	unsigned int	refcount;
-	spinlock_t	iommu_lock;	/* global for this whole object */
+	struct mutex	iommu_lock;	/* global for this whole object */
 
 	/*
 	 * We don't change iopgd for a situation like pgd for a task,
 	 * but share it globally for each iommu.
 	 */
 	u32		*iopgd;
-	spinlock_t	page_table_lock; /* protect iopgd */
+	struct mutex	page_table_lock; /* protect iopgd */
 
 	int		nr_tlb_entries;
 

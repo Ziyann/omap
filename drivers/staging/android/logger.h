@@ -20,6 +20,10 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#endif
+
 /*
  * The userspace structure for version 1 of the logger_entry ABI.
  * This structure is returned to userspace unless the caller requests
@@ -55,6 +59,16 @@ struct logger_entry {
 #define LOGGER_LOG_EVENTS	"log_events"	/* system/hardware events */
 #define LOGGER_LOG_SYSTEM	"log_system"	/* system/framework messages */
 #define LOGGER_LOG_MAIN		"log_main"	/* everything else */
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#define LOGGER_LOG_METRICS	"log_metrics"		/* metrics logs */
+#define LOGGER_LOG_AMAZON_VITALS "log_vitals"		/* vitals logs */
+#endif
+
+#ifdef CONFIG_AMAZON_LOG
+/* private buffer for amazon signed apk */
+#define LOGGER_LOG_AMAZON_MAIN	"log_amazon_main"
+#endif
 
 #define LOGGER_ENTRY_MAX_PAYLOAD	4076
 

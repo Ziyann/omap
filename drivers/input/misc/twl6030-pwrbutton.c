@@ -34,6 +34,9 @@
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
 #include <linux/delay.h>
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#endif
 
 #define PWR_PWRON_IRQ (1 << 0)
 #define STS_HW_CONDITIONS 0x21
@@ -54,6 +57,12 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 	int ret = 0;
 	static int prev_pwr_val = 0xFFFF;
 	static int push_release_flag;
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	char *action;
+#define TMP103_METRICS_STR_LEN 128
+	char buf[TMP103_METRICS_STR_LEN];
+#endif
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (IS_ERR_VALUE(ret))
@@ -83,6 +92,12 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 		push_release_flag = 1;
 		input_report_key(pwr->input_dev, pwr->report_key, !pwr_val);
 		input_sync(pwr->input_dev);
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	action = (!pwr_val) ? "press" : "release";
+	sprintf(buf, "%s:powi%c:report_action_is_%s=1;CT;1:NR", __func__,
+		action[0], action);
+	log_to_metrics(ANDROID_LOG_INFO, "PowerKeyEvent", buf);
+#endif
 
 		msleep(20);
 
@@ -93,6 +108,12 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 	}
 
 	prev_pwr_val = pwr_val;
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	action = pwr_val ? "press" : "release";
+	sprintf(buf, "%s:powi%c:report_action_is_%s=1;CT;1:NR", __func__,
+		action[0], action);
+	log_to_metrics(ANDROID_LOG_INFO, "PowerKeyEvent", buf);
+#endif
 	return IRQ_HANDLED;
 }
 

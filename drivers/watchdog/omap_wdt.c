@@ -35,6 +35,7 @@
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/sysrq.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/err.h>
@@ -45,16 +46,26 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/interrupt.h>
+#include <linux/nmi.h>
+#include <linux/suspend.h>
+#include <linux/pm_qos.h>
 #include <mach/hardware.h>
 #include <plat/prcm.h>
 
 #include "omap_wdt.h"
+
+extern struct atomic_notifier_head touch_watchdog_notifier_head;
 
 static struct platform_device *omap_wdt_dev;
 
 static unsigned timer_margin;
 module_param(timer_margin, uint, 0);
 MODULE_PARM_DESC(timer_margin, "initial watchdog timeout (in seconds)");
+
+static int kernelpet = 0;
+module_param(kernelpet, int, 0);
+MODULE_PARM_DESC(kernelpet, "pet watchdog in kernel via irq");
 
 static unsigned int wdt_trgr_pattern = 0x1234;
 static DEFINE_SPINLOCK(wdt_lock);
@@ -65,11 +76,17 @@ struct omap_wdt_dev {
 	int             omap_wdt_users;
 	struct resource *mem;
 	struct miscdevice omap_wdt_miscdev;
+	int irq;
+	struct notifier_block nb;
+	struct pm_qos_request pm_qos_request;
 };
 
 static void omap_wdt_ping(struct omap_wdt_dev *wdev)
 {
 	void __iomem    *base = wdev->base;
+
+	if (pm_qos_request_active(&wdev->pm_qos_request))
+		pm_qos_remove_request(&wdev->pm_qos_request);
 
 	/* wait for posted write to complete */
 	while ((__raw_readl(base + OMAP_WATCHDOG_WPS)) & 0x08)
@@ -123,8 +140,18 @@ static void omap_wdt_adjust_timeout(unsigned new_timeout)
 
 static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 {
-	u32 pre_margin = GET_WLDR_VAL(timer_margin);
+	u32 pre_margin;
+	u32 delay_period;
 	void __iomem *base = wdev->base;
+
+	/* Find the right delay period */
+	if (kernelpet) {
+		pre_margin = GET_WLDR_VAL(timer_margin);
+		delay_period = GET_WLDR_VAL(timer_margin / 2);
+	} else {
+		pre_margin = GET_WLDR_VAL(timer_margin + TIME_BEFORE_REBOOT);
+		delay_period = GET_WLDR_VAL(timer_margin / 2);
+	}
 
 	/* just count up at 32 KHz */
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x04)
@@ -133,20 +160,58 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 	__raw_writel(pre_margin, base + OMAP_WATCHDOG_LDR);
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x04)
 		cpu_relax();
+
+	/* Set delay interrupt to half the watchdog interval. */
+	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 1 << 5)
+		cpu_relax();
+	__raw_writel(delay_period, base + OMAP_WATCHDOG_WDLY);
 }
 
-/*
- *	Allow only one task to hold it open
- */
-static int omap_wdt_open(struct inode *inode, struct file *file)
+static irqreturn_t omap_wdt_interrupt_th(int irq, void *dev_id)
 {
-	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
+	struct omap_wdt_dev *wdev = dev_id;
+
+	if (!pm_qos_request_active(&wdev->pm_qos_request)) {
+		pr_crit("WA: WDT request PM_QOS_MEMORY_THROUGHPUT\n");
+
+		/* pm_qos_add_request() require might_sleep() */
+		pm_qos_add_request(&wdev->pm_qos_request,
+			PM_QOS_MEMORY_THROUGHPUT,
+			PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE);
+	}
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t omap_wdt_interrupt(int irq, void *dev_id)
+{
+	struct omap_wdt_dev *wdev = dev_id;
+	void __iomem *base = wdev->base;
+	u32 i;
+
+	if (!kernelpet) {
+		/* If this interrupt is triggered this means that the user daemon is not able any more
+		 * to ping the watchdog. Then try to collect as much as possible data to help debugging
+		 */
+		__handle_sysrq('d', 0);
+		__handle_sysrq('w', 0);
+		__handle_sysrq('l', 0);
+		printk(KERN_ERR "Watchdog timeout!!! Board is going to reboot...\n");
+	} else
+		omap_wdt_ping(wdev);
+
+	i = __raw_readl(base + OMAP_WATCHDOG_WIRQSTAT);
+	__raw_writel(i, base + OMAP_WATCHDOG_WIRQSTAT);
+
+	return (!kernelpet) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
+}
+
+static int omap_wdt_setup(struct omap_wdt_dev *wdev)
+{
 	void __iomem *base = wdev->base;
 
 	if (test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users)))
 		return -EBUSY;
-
-	pm_runtime_get_sync(wdev->dev);
 
 	/* initialize prescaler */
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x01)
@@ -156,23 +221,83 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x01)
 		cpu_relax();
 
-	file->private_data = (void *) wdev;
-
 	omap_wdt_set_timeout(wdev);
 	omap_wdt_ping(wdev); /* trigger loading of new timeout value */
+
+	/* Enable delay interrupt */
+	if (wdev->irq)
+		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQENSET);
+
 	omap_wdt_enable(wdev);
+
+	return 0;
+}
+
+static int omap_wdt_nb_func(struct notifier_block *nb, unsigned long val,
+	void *v)
+{
+	struct omap_wdt_dev *wdev = container_of(nb, struct omap_wdt_dev, nb);
+
+	spin_lock(&wdt_lock);
+	printk(KERN_NOTICE "omap_wdt: pm notification has been recived -> ping watchdog\n");
+	omap_wdt_ping(wdev);
+	spin_unlock(&wdt_lock);
+
+	return NOTIFY_OK;
+}
+
+/*
+ *	Allow only one task to hold it open
+ */
+static int omap_wdt_open(struct inode *inode, struct file *file)
+{
+	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
+	int ret;
+
+	pm_runtime_get_sync(wdev->dev);
+
+	ret = omap_wdt_setup(wdev);
+
+	if (ret) {
+		pm_runtime_put_sync(wdev->dev);
+		return ret;
+	}
+
+	/* Enable notif register notifier in order to handle suspend/resume seuqence:
+         *  The notify callback will ping watchdog before and after freezing threads
+         *  Thus it give time to the kernel to freeze/wake-up all the threads before
+         *  watchdog experiration
+         */
+	if (!kernelpet) {
+		wdev->nb.notifier_call = omap_wdt_nb_func;
+		register_pm_notifier(&wdev->nb);
+	}
+
+	file->private_data = (void *)wdev;
+
 	return nonseekable_open(inode, file);
 }
 
 static int omap_wdt_release(struct inode *inode, struct file *file)
 {
 	struct omap_wdt_dev *wdev = file->private_data;
+#ifndef CONFIG_WATCHDOG_NOWAYOUT
+	void __iomem *base = wdev->base;
+#endif
 
 	/*
 	 *      Shut off the timer unless NOWAYOUT is defined.
 	 */
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 	omap_wdt_disable(wdev);
+
+	/* Disable notify chain */
+	if (!kernelpet)
+		unregister_pm_notifier(&wdev->nb);
+
+	/* Disable delay interrupt */
+	if (wdev->irq)
+		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQENCLR);
 
 	pm_runtime_put_sync(wdev->dev);
 #else
@@ -258,7 +383,7 @@ static const struct file_operations omap_wdt_fops = {
 
 static int __devinit omap_wdt_probe(struct platform_device *pdev)
 {
-	struct resource *res, *mem;
+	struct resource *res, *mem, *res_irq;
 	struct omap_wdt_dev *wdev;
 	int ret;
 
@@ -296,6 +421,17 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 		goto err_ioremap;
 	}
 
+	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (res_irq) {
+		ret = request_threaded_irq(res_irq->start, omap_wdt_interrupt,
+			omap_wdt_interrupt_th, 0, dev_name(&pdev->dev), wdev);
+
+		if (ret)
+			goto err_irq;
+
+		wdev->irq = res_irq->start;
+	}
+
 	platform_set_drvdata(pdev, wdev);
 
 	/*
@@ -304,9 +440,11 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 	 * OMAP4/5 (like provided with runtime API) will cause system failure
 	 */
 	pm_runtime_enable(wdev->dev);
+	pm_runtime_irq_safe(wdev->dev);
 	pm_runtime_get_sync(wdev->dev);
 
-	omap_wdt_disable(wdev);
+	/* Keep wdt enabled as per bootloader settings */
+	/* omap_wdt_disable(wdev); */
 	omap_wdt_adjust_timeout(timer_margin);
 
 	wdev->omap_wdt_miscdev.parent = &pdev->dev;
@@ -323,6 +461,14 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 		timer_margin);
 
 	omap_wdt_dev = pdev;
+
+	if (kernelpet && wdev->irq) {
+		wdev->nb.notifier_call = omap_wdt_nb_func;
+		atomic_notifier_chain_register(&touch_watchdog_notifier_head,
+			&wdev->nb);
+		return omap_wdt_setup(wdev);
+	}
+
 	pm_runtime_put_sync(wdev->dev);
 	return 0;
 
@@ -330,6 +476,11 @@ err_misc:
 	pm_runtime_put_sync(wdev->dev);
 	pm_runtime_disable(wdev->dev);
 	platform_set_drvdata(pdev, NULL);
+
+	if (wdev->irq)
+		free_irq(wdev->irq, wdev);
+
+err_irq:
 	iounmap(wdev->base);
 
 err_ioremap:
@@ -350,7 +501,9 @@ static void omap_wdt_shutdown(struct platform_device *pdev)
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
 	if (wdev->omap_wdt_users) {
-		omap_wdt_disable(wdev);
+		spin_lock(&wdt_lock);
+		omap_wdt_ping(wdev);
+		spin_unlock(&wdt_lock);
 		pm_runtime_put_sync(wdev->dev);
 	}
 }
@@ -364,9 +517,21 @@ static int __devexit omap_wdt_remove(struct platform_device *pdev)
 	if (!res)
 		return -ENOENT;
 
+	if (pm_qos_request_active(&wdev->pm_qos_request))
+		pm_qos_remove_request(&wdev->pm_qos_request);
+
 	misc_deregister(&(wdev->omap_wdt_miscdev));
 	release_mem_region(res->start, resource_size(res));
 	platform_set_drvdata(pdev, NULL);
+
+	if (wdev->irq)
+		free_irq(wdev->irq, wdev);
+
+	if (kernelpet && wdev->irq) {
+		omap_wdt_disable(wdev);
+		atomic_notifier_chain_unregister(&touch_watchdog_notifier_head,
+			&wdev->nb);
+	}
 
 	iounmap(wdev->base);
 

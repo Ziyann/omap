@@ -34,8 +34,8 @@
 #ifndef RPROC_DRM_H
 #define RPROC_DRM_H
 
-#define COMMON_SECURE_DRIVER_UUID {0xC2537CC3, 0x36F0, 0x48D9, \
-			{0x82, 0x0E, 0x55, 0x96, 0x01, 0x47, 0x80, 0x29} }
+#define COMMON_SECURE_DRIVER_UUID {0x7B1DD682, 0x1077, 0x4939, \
+			{0x97, 0x55, 0xB6, 0x19, 0x2C, 0x5C, 0xC5, 0xFD} }
 
 /*
  * common definition shared between rproc and secure services
@@ -112,12 +112,16 @@ struct rproc_sec_params {
  * after validation
  */
 enum rproc_service_enum {
+#if defined(CONFIG_DRM_WIDEVINE)
 	AUTHENTICATION_A0 = 0x00002000,
 	AUTHENTICATION_A1,
 	AUTHENTICATION_A2,
 	ENTER_SECURE_PLAYBACK = 0x00003000,
 	EXIT_SECURE_PLAYBACK,
 	ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION
+#endif
+	RPROC_ENTER_SECURE_PLAYBACK = 0x00003000,
+	RPROC_EXIT_SECURE_PLAYBACK = 0x00003001,
 };
 
 typedef int (*rproc_drm_invoke_service_t)(enum rproc_service_enum service,

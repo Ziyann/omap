@@ -981,11 +981,16 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 			omap_aess_dbg_error(abe, OMAP_ABE_ERR_API,
 					   ABE_PARAMETER_ERROR);
 		}
+
+#ifndef CONFIG_ABE_44100
 		if (abe_port[id].format.f == 44100)
 			smem1 = omap_aess_update_io_task(abe, &aess_port_mm_dl_441k_pp, 1);
 		else
 			smem1 = omap_aess_update_io_task(abe, &aess_port_mm_dl_48k, 1);
-
+#else
+		omap_aess_update_io_task(abe, &aess_port_mm_dl_441k_pp, 0);
+		smem1 = MM_DL_labelID;
+#endif
 		/* able  interrupt to be generated at the first frame */
 		desc_pp.split_addr1 = 1;
 
@@ -1256,16 +1261,26 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 			break;
 		case OMAP_ABE_MM_DL_PORT:
 			/* check for CBPr / serial_port / Ping-pong access */
+#ifndef CONFIG_ABE_44100
 			if (abe_port[id].format.f == 44100)
 				smem1 = omap_aess_update_io_task(abe, &aess_port_mm_dl_441k, 1);
 			else
 				smem1 = omap_aess_update_io_task(abe, &aess_port_mm_dl_48k, 1);
+#else
+			omap_aess_update_io_task(abe, &aess_port_mm_dl_441k, 0);
+			smem1 = MM_DL_labelID;
+#endif
 			break;
 		case OMAP_ABE_TONES_DL_PORT:
+#ifndef CONFIG_ABE_44100
 			if (abe_port[id].format.f == 44100)
 				smem1 = omap_aess_update_io_task(abe, &aess_port_tones_dl_441k, 1);
 			else
 				smem1 = omap_aess_update_io_task(abe, &aess_port_tones_dl_48k, 1);
+#else
+			omap_aess_update_io_task(abe, &aess_port_tones_dl_441k, 0);
+			smem1 = Tones_labelID;
+#endif
 			break;
 		case OMAP_ABE_MM_UL_PORT:
 			copy_func_index1 = COPY_MM_UL_CFPID;

@@ -84,13 +84,12 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 			return -EINVAL;
 
 		pa = virt_to_phys(obj->iopgd);
-		if (!IS_ALIGNED(pa, SZ_16K))
-			return -EINVAL;
 	} else {
 		pa = (u32)obj->secure_ttb;
-		if (!pa || !IS_ALIGNED(pa, SZ_16K))
-			return -EINVAL;
 	}
+
+	if (!pa || !IS_ALIGNED(pa, SZ_16K))
+		return -EINVAL;
 
 	l = iommu_read_reg(obj, MMU_REVISION);
 	dev_info(obj->dev, "%s: version %d.%d\n", obj->name,
@@ -114,6 +113,9 @@ static void omap2_iommu_disable(struct omap_iommu *obj)
 	oh = omap_hwmod_lookup(obj->name);
 	if (!oh)
 		return;
+
+	clkdm_deny_idle(oh->clkdm);
+
 	/*
 	 * IPU and DSP iommus are not directly connected to the processor
 	 * instead they are  behind a shared MMU. Therefore in the case of
@@ -178,8 +180,6 @@ static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 	if (stat & MMU_IRQ_MULTIHITFAULT)
 		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
-
-	clkdm_deny_idle(oh->clkdm);
 
 	return errs;
 }

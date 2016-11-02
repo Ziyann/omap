@@ -405,6 +405,7 @@ struct rproc;
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
+ * @cb_barrier:	wait for all ongoing virtio callbacks to complete
  * @suspend:	suspend callback (auto_suspend flag as a parameter)
  * @resume:	resume callback
  * @set_latency		set latency on remote processor
@@ -416,6 +417,7 @@ struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
+	int (*cb_barrier)(struct rproc *rproc);
 	int (*suspend)(struct rproc *rproc, bool auto_suspend);
 	int (*resume)(struct rproc *rproc);
 	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
@@ -517,6 +519,7 @@ struct rproc {
 	struct rproc_mem_pool *memory_pool;
 	const char *firmware;
 	void *priv;
+	const struct firmware *fw;
 	const struct rproc_ops *ops;
 	struct device dev;
 	struct kref refcount;

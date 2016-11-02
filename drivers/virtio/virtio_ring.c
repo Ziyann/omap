@@ -638,6 +638,7 @@ EXPORT_SYMBOL_GPL(virtqueue_detach_unused_buf);
 irqreturn_t vring_interrupt(int irq, void *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
+	void (*cb)(struct virtqueue *vq);
 
 	if (!more_used(vq)) {
 		pr_debug("virtqueue interrupt with no work for %p\n", vq);
@@ -647,9 +648,10 @@ irqreturn_t vring_interrupt(int irq, void *_vq)
 	if (unlikely(vq->broken))
 		return IRQ_HANDLED;
 
-	pr_debug("virtqueue callback for %p (%p)\n", vq, vq->vq.callback);
-	if (vq->vq.callback)
-		vq->vq.callback(&vq->vq);
+	cb = vq->vq.callback;
+	pr_debug("virtqueue callback for %p (%p)\n", vq, cb);
+	if (cb)
+		cb(&vq->vq);
 
 	return IRQ_HANDLED;
 }

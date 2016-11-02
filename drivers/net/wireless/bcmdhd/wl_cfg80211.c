@@ -2392,11 +2392,11 @@ wl_set_auth_type(struct net_device *dev, struct cfg80211_connect_params *sme)
 	s32 bssidx = wl_cfgp2p_find_idx(wl, dev);
 	switch (sme->auth_type) {
 	case NL80211_AUTHTYPE_OPEN_SYSTEM:
-		val = WL_AUTH_OPEN_SYSTEM;
+		val = WL_AUTH_OPEN_SHARED;
 		WL_DBG(("open system\n"));
 		break;
 	case NL80211_AUTHTYPE_SHARED_KEY:
-		val = WL_AUTH_SHARED_KEY;
+		val = WL_AUTH_OPEN_SHARED;
 		WL_DBG(("shared key\n"));
 		break;
 	case NL80211_AUTHTYPE_AUTOMATIC:
@@ -2999,7 +2999,7 @@ wl_cfg80211_config_default_key(struct wiphy *wiphy, struct net_device *dev,
 		WL_ERR(("WLC_GET_WSEC error (%d)\n", err));
 		return err;
 	}
-	if (wsec & WEP_ENABLED) {
+	if (wsec == WEP_ENABLED) {
 		/* Just select a new current key */
 		index = (u32) key_idx;
 		index = htod32(index);
@@ -5875,17 +5875,15 @@ static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev
 		WIPHY_FLAG_SUPPORTS_SEPARATE_DEFAULT_KEYS |
 #endif
 		WIPHY_FLAG_4ADDR_STATION;
-	/*  If driver advertises FW_ROAM, the supplicant wouldn't
-	 * send the BSSID & Freq in the connect command allowing the
-	 * the driver to choose the AP to connect to. But unless we
-	 * support ROAM_CACHE in firware this will delay the ASSOC as
-	 * as the FW need to do a full scan before attempting to connect
-	 * So that feature will just increase assoc. The better approach
-	 * to let Supplicant to provide channel info and FW letter may roam
-	 * if needed so DON'T advertise that featur eto Supplicant.
+	/* Please use supplicant patch to send BSSID even when
+	 * driver sets WIPHY_FLAG_SUPPORTS_FW_ROAM flag.
+	 * If driver advertises FW_ROAM, default supplicant wouldn't
+	 * send the BSSID & Freq in the connect req command. This
+	 * will delay the ASSOC as the FW need to do a full scan
+	 * before attempting to connect.
 	 */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
-	/* wdev->wiphy->flags |= WIPHY_FLAG_SUPPORTS_FW_ROAM; */
+	wdev->wiphy->flags |= WIPHY_FLAG_SUPPORTS_FW_ROAM;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
 	wdev->wiphy->flags |= WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL |
@@ -6687,17 +6685,17 @@ wl_bss_roaming_done(struct wl_priv *wl, struct net_device *ndev,
 	printk("wl_bss_roaming_done succeeded to " MACDBG "\n",
 		MAC2STRDBG((u8*)(&e->addr)));
 
-	cfg80211_roamed(ndev,
+			cfg80211_roamed(ndev,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
-		NULL,	/* struct cfg80211_bss *bss */
+			NULL,	/* struct cfg80211_bss *bss */
 #elif LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)
-		NULL,
+			NULL,
 #endif
-		curbssid,
-		conn_info->req_ie, conn_info->req_ie_len,
-		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
-	WL_DBG(("Report roaming result\n"));
+			curbssid,
+			conn_info->req_ie, conn_info->req_ie_len,
+			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
+		WL_DBG(("Report roaming result\n"));
 
 	wl_set_drv_status(wl, CONNECTED, ndev);
 

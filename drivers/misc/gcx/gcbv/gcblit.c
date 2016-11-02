@@ -539,11 +539,13 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	if (dstinfo->surfdirty)
 		batchfinalize |= GCBV_BATCH_FINALIZE_FLAGS_DST;
 
-	if (dstinfo->cliprectdirty)
-		batchfinalize |= GCBV_BATCH_FINALIZE_FLAGS_CLIPRECT;
-
 	if (dstinfo->destrectdirty)
-		batchfinalize |= GCBV_BATCH_FINALIZE_FLAGS_DESTRECT;
+		batchfinalize |= GCBV_BATCH_FINALIZE_FLAGS_DESTRECT |
+				 dstinfo->surfdirty;
+
+	if (dstinfo->cliprectdirty)
+		batchfinalize |= GCBV_BATCH_FINALIZE_FLAGS_CLIPRECT |
+				 dstinfo->surfdirty | dstinfo->destrectdirty;
 
 	/* Check if we need to finalize existing batch. */
 	if (batchfinalize) {

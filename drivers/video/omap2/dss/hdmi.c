@@ -42,6 +42,9 @@
 #include "dss.h"
 #include "dss_features.h"
 
+#include <linux/pm_qos.h>
+static struct pm_qos_request pm_qos_handle;
+
 #define HDMI_WP			0x0
 #define HDMI_PLLCTRL		0x200
 #define HDMI_PHY		0x300
@@ -392,6 +395,18 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 	}
 }
 
+/* Set / Release c-state constraints */
+static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
+{
+	DSSINFO("%s c-state constraint for HDMI\n\n",
+		enable ? "Set" : "Release");
+
+	if (enable)
+		pm_qos_add_request(&pm_qos_handle, PM_QOS_CPU_DMA_LATENCY, 100);
+	else
+		pm_qos_remove_request(&pm_qos_handle);
+}
+ 
 static int hdmi_power_on(struct omap_dss_device *dssdev)
 {
 	int r;
@@ -401,6 +416,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	r = hdmi_runtime_get();
 	if (r)
 		return r;
+
+	hdmi_set_l3_cstr(dssdev, true);
 
 	if (cpu_is_omap54xx()) {
 		r = regulator_enable(hdmi.vdds_hdmi);
@@ -458,7 +475,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 0);
 
-	hdmi_load_hdcp_keys(dssdev);
+	//hdmi_load_hdcp_keys(dssdev);
 
 	/* config the PLL and PHY hdmi_set_pll_pwrfirst */
 	r = hdmi.ip_data.ops->pll_enable(&hdmi.ip_data);
@@ -497,9 +514,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 1);
 
-	if (hdmi.hdmi_start_frame_cb &&
+	/*if (hdmi.hdmi_start_frame_cb &&
 		hdmi.custom_set)
-		(*hdmi.hdmi_start_frame_cb)();
+		(*hdmi.hdmi_start_frame_cb)();*/ 
 
 	r = dss_mgr_enable(dssdev->manager);
 	if (r)
@@ -513,6 +530,7 @@ err_mgr_enable:
 	hdmi.ip_data.ops->phy_disable(&hdmi.ip_data);
 	hdmi.ip_data.ops->pll_disable(&hdmi.ip_data);
 err:
+	hdmi_set_l3_cstr(dssdev, false);
 	hdmi_runtime_put();
 	return -EIO;
 }
@@ -532,6 +550,8 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 
 	if (cpu_is_omap54xx())
 		regulator_disable(hdmi.vdds_hdmi);
+
+	hdmi_set_l3_cstr(dssdev, false);
 
 	hdmi_runtime_put();
 

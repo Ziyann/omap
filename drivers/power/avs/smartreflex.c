@@ -28,6 +28,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/power/smartreflex.h>
 #include <linux/sched.h>
+#include <linux/reboot.h>
+#include <linux/sysrq.h>
 #include <plat/voltage.h>
 #include <plat/dvfs.h>
 
@@ -976,12 +978,16 @@ bool omap_sr_is_enabled(struct voltagedomain *voltdm)
 void omap_sr_enable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
+	static bool reduce_spam = 0;
 	int r;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
+		if (!reduce_spam) {
+			pr_warning("%s: omap_sr struct for voltdm not found\n",
 			   __func__);
+			reduce_spam = true;
+		}
 		return;
 	}
 
@@ -1019,11 +1025,21 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 void omap_sr_disable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
+	static unsigned long reduce_spam = 0;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
+		if (!reduce_spam) {
+			pr_warning("%s: omap_sr struct for voltdm not found\n",
 			   __func__);
+			reduce_spam = jiffies;
+		} else {
+			if (jiffies - reduce_spam > 30 * HZ) {
+				__handle_sysrq('w', 0);
+				printk("\nSR : rebooting!\n\n");
+				emergency_restart();
+			}
+		}
 		return;
 	}
 

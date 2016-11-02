@@ -30,7 +30,11 @@
 #define ANDROID_ALARM_PRINT_IO (1U << 1)
 #define ANDROID_ALARM_PRINT_INT (1U << 2)
 
+#ifdef CONFIG_RTC_INF_ALARM_DEV_DEBUG
+static int debug_mask = ANDROID_ALARM_PRINT_INFO | ANDROID_ALARM_PRINT_IO;
+#else
 static int debug_mask = ANDROID_ALARM_PRINT_INFO;
+#endif
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #define pr_alarm(debug_level_mask, args...) \
@@ -138,7 +142,8 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (ANDROID_ALARM_BASE_CMD(cmd)) {
 	case ANDROID_ALARM_CLEAR(0):
 		spin_lock_irqsave(&alarm_slock, flags);
-		pr_alarm(IO, "alarm %d clear\n", alarm_type);
+		pr_alarm(IO, "alarm %d clear from from %s(%d)\n",
+			alarm_type, current->comm, current->pid);
 		devalarm_try_to_cancel(&alarms[alarm_type]);
 		if (alarm_pending) {
 			alarm_pending &= ~alarm_type_mask;
@@ -167,8 +172,10 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 from_old_alarm_set:
 		spin_lock_irqsave(&alarm_slock, flags);
-		pr_alarm(IO, "alarm %d set %ld.%09ld\n", alarm_type,
-			new_alarm_time.tv_sec, new_alarm_time.tv_nsec);
+		pr_alarm(IO, "alarm %d set %ld.%09ld from %s(%d)\n",
+			alarm_type, new_alarm_time.tv_sec,
+			new_alarm_time.tv_nsec, current->comm,
+			current->pid);
 		alarm_enabled |= alarm_type_mask;
 		devalarm_start(&alarms[alarm_type],
 			timespec_to_ktime(new_alarm_time));

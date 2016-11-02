@@ -45,15 +45,33 @@
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
 #include <linux/rproc_drm.h>
+#include <linux/kthread.h>
+#include <linux/wakelock.h>
+
+#include <linux/metricslog.h>
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#include "../../fs/proc/internal.h"
+#endif
 
 #include "remoteproc_internal.h"
 
 #define DEFAULT_AUTOSUSPEND_TIMEOUT 5000
+#define RPROC_WAKELOCK_TIMEOUT (5*HZ)
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	#define M3_IDLEST_SUSPEND		0x00070000
+	#define OMAP4430_CM_M3_M3_CLKCTRL	0x4A008920
+	static void __iomem *idle_st;
+#endif
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
 static void klist_rproc_get(struct klist_node *n);
 static void klist_rproc_put(struct klist_node *n);
+
+/* used to guard rproc reload sequence */
+static struct wake_lock rproc_reload_wakelock;
 
 /*
  * klist of the available remote processors.
@@ -1686,9 +1704,26 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
 	char class;
 
 	if (!fw) {
+#ifdef CONFIG_AMAZON_METRICS_LOG
+		char buf[128], buf2[128];
+		struct vmalloc_info vmi;
+		get_vmalloc_info(&vmi);
+		strcpy(buf2, "remoteproc:ducati-loading-failure:reason=");
+		sprintf(buf,
+			"remoteproc:ducati-loading-failure:reason_Largest_Chunk_kB=%ld;CT;1,Used_kB=%ld;CT;1:NR",
+			vmi.largest_chunk >> 10, vmi.used >> 10);
+		log_to_metrics(ANDROID_LOG_ERROR, "remoteproc", buf);
+#endif
 		dev_err(dev, "failed to load %s\n", name);
 		return -EINVAL;
 	}
+
+	/*
+	 * If we've managed to get here, then the one and only rproc->fw
+	 * must have been loaded. It will stay loaded until reboot (i.e.
+	 * rproc unregister).
+	 */
+	BUG_ON(!rproc->fw);
 
 	if (fw->size < sizeof(struct elf32_hdr)) {
 		dev_err(dev, "Image is too small\n");
@@ -1825,7 +1860,11 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* check and validate secure certificate */
-	rproc_secure_boot(rproc);
+	ret = rproc_secure_boot(rproc);
+	if (ret) {
+		dev_err(dev, "Failed to process secure mode: %d\n", ret);
+		goto free_version;
+	}
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
@@ -1889,8 +1928,8 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
 		goto out;
 
 out:
-	if (fw)
-		release_firmware(fw);
+	kref_put(&rproc->refcount, rproc_release);
+
 	/* allow rproc_unregister() contexts, if any, to proceed */
 	complete_all(&rproc->firmware_loading_complete);
 }
@@ -1908,7 +1947,6 @@ out:
  */
 int rproc_boot(struct rproc *rproc)
 {
-	const struct firmware *firmware_p;
 	struct device *dev;
 	int ret;
 
@@ -1955,18 +1993,12 @@ int rproc_boot(struct rproc *rproc)
 
 	dev_info(dev, "powering up %s\n", rproc->name);
 
-	/* load firmware */
-	ret = request_firmware(&firmware_p, rproc->firmware, dev);
-	if (ret < 0) {
-		dev_err(dev, "request_firmware failed: %d\n", ret);
-		goto downref_rproc;
-	}
+	/*
+	 * virtio actually causes rproc to boot, so if we're here then
+	 * firmware has been loaded by rproc_loader_thread.
+	 */
+	ret = rproc_fw_boot(rproc, rproc->fw);
 
-	ret = rproc_fw_boot(rproc, firmware_p);
-
-	release_firmware(firmware_p);
-
-downref_rproc:
 	if (ret) {
 		module_put(dev->parent->driver->owner);
 		atomic_dec(&rproc->power);
@@ -2026,11 +2058,11 @@ void rproc_shutdown(struct rproc *rproc)
 	 * we need to wake it up to avoid stopping the processor with
 	 * context saved which can cause a issue when it is started again
 	 */
-	if (rproc->auto_suspend_timeout >= 0)
+	if (rproc->auto_suspend_timeout >= 0 && rproc->state != RPROC_CRASHED)
 		pm_runtime_get_sync(dev);
 
 	pm_runtime_put_noidle(&rproc->dev);
-	if (smode || !rproc_is_secure(rproc))
+	if (smode || !rproc_is_secure(rproc) || rproc->state == RPROC_CRASHED)
 		pm_runtime_disable(&rproc->dev);
 	pm_runtime_set_suspended(&rproc->dev);
 
@@ -2138,6 +2170,11 @@ static int _reset_all_vdev(struct rproc *rproc)
 {
 	struct rproc_vdev *rvdev, *rvtmp;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	unsigned long ta;
+	if (!idle_st)
+		idle_st = ioremap(OMAP4430_CM_M3_M3_CLKCTRL, sizeof(u32));
+#endif
 	dev_dbg(&rproc->dev, "reseting virtio devices for %s\n", rproc->name);
 
 	/* reset firewalls */
@@ -2147,10 +2184,22 @@ static int _reset_all_vdev(struct rproc *rproc)
 	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
 		rproc_remove_virtio_dev(rvdev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	ta = jiffies + msecs_to_jiffies(1000);
+	while ((readl(idle_st) & M3_IDLEST_SUSPEND) != M3_IDLEST_SUSPEND) {
+		if (time_after(jiffies, ta)) {
+			printk(KERN_ERR "Ducati cannot reach idle state!\n");
+			break;
+		} else {
+			usleep_range(1000, 1500);
+		}
+	}
+#endif
 	/* run rproc_fw_config_virtio to create vdevs again */
-	return request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-			rproc->firmware, &rproc->dev, GFP_KERNEL,
-			rproc, rproc_fw_config_virtio);
+	BUG_ON(!rproc->fw);
+	rproc_fw_config_virtio(rproc->fw, rproc);
+
+	return 0;
 }
 
 /**
@@ -2179,10 +2228,8 @@ static void rproc_error_handler_work(struct work_struct *work)
 	 * if recovery enabled reset all virtio devices, so that all rpmsg
 	 * drivers can be restarted in order to make them functional again
 	 */
-	if (!rproc->recovery_disabled) {
-		dev_err(dev, "trying to recover %s\n", rproc->name);
-		_reset_all_vdev(rproc);
-	}
+	if (!rproc->recovery_disabled)
+		rproc_secure_recover(rproc);
 }
 
 /**
@@ -2197,7 +2244,7 @@ void rproc_recover(struct rproc *rproc)
 {
 	if (rproc->recovery_disabled && rproc->state == RPROC_CRASHED) {
 		dev_info(&rproc->dev, "rproc recovering....\n");
-		_reset_all_vdev(rproc);
+		rproc_secure_recover(rproc);
 	}
 }
 
@@ -2212,6 +2259,10 @@ int rproc_reload(const char *name)
 	struct klist_iter i;
 	int ret = 0;
 
+	if (wake_lock_active(&rproc_reload_wakelock))
+		wake_unlock(&rproc_reload_wakelock);
+	wake_lock_timeout(&rproc_reload_wakelock,
+					RPROC_WAKELOCK_TIMEOUT);
 	/* find the remote processor, and upref its refcount */
 	klist_iter_init(&rprocs, &i);
 	while ((rproc = next_rproc(&i)) != NULL)
@@ -2224,11 +2275,13 @@ int rproc_reload(const char *name)
 	/* can't find this rproc ? */
 	if (!rproc) {
 		pr_err("can't find remote processor %s\n", name);
+		if (wake_lock_active(&rproc_reload_wakelock))
+			wake_unlock(&rproc_reload_wakelock);
 		return -ENODEV;
 	}
 
 	dev_info(&rproc->dev, "rproc reloading....\n");
-	_reset_all_vdev(rproc);
+	ret = _reset_all_vdev(rproc);
 	return ret;
 }
 
@@ -2352,7 +2405,6 @@ EXPORT_SYMBOL(rproc_set_constraints);
 
 static int rproc_loader_thread(struct rproc *rproc)
 {
-	const struct firmware *fw;
 	struct device *dev = &rproc->dev;
 	unsigned long to;
 	int ret;
@@ -2372,18 +2424,19 @@ static int rproc_loader_thread(struct rproc *rproc)
 	}
 
 	/* make some retries in case FS is not up yet */
-	while (request_firmware(&fw, rproc->firmware, dev) &&
-				time_after(to, jiffies))
+	while (!rproc->fw
+			&& request_firmware(&rproc->fw, rproc->firmware, dev)
+			&& time_after(to, jiffies))
 		msleep(1000);
 
-	if (!fw) {
+	if (!rproc->fw) {
 		ret = -ETIME;
 		dev_err(dev, "error %d requesting firmware %s\n",
 							ret, rproc->firmware);
 		return ret;
 	}
 
-	rproc_fw_config_virtio(fw, rproc);
+	rproc_fw_config_virtio(rproc->fw, rproc);
 
 	return 0;
 }
@@ -2417,6 +2470,8 @@ int rproc_register(struct rproc *rproc)
 	if (ret < 0)
 		return ret;
 
+	kref_get(&rproc->refcount);
+
 	/* expose to rproc_get_by_name users */
 	klist_add_tail(&rproc->node, &rprocs);
 
@@ -2430,6 +2485,8 @@ int rproc_register(struct rproc *rproc)
 
 	/* rproc_unregister() calls must wait until async loader completes */
 	init_completion(&rproc->firmware_loading_complete);
+
+	wake_lock_init(&rproc_reload_wakelock, WAKE_LOCK_SUSPEND, "rproc_wake");
 
 	/* initialize secure service */
 	rproc_secure_reset(rproc);
@@ -2447,6 +2504,7 @@ int rproc_register(struct rproc *rproc)
 		dev_err(dev, "request_firmware_nowait failed: %d\n", ret);
 		complete_all(&rproc->firmware_loading_complete);
 		klist_remove(&rproc->node);
+		wake_lock_destroy(&rproc_reload_wakelock);
 	}
 
 	return ret;
@@ -2624,6 +2682,10 @@ int rproc_unregister(struct rproc *rproc)
 	/* if rproc is just being registered, wait */
 	wait_for_completion(&rproc->firmware_loading_complete);
 
+	if (rproc->fw)
+		release_firmware(rproc->fw);
+	rproc->fw = NULL;
+
 	/* clean up remote vdev entries */
 	list_for_each_entry_safe(rvdev, tmp, &rproc->rvdevs, node)
 		rproc_remove_virtio_dev(rvdev);
@@ -2633,9 +2695,14 @@ int rproc_unregister(struct rproc *rproc)
 
 	device_del(&rproc->dev);
 
+	wake_lock_destroy(&rproc_reload_wakelock);
 	/* the rproc will only be released after its refcount drops to zero */
 	kref_put(&rproc->refcount, rproc_release);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	if (idle_st)
+		iounmap(idle_st);
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(rproc_unregister);

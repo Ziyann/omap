@@ -2,6 +2,15 @@ if ARCH_OMAP2PLUS
 
 menu "TI OMAP2/3/4 Specific Features"
 
+config LAB126_DIAG_MODE
+	bool "Lab126 Kernel Diagnostics mode"
+	default n
+	help
+	  Enable unsafe features required to recover broken devices
+	  1. Secure sanitize support in mmc/core
+	  2. secure sanitize support in omap4 mmc host driver
+	  If unsure, say N
+
 config ARCH_OMAP2PLUS_TYPICAL
 	bool "Typical OMAP configuration"
 	default y
@@ -393,6 +402,81 @@ config MACH_OMAP4_PANDA
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select OMAP_TPS6236X
 
+config MACH_OMAP4_BOWSER
+	bool
+
+choice
+	prompt "OMAP4 Bowser based boards"
+	depends on ARCH_OMAP4
+
+config MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7
+	bool "Bowser7"
+	select MACH_OMAP4_BOWSER
+	select LEDS_OMAP4430_SDP_DISPLAY
+	select LEDS_OMAP4430_SDP_KEYPAD
+	select SENSORS_LM75
+	select INPUT_BH1780
+	select INPUT_BMP085
+	select INPUT_HMC5843
+	select INPUT_SFH7741
+	select INPUT_MISC
+	select HWMON
+	select INPUT_CMA3000
+	select INPUT_CMA3000_I2C
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select OMAP_TPS6236X
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select OMAP_RESET_REASON
+
+config MACH_OMAP4_BOWSER_SUBTYPE_JEM
+	bool "Jem"
+	select MACH_OMAP4_BOWSER
+	select INPUT_MISC
+	select HWMON
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select OMAP_RESET_REASON
+	select INPUT_BU52061_HALLSENSOR
+	select BATTERY_BQ27541
+	select CHARGER_SMB347
+	select BCMDHD_BCM43239
+	select TOUCHSCREEN_CYPRESS_TTSP
+	select PANEL_NT71391_HYDIS
+	select BACKLIGHT_BOWSER
+
+config MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	bool "Soho"
+	select MACH_OMAP4_BOWSER
+	select INPUT_MISC
+	select HWMON
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select OMAP_RESET_REASON
+	select INPUT_BU52061_HALLSENSOR
+	select BATTERY_BQ27541
+	select CHARGER_SMB347
+	select BCMDHD_BCM4330
+	select TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	select BACKLIGHT_LP855X
+
+endchoice
+
+config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
+        bool "FTM mode for OMAP4 Bowser based Jem sub-type board"
+        depends on MACH_OMAP4_BOWSER_SUBTYPE_JEM
+
 config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
 	default y
@@ -520,6 +604,22 @@ config OMAP_REBOOT_REASON
 	  Let bootloader to know when their platform do a reboot. The boot
 	  reason is written to SAR memory that is retained across reboots.
 	  Then bootloader cat read it. Bootloader should be updated accordingly.
+
+config OMAP_RESET_REASON
+	depends on ARCH_OMAP4
+	bool "Log OMAP boot reason"
+	default n
+	help
+	  This allows knowing why OMAP started up
+	  (warm reset, cold reset, watchdog, etc...)
+
+config OMAP4_CPU_PC_DUMP
+	depends on ARCH_OMAP4
+	bool "Dumps OMAP4 CPU PC"
+	default n
+	help
+	  Allows dumping CPU program counter though EMU.
+	  Usefull when a CPU is stuck with preempion disabled.
 
 endmenu
 

@@ -241,10 +241,6 @@ struct mmc_host {
 #define MMC_CAP2_HC_ERASE_SZ	(1 << 9)	/* High-capacity erase size */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
-	unsigned int        power_notify_type;
-#define MMC_HOST_PW_NOTIFY_NONE		0
-#define MMC_HOST_PW_NOTIFY_SHORT	1
-#define MMC_HOST_PW_NOTIFY_LONG		2
 
 #ifdef CONFIG_MMC_CLKGATE
 	int			clk_requests;	/* internal reference counter */
@@ -256,6 +252,10 @@ struct mmc_host {
 	struct mutex		clk_gate_mutex;	/* mutex for clock gating */
 	struct device_attribute clkgate_delay_attr;
 	unsigned long           clkgate_delay;
+#endif
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	struct delayed_work     metrics_delay_work; /* delayed metrics output */
 #endif
 
 	/* host specific block data */

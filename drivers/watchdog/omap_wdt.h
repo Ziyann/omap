@@ -38,7 +38,11 @@
 #define OMAP_WATCHDOG_LDR		(0x2c)
 #define OMAP_WATCHDOG_TGR		(0x30)
 #define OMAP_WATCHDOG_WPS		(0x34)
+#define OMAP_WATCHDOG_WDLY		(0x44)
 #define OMAP_WATCHDOG_SPR		(0x48)
+#define OMAP_WATCHDOG_WIRQSTAT		(0x58)
+#define OMAP_WATCHDOG_WIRQENSET		(0x5c)
+#define OMAP_WATCHDOG_WIRQENCLR		(0x60)
 
 /* Using the prescaler, the OMAP watchdog could go for many
  * months before firing.  These limits work without scaling,
@@ -50,5 +54,9 @@
 
 #define PTV			0	/* prescale */
 #define GET_WLDR_VAL(secs)	(0xffffffff - ((secs) * (32768/(1<<PTV))) + 1)
+
+#define TIME_BEFORE_REBOOT      10      /* if delay interrupt occurs and if the watchdog is pet by userspace
+                                         * then wait 10s before rebooting the system.
+                                         */
 
 #endif				/* _OMAP_WATCHDOG_H */

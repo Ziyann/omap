@@ -39,6 +39,7 @@
 struct wm8962_pdata {
 	int gpio_base;
 	u32 gpio_init[WM8962_MAX_GPIO];
+	int gpio_irq;
 
 	/* Setup for microphone detection, raw value to be written to
 	 * R48(0x30) - only microphone related bits will be updated.

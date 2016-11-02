@@ -123,7 +123,7 @@ static struct device_info iva_dev_info = {
 	.voltdm_name	= "mpu_iva",
 };
 
-static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
+static struct omap_opp_def omap34xx_opp_def_list[] = {
 	/* MPU OPP1 */
 	OPP_INITIALIZER(&mpu_dev_info, true, 125000000, OMAP3430_VDD_MPU_OPP1_UV),
 	/* MPU OPP2 */

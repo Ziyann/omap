@@ -27,6 +27,7 @@
 #include <linux/mutex.h>
 #include <linux/rcupdate.h>
 #include "input-compat.h"
+#include <linux/trapz.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
@@ -350,6 +351,10 @@ void input_event(struct input_dev *dev,
 	unsigned long flags;
 
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
+		TRAPZ_DESCRIBE(TRAPZ_KERN_INP, input_event,
+			"Input framework event");
+		TRAPZ_LOG(TRAPZ_LOG_DEBUG, 0, TRAPZ_KERN_INP, input_event,
+			type, code, value, 0);
 
 		spin_lock_irqsave(&dev->event_lock, flags);
 		add_input_randomness(type, code, value);
@@ -1844,8 +1849,10 @@ int input_register_device(struct input_dev *dev)
 	if (!dev->rep[REP_DELAY] && !dev->rep[REP_PERIOD]) {
 		dev->timer.data = (long) dev;
 		dev->timer.function = input_repeat_key;
-		dev->rep[REP_DELAY] = 250;
-		dev->rep[REP_PERIOD] = 33;
+                /* ACOS_MOD_BEGIN */
+		dev->rep[REP_DELAY] = 750;
+		dev->rep[REP_PERIOD] = 99;
+                /* ACOS_MOD_END */
 	}
 
 	if (!dev->getkeycode)

@@ -29,7 +29,7 @@
  * follows:
  * dev_opp_list (root)
  *	|- device 1 (represents voltage domain 1)
- *	|	|- opp 1 (availability, freq, voltage)
+ *	|	|- opp 1 (availability, freq, voltage, opp_name)
  *	|	|- opp 2 ..
  *	...	...
  *	|	`- opp n ..
@@ -65,6 +65,7 @@ struct opp {
 	unsigned long u_volt;
 
 	struct device_opp *dev_opp;
+	char *opp_name;
 };
 
 /**
@@ -224,6 +225,36 @@ int opp_get_opp_count(struct device *dev)
 EXPORT_SYMBOL(opp_get_opp_count);
 
 /**
+ * opp_get_name() - Gets the Name corresponding to an available opp
+ * @opp:	opp for which voltage has to be returned for
+ *
+ * Return opp name corresponding to the opp, else
+ * return 0
+ *
+ * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+ * protected pointer. This means that opp which could have been fetched by
+ * opp_find_freq_{exact,ceil,floor} functions is valid as long as we are
+ * under RCU lock. The pointer returned by the opp_find_freq family must be
+ * used in the same section as the usage of this function with the pointer
+ * prior to unlocking with rcu_read_unlock() to maintain the integrity of the
+ * pointer.
+ */
+char *opp_get_name(struct opp *opp)
+{
+	struct opp *tmp_opp;
+	char *opp_name = NULL;
+
+	tmp_opp = rcu_dereference(opp);
+	if (unlikely(IS_ERR_OR_NULL(tmp_opp)) || !tmp_opp->available)
+		pr_err("%s: Invalid parameters\n", __func__);
+	else
+		opp_name = tmp_opp->opp_name;
+
+	return opp_name;
+}
+EXPORT_SYMBOL(opp_get_name);
+
+/**
  * opp_find_freq_exact() - search for an exact frequency
  * @dev:		device for which we do this operation
  * @freq:		frequency to search for
@@ -311,7 +342,7 @@ struct opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq)
 
 	return opp;
 }
-EXPORT_SYMBOL(opp_find_freq_ceil);
+EXPORT_SYMBOL_GPL(opp_find_freq_ceil);
 
 /**
  * opp_find_freq_floor() - Search for a rounded floor freq
@@ -376,7 +407,8 @@ EXPORT_SYMBOL(opp_find_freq_floor);
  * that this function is *NOT* called under RCU protection or in contexts where
  * mutex cannot be locked.
  */
-int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt,
+	char *opp_name)
 {
 	struct device_opp *dev_opp = NULL;
 	struct opp *opp, *new_opp;
@@ -423,6 +455,7 @@ int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
 	new_opp->rate = freq;
 	new_opp->u_volt = u_volt;
 	new_opp->available = true;
+	new_opp->opp_name = opp_name;
 
 	/* Insert new OPP in order of increasing frequency */
 	head = &dev_opp->opp_list;

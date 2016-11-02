@@ -15,6 +15,9 @@
 #include <linux/lockdep.h>
 #include <linux/export.h>
 #include <linux/sysctl.h>
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#endif
 
 /*
  * The number of tasks checked:
@@ -71,6 +74,9 @@ static struct notifier_block panic_block = {
 static void check_hung_task(struct task_struct *t, unsigned long timeout)
 {
 	unsigned long switch_count = t->nvcsw + t->nivcsw;
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	char buf[256];
+#endif
 
 	/*
 	 * Ensure the task is not frozen.
@@ -103,6 +109,12 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 			"%ld seconds.\n", t->comm, t->pid, timeout);
 	printk(KERN_ERR "\"echo 0 > /proc/sys/kernel/hung_task_timeout_secs\""
 			" disables this message.\n");
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	snprintf(buf, sizeof(buf),
+		"hung_task:def:process_%s=1;CT;1,pid_%d=1;CT;1,blocked_for_%ld_seconds;DV;1:HI",
+		t->comm, t->pid, timeout);
+	log_to_metrics(ANDROID_LOG_INFO, "hungtask", buf);
+#endif
 	sched_show_task(t);
 	debug_show_held_locks(t);
 

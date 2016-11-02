@@ -58,6 +58,7 @@
 #include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
 
 static void exit_mm(struct task_struct * tsk);
 
@@ -983,6 +984,13 @@ void do_exit(long code)
 	if (group_dead)
 		acct_process();
 	trace_sched_process_exit(tsk);
+
+	/* ACOS_MOD_BEGIN */
+	TRAPZ_DESCRIBE(TRAPZ_KERN_SCHED, Exit,
+		"in do_exit about to exit_thread");
+	TRAPZ_LOG(TRAPZ_LOG_VERBOSE, 0, TRAPZ_KERN_SCHED, Exit,
+		tsk->tgid, tsk->pid, 0, 0);
+	/* ACOS_MOD_END */
 
 	exit_sem(tsk);
 	exit_shm(tsk);

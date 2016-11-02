@@ -259,7 +259,7 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tXP		= 7500,
 		.tRTP		= 7500,
 		.tCKESR		= 15000,
-		.tDQSCK_max	= 5500,
+		.tDQSCK_max	= 7000,
 		.tFAW		= 50000,
 		.tZQCS		= 90000,
 		.tZQCL		= 360000,
@@ -267,7 +267,7 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tRAS_max_ns	= 70000,
 		.tRTW		= 7500,
 		.tAONPD		= 1000,
-		.tDQSCK_max_derated = 6000,
+		.tDQSCK_max_derated = 7000,
 	},
 	/* Speed bin 800(400 MHz) */
 	[2] = {

@@ -13,6 +13,10 @@
 #include <linux/notifier.h>
 #include <linux/thermal_framework.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 /* Notes on locking:
  *
  * backlight_device->ops_lock is an internal backlight lock protecting the
@@ -60,11 +64,11 @@ struct backlight_ops {
 
 /* This structure defines all the properties of a backlight */
 struct backlight_properties {
-	/* Current User requested brightness (0 - max_brightness) */
+	/* Current User requested brightness (0 can be max_brightness) */
 	int brightness;
 	/* Maximal value for brightness (read-only) */
 	int max_brightness;
-	/* Maximum value duet to thermal limits (< max_brightness) */
+	/* Maximum value due to thermal limits (<= max_brightness) */
 	int max_thermal_brightness;
 	/* Current FB Power mode (0: full on, 1..3: power saving
 	   modes; 4: full off), see FB_BLANK_XXX */
@@ -107,6 +111,10 @@ struct backlight_device {
 	struct thermal_dev *tdev;
 
 	struct device dev;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+#endif
 };
 
 static inline void backlight_update_status(struct backlight_device *bd)

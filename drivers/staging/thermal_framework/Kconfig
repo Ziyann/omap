@@ -20,6 +20,12 @@ config THERMAL_FRAMEWORK_DEBUG
 	  components, e.g. thermal domains, governors, sensors and
 	  cooling devices and their attributes.
 
+config AMZN_VITALS
+       bool "AMZN vitals metrics support"
+       default n
+       help
+         Say 'Y' here if you want to enable AMZN vitals metrics
+
 
 source "drivers/staging/thermal_framework/Kconfig.omap_thermal"
 source "drivers/staging/thermal_framework/Kconfig.duty_cycle"

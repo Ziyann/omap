@@ -218,7 +218,6 @@ static struct rpmsg_endpoint *__rpmsg_create_ept(struct virtproc_info *vrp,
 	}
 
 	kref_init(&ept->refcount);
-	mutex_init(&ept->cb_lock);
 
 	ept->rpdev = rpdev;
 	ept->cb = cb;
@@ -319,12 +318,8 @@ __rpmsg_destroy_ept(struct virtproc_info *vrp, struct rpmsg_endpoint *ept)
 	/* make sure new inbound messages can't find this ept anymore */
 	mutex_lock(&vrp->endpoints_lock);
 	idr_remove(&vrp->endpoints, ept->addr);
-	mutex_unlock(&vrp->endpoints_lock);
-
-	/* make sure in-flight inbound messages won't invoke cb anymore */
-	mutex_lock(&ept->cb_lock);
 	ept->cb = NULL;
-	mutex_unlock(&ept->cb_lock);
+	mutex_unlock(&vrp->endpoints_lock);
 
 	kref_put(&ept->refcount, __ept_release);
 }
@@ -786,26 +781,16 @@ out:
 }
 EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
 
-/* called when an rx buffer is used, and it's time to digest a message */
-static void rpmsg_recv_done(struct virtqueue *rvq)
+static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
+			     struct rpmsg_hdr *msg, unsigned int len)
 {
-	struct rpmsg_hdr *msg;
-	unsigned int len;
 	struct rpmsg_endpoint *ept;
+	rpmsg_rx_cb_t cb = NULL;
 	struct scatterlist sg;
-	struct virtproc_info *vrp = rvq->vdev->priv;
-	struct device *dev = &rvq->vdev->dev;
 	unsigned long offset = 0;
 	void *sg_addr;
 	int err;
 
-	mutex_lock(&vrp->rx_lock);
-	msg = virtqueue_get_buf(rvq, &len);
-	if (!msg) {
-		mutex_unlock(&vrp->rx_lock);
-		dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
-		return;
-	}
 
 	dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
 					msg->src, msg->dst, msg->len,
@@ -823,7 +808,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 		msg->len > (len - sizeof(struct rpmsg_hdr))) {
 		mutex_unlock(&vrp->rx_lock);
 		dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
-		return;
+		return -EINVAL;
 	}
 
 	/* use the dst addr to fetch the callback of the appropriate user */
@@ -832,20 +817,18 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	ept = idr_find(&vrp->endpoints, msg->dst);
 
 	/* let's make sure no one deallocates ept while we use it */
-	if (ept)
+	if (ept) {
 		kref_get(&ept->refcount);
+		cb = ept->cb;
+	}
 
 	mutex_unlock(&vrp->endpoints_lock);
 
 	if (ept) {
-		/* make sure ept->cb doesn't go away while we use it */
-		mutex_lock(&ept->cb_lock);
-
-		if (ept->cb)
-			ept->cb(ept->rpdev, msg->data, msg->len, ept->priv,
+		/* ept->cb won't go away until refcount drops to zero */
+		if (cb)
+			cb(ept->rpdev, msg->data, msg->len, ept->priv,
 				msg->src);
-
-		mutex_unlock(&ept->cb_lock);
 
 		/* farewell, ept, we don't need you anymore */
 		kref_put(&ept->refcount, __ept_release);
@@ -867,11 +850,50 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	if (err < 0) {
 		mutex_unlock(&vrp->rx_lock);
 		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+/* called when an rx buffer is used, and it's time to digest a message */
+static void rpmsg_recv_done(struct virtqueue *rvq)
+{
+	struct virtproc_info *vrp = rvq->vdev->priv;
+	struct device *dev = &rvq->vdev->dev;
+	struct rpmsg_hdr *msg;
+	unsigned int len, msgs_received = 0;
+	int err;
+
+	mutex_lock(&vrp->rx_lock);
+
+	msg = virtqueue_get_buf(rvq, &len);
+	if (!msg) {
+		mutex_unlock(&vrp->rx_lock);
+		/*
+		 * This is not an error as we might have handled a couple of
+		 * buffers with the previous signal.
+		 */
+		dev_dbg(dev, "uhm, incoming signal, but no used buffer\n");
 		return;
 	}
 
+	while (msg) {
+		err = rpmsg_recv_single(vrp, dev, msg, len);
+		if (err)
+			break;
+
+		msgs_received++;
+
+		msg = virtqueue_get_buf(rvq, &len);
+	};
+
+	dev_dbg(dev, "Received %u messages\n", msgs_received);
+
 	/* tell the remote processor we added another available rx buffer */
-	virtqueue_kick(vrp->rvq);
+	if (msgs_received)
+		virtqueue_kick(vrp->rvq);
+
 	mutex_unlock(&vrp->rx_lock);
 }
 
@@ -981,6 +1003,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		return -ENOMEM;
 
 	vrp->vdev = vdev;
+	vdev->priv = vrp;
 
 	idr_init(&vrp->endpoints);
 	mutex_init(&vrp->endpoints_lock);
@@ -1042,6 +1065,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	/* and half is dedicated for TX */
 	vrp->sbufs = bufs_va + RPMSG_TOTAL_BUF_SPACE / 2;
 
+	/* disable "rx-complete" interrupts */
+	virtqueue_disable_cb(vrp->rvq);
+
 	/* set up the receive buffers */
 	for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
 		struct scatterlist sg;
@@ -1064,8 +1090,6 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	/* suppress "tx-complete" interrupts */
 	virtqueue_disable_cb(vrp->svq);
 
-	vdev->priv = vrp;
-
 	/* if supported by the remote processor, enable the name service */
 	if (virtio_has_feature(vdev, VIRTIO_RPMSG_F_NS)) {
 		/* a dedicated endpoint handles the name service msgs */
@@ -1078,12 +1102,11 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		}
 	}
 
-	/*
-	 * FIXME (if needed): the below virtqueue_kick is commented out
-	 * to help with supporting the non-SMP boot of IPU processors, which
-	 * is non-standard for 3.4 and upstream kernels.
-	 */
-	/* virtqueue_kick(vrp->rvq); */
+	/* re-enable "rx-complete" interrupts */
+	virtqueue_enable_cb(vrp->rvq);
+
+	/* tell the remote processor it can start sending messages */
+	virtqueue_kick(vrp->rvq);
 
 	dev_info(&vdev->dev, "rpmsg host is online\n");
 

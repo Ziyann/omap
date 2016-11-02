@@ -36,8 +36,6 @@
 #include <linux/thermal_framework.h>
 
 #define AVERAGE_NUMBER_MAX      200
-#define INIT_T_HOT		20000
-#define INIT_T_COLD		19000
 
 /*
  * case_temp_sensor structure
@@ -122,21 +120,16 @@ static int case_report_temp(struct thermal_dev *tdev)
 	    (temp_sensor->avg_is_valid == 1)) {
 		/* if we are hot, keep sending reports, whatever is hotevent */
 		if (current_temp >= temp_sensor->threshold_hot) {
-			/* first update the zone, hotevent goes 0 */
 			mutex_unlock(&temp_sensor->sensor_mutex);
 			thermal_sensor_set_temp(temp_sensor->therm_fw);
 			mutex_lock(&temp_sensor->sensor_mutex);
-			kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
-			/* now hotevent back to 1 until we reach cold thres */
-			temp_sensor->hot_event = 1;
 		}
 		if ((current_temp < temp_sensor->threshold_cold) &&
 		    (temp_sensor->hot_event == 1)) {
+			temp_sensor->hot_event = 0;
 			mutex_unlock(&temp_sensor->sensor_mutex);
 			thermal_sensor_set_temp(temp_sensor->therm_fw);
 			mutex_lock(&temp_sensor->sensor_mutex);
-			kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
-			temp_sensor->hot_event = 0;
 		}
 	}
 	mutex_unlock(&temp_sensor->sensor_mutex);
@@ -157,7 +150,7 @@ static int case_set_temp_thresh(struct thermal_dev *tdev, int min, int max)
 	mutex_lock(&temp_sensor->sensor_mutex);
 	temp_sensor->threshold_cold = min;
 	temp_sensor->threshold_hot = max;
-	temp_sensor->hot_event = 0;
+	temp_sensor->hot_event = 1;
 	pr_info("%s:threshold_cold %d, threshold_hot %d\n", __func__,
 		min, max);
 	mutex_unlock(&temp_sensor->sensor_mutex);
@@ -273,7 +266,7 @@ static void case_sensor_delayed_work_fn(struct work_struct *work)
 					     case_sensor_work.work);
 
 	case_report_temp(temp_sensor->therm_fw);
-	schedule_delayed_work(&temp_sensor->case_sensor_work,
+	queue_delayed_work(system_long_wq, &temp_sensor->case_sensor_work,
 				msecs_to_jiffies(temp_sensor->work_delay));
 }
 
@@ -301,9 +294,6 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 
 	temp_sensor->dev = dev;
 
-	pm_runtime_enable(dev);
-
-	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
 	platform_set_drvdata(pdev, temp_sensor);
 
 	temp_sensor->therm_fw = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
@@ -320,17 +310,13 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 		goto free_temp_sensor;
 	}
 
-	temp_sensor->threshold_hot = INIT_T_HOT;
-	temp_sensor->threshold_cold = INIT_T_COLD;
-	temp_sensor->hot_event = 0;
-
 	if (pdata->average_number > AVERAGE_NUMBER_MAX)
 		temp_sensor->average_number = AVERAGE_NUMBER_MAX;
 	else
 		temp_sensor->average_number = pdata->average_number;
 
 	temp_sensor->work_delay = pdata->report_delay_ms;
-	schedule_work(&temp_sensor->case_sensor_work.work);
+	queue_work(system_long_wq, &temp_sensor->case_sensor_work.work);
 
 	dev_info(&pdev->dev, "%s: Initialised\n", temp_sensor->therm_fw->name);
 
@@ -345,10 +331,9 @@ static int __devexit case_temp_sensor_remove(struct platform_device *pdev)
 {
 	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
+	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
 	thermal_sensor_dev_unregister(temp_sensor->therm_fw);
 	kfree(temp_sensor->therm_fw);
-	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_REMOVE);
-	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
 	platform_set_drvdata(pdev, NULL);
 	mutex_destroy(&temp_sensor->sensor_mutex);
 	kfree(temp_sensor);
@@ -361,35 +346,11 @@ static void case_temp_sensor_shutdown(struct platform_device *pdev)
 	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
+	thermal_sensor_dev_unregister(temp_sensor->therm_fw);
 }
 
 #ifdef CONFIG_PM
-static int case_temp_sensor_suspend(struct platform_device *pdev,
-				    pm_message_t state)
-{
-	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-
-	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
-
-	return 0;
-}
-
-static int case_temp_sensor_resume(struct platform_device *pdev)
-{
-	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
-
-	schedule_work(&temp_sensor->case_sensor_work.work);
-
-	return 0;
-}
-
-#else
-case_temp_sensor_suspend NULL
-case_temp_sensor_resume NULL
-
-#endif /* CONFIG_PM */
-
-static int case_temp_sensor_runtime_suspend(struct device *dev)
+static int case_temp_sensor_suspend(struct device *dev)
 {
 	struct case_temp_sensor *temp_sensor =
 			platform_get_drvdata(to_platform_device(dev));
@@ -399,30 +360,35 @@ static int case_temp_sensor_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int case_temp_sensor_runtime_resume(struct device *dev)
+static int case_temp_sensor_resume(struct device *dev)
 {
 	struct case_temp_sensor *temp_sensor =
 			platform_get_drvdata(to_platform_device(dev));
 
-	schedule_work(&temp_sensor->case_sensor_work.work);
+	queue_work(system_long_wq, &temp_sensor->case_sensor_work.work);
 
 	return 0;
 }
 
 static const struct dev_pm_ops case_temp_sensor_dev_pm_ops = {
-	.runtime_suspend = case_temp_sensor_runtime_suspend,
-	.runtime_resume = case_temp_sensor_runtime_resume,
+	.suspend = case_temp_sensor_suspend,
+	.resume = case_temp_sensor_resume,
 };
+
+#define CASE_TEMP_SENS_DEV_PM_OPS (&case_temp_sensor_dev_pm_ops)
+#else
+#define CASE_TEMP_SENS_DEV_PM_OPS NULL
+#endif /* CONFIG_PM */
+
+
 
 static struct platform_driver case_temp_sensor_driver = {
 	.probe = case_temp_sensor_probe,
 	.remove = __exit_p(case_temp_sensor_remove),
-	.suspend = case_temp_sensor_suspend,
-	.resume = case_temp_sensor_resume,
 	.driver = {
 		.owner	= THIS_MODULE,
 		.name = "case_temp_sensor",
-		.pm = &case_temp_sensor_dev_pm_ops,
+		.pm = CASE_TEMP_SENS_DEV_PM_OPS,
 	},
 	.shutdown = case_temp_sensor_shutdown,
 };

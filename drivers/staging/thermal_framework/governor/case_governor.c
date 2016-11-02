@@ -28,10 +28,25 @@
 #include <linux/opp.h>
 #include <plat/omap_device.h>
 
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#include <linux/logger.h>
+#include <linux/syscalls.h>
+#include <linux/unistd.h>
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/file.h>
+#include <linux/uaccess.h>
+#include <asm/processor.h>
+#define THERMO_METRICS_STR_LEN 128
+#endif
+
+
 /* System/Case Thermal thresholds */
-#define SYS_THRESHOLD_HOT		62000
-#define SYS_THRESHOLD_COLD		57000
-#define SYS_THRESHOLD_HOT_INC		500
+#define SYS_THRESHOLD_HOT		78000
+#define SYS_THRESHOLD_COLD		74000
+#define SYS_THRESHOLD_HOT_INC		1000
 #define INIT_COOLING_LEVEL		0
 #define CASE_SUBZONES_NUMBER		4
 int case_subzone_number = CASE_SUBZONES_NUMBER;
@@ -39,6 +54,7 @@ EXPORT_SYMBOL_GPL(case_subzone_number);
 
 static int sys_threshold_hot = SYS_THRESHOLD_HOT;
 static int sys_threshold_cold = SYS_THRESHOLD_COLD;
+static int sys_threshold_hot_inc = SYS_THRESHOLD_HOT_INC;
 static int thot = SYS_THRESHOLD_COLD;
 static int tcold = SYS_THRESHOLD_COLD;
 
@@ -50,13 +66,61 @@ struct case_governor {
 
 static struct thermal_dev *therm_fw;
 static struct case_governor *case_gov;
+static struct case_policy *extern_policy;
+
+#ifdef CONFIG_AMZN_VITALS
+#define       VITAL_STR_LEN  16
+static struct timespec       last_thermal_zone_time;
+#endif
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+
+#define CASE_GOVERNOR_THERMAL_SHUTDOWN_TEMP_FILE_NAME \
+		"/data/thermal_shutdown_temp_log"
+#define CASE_GOVERNOR_THERMAL_SHUTDOWN_TEMP_FILE_MODE \
+		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+
+/* write log to temp file func */
+static void log_to_metrics_by_temp_file(char *buf)
+{
+	struct file *fp = NULL;
+	fp = filp_open(CASE_GOVERNOR_THERMAL_SHUTDOWN_TEMP_FILE_NAME,
+		O_RDWR|O_CREAT|O_TRUNC,
+		CASE_GOVERNOR_THERMAL_SHUTDOWN_TEMP_FILE_MODE);
+	if (IS_ERR(fp)) {
+		pr_emerg("create temp file error\n");
+	} else {
+		int len = strlen(buf);
+		mm_segment_t oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		int writelen = fp->f_op->write(fp, buf, len, &fp->f_pos);
+		if (writelen == len)
+			pr_emerg("write temp file success\n");
+		else
+			pr_emerg("write temp file error\n");
+		set_fs(oldfs);
+		filp_close(fp, NULL);
+	}
+}
+#endif
 
 static void case_reached_max_state(int temp)
 {
-	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
-		 __func__, temp);
-	sys_sync();
-	kernel_restart(NULL);
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	char *thermal_metric_prefix = "thermzone:def:monitor=1;CT;1";
+	char buf[THERMO_METRICS_STR_LEN];
+
+	snprintf(buf, THERMO_METRICS_STR_LEN,
+		"%s,thermal_temp=%d;CT;1,thermal_caught_shutdown=1;CT;1:NR",
+		thermal_metric_prefix, temp);
+	log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
+	log_to_metrics_by_temp_file(buf);
+#endif
+	pr_emerg("%s: shutdown due to thermal case policy (temp == %d)\n",
+		__func__, temp);
+
+	/* Sync and shutdown. */
+	orderly_poweroff(true);
 }
 
 /**
@@ -84,11 +148,25 @@ static void case_reached_max_state(int temp)
 
 static int case_thermal_manager(struct list_head *cooling_list, int temp)
 {
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	char *thermal_metric_prefix = "thermzone:def:monitor=1;CT;1";
+	char buf[THERMO_METRICS_STR_LEN];
+#endif
+
+#ifdef CONFIG_AMZN_VITALS
+       struct       timespec curr_thermal_zone_time;
+       char         buff[VITAL_STR_LEN];
+       static int   last_thermal_zone ;
+#endif
+
 	pr_debug("%s: temp: %d thot: %d level: %d sys_thot: %d sys_tcold: %d",
 		 __func__, temp, thot, case_gov->cooling_level,
 		 sys_threshold_hot, sys_threshold_cold);
 
 	if (temp < sys_threshold_cold) {
+		/* Do nothing if system is cool and we're already on level 0. */
+		if (case_gov->cooling_level == INIT_COOLING_LEVEL)
+			return 0;
 		case_gov->cooling_level = INIT_COOLING_LEVEL;
 		/* We want to be notified on the first subzone */
 		thot = sys_threshold_cold;
@@ -108,17 +186,17 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 		if (temp < tcold) {
 			case_gov->cooling_level--;
 			thot = tcold;
-			tcold -= SYS_THRESHOLD_HOT_INC;
+			tcold -= sys_threshold_hot_inc;
 		} else { /* temp > thot */
 			case_gov->cooling_level++;
 			tcold = thot;
-			thot += SYS_THRESHOLD_HOT_INC;
+			thot += sys_threshold_hot_inc;
 		}
 
 		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d:%d (%d)",
 			 __func__, temp, thot, tcold, case_gov->cooling_level);
 
-		if (case_gov->cooling_level >= case_gov->max_cooling_level)
+		if (case_gov->cooling_level > case_gov->max_cooling_level)
 			case_reached_max_state(temp);
 	} else if (temp > thot) { /* sys_thot > temp > sys_tcold */
 		case_gov->cooling_level++;
@@ -130,22 +208,15 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 
 		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, %d:%d (%d)",
 			 __func__, temp, thot, tcold, case_gov->cooling_level);
-	} else if (temp < tcold) {
-		/* coming from Tj > sys_threshold_hot */
-		if (case_gov->cooling_level > case_subzone_number) {
-			case_gov->cooling_level = case_subzone_number;
-			/*
-			 * simplifying computation. from here we won't
-			 * change tcold or thot, unless we cross again
-			 * sys_threshold_hot.
-			 */
-			thot = sys_threshold_hot;
-			tcold = sys_threshold_cold;
-
-			pr_debug("%s: sys_thot >= temp: %d reseting %d:%d (%d)",
-				 __func__, temp, thot, tcold,
-				 case_gov->cooling_level);
-		}
+	} else if (temp <= tcold) {
+		case_gov->cooling_level--;
+		thot = tcold;
+		tcold = sys_threshold_cold +
+			((sys_threshold_hot - sys_threshold_cold) /
+			case_subzone_number) * (case_gov->cooling_level - 1);
+		pr_debug("%s: sys_thot >= temp: %d reseting %d:%d (%d)",
+				__func__, temp, thot, tcold,
+				case_gov->cooling_level);
 	}
 
 update:
@@ -153,7 +224,24 @@ update:
 						case_gov->cooling_level);
 	thermal_device_call(case_gov->temp_sensor, set_temp_thresh,
 								tcold, thot);
-	return 0;
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	snprintf(buf, THERMO_METRICS_STR_LEN,
+		"%s,thermal_zone=%d;CT;1,temp=%d;DV;1:NR",
+		thermal_metric_prefix, case_gov->cooling_level, temp);
+	log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
+#endif
+
+#ifdef CONFIG_AMZN_VITALS
+        /* Vital for thermal zone duration */
+        get_monotonic_boottime(&curr_thermal_zone_time);
+        snprintf(buff, VITAL_STR_LEN, "zone%d",  last_thermal_zone);
+        log_counter_to_vitals(ANDROID_LOG_INFO, "thermal engine", "thermal",
+                "time_in_thermal_bucket", buff, curr_thermal_zone_time.tv_sec - last_thermal_zone_time.tv_sec, "s", false);
+        last_thermal_zone_time = curr_thermal_zone_time;
+        last_thermal_zone = case_gov->cooling_level;
+#endif
+
+        return 0;
 }
 
 static int case_process_temp(struct thermal_dev *gov,
@@ -167,6 +255,12 @@ static int case_process_temp(struct thermal_dev *gov,
 	ret = case_thermal_manager(cooling_list, temp);
 
 	return ret;
+}
+
+void set_case_policy(struct case_policy *policy)
+{
+	if (policy)
+		extern_policy = policy;
 }
 
 static int option_get(void *data, u64 *val)
@@ -222,7 +316,10 @@ static int __init case_governor_init(void)
 	struct device *dev;
 	int tmp, opps;
 
-	dev = omap_device_get_by_hwmod_name("mpu");
+#ifdef CONFIG_AMZN_VITALS
+        get_monotonic_boottime(&last_thermal_zone_time);
+#endif
+        dev = omap_device_get_by_hwmod_name("mpu");
 	if (!dev) {
 		pr_err("%s: domain does not know the amount of throttling",
 			__func__);
@@ -259,8 +356,26 @@ static int __init case_governor_init(void)
 		return -ENOMEM;
 	}
 
-	case_gov->cooling_level = INIT_COOLING_LEVEL;
-	case_gov->max_cooling_level = CASE_SUBZONES_NUMBER + opps;
+	if (extern_policy) {
+		if (extern_policy->sys_threshold_hot)
+			sys_threshold_hot = extern_policy->sys_threshold_hot;
+		if (extern_policy->sys_threshold_cold) {
+			sys_threshold_cold = extern_policy->sys_threshold_cold;
+			tcold = sys_threshold_cold;
+		}
+		if (extern_policy->case_subzone_number)
+			case_subzone_number =
+				extern_policy->case_subzone_number;
+		if (extern_policy->sys_threshold_hot_inc)
+			sys_threshold_hot_inc =
+				extern_policy->sys_threshold_hot_inc;
+	}
+
+	/* Start governor in zone 1, so we can init case_sensor tcold/thot. */
+	thot = sys_threshold_cold + (sys_threshold_hot - sys_threshold_cold) /
+							case_subzone_number;
+	case_gov->cooling_level = INIT_COOLING_LEVEL + 1;
+	case_gov->max_cooling_level = case_subzone_number + opps;
 
 	return 0;
 }

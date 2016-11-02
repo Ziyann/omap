@@ -1,5 +1,6 @@
 config BCMDHD
 	tristate "Broadcom 4329/30 wireless cards support"
+	depends on CFG80211
 	depends on MMC
 	---help---
 	  This module adds support for wireless adapters based on
@@ -10,10 +11,45 @@ config BCMDHD
 	  If you choose to build a module, it'll be called dhd. Say M if
 	  unsure.
 
+choice
+	prompt "BCBDHD WLAN Chipset"
+	depends on BCMDHD
+	default BCMDHD_GENERIC
+	help
+	  Select BCM chipset this driver shall work with.
+	  This setting will only affect the FW file name
+	  loaded info BCM chip. No driver logic depends on it
+	  Explicit selection helps track 
+
+config BCMDHD_BCM4329
+	bool "BCM4329"
+
+config BCMDHD_BCM4330
+	bool "BCM4330"
+
+config BCMDHD_BCM43239
+	bool "BCM43239"
+
+config BCMDHD_BCM4324
+	bool "BCM4324"
+
+config BCMDHD_BCM43241
+	bool "BCM43241"
+
+config BCMDHD_GENERIC
+	bool "Generic"
+
+endchoice
+
 config BCMDHD_FW_PATH
 	depends on BCMDHD
 	string "Firmware path"
-	default "/system/etc/firmware/fw_bcmdhd.bin"
+	default "/system/vendor/firmware/fw_bcm4329.bin"  if BCMDHD_BCM4329
+	default "/system/vendor/firmware/fw_bcm4330.bin"  if BCMDHD_BCM4330
+	default "/system/vendor/firmware/fw_bcm43239.bin" if BCMDHD_BCM43239
+	default "/system/vendor/firmware/fw_bcm4324.bin"  if BCMDHD_BCM4324
+	default "/system/vendor/firmware/fw_bcm43241.bin" if BCMDHD_BCM43241
+	default "/system/vendor/firmware/fw_bcmdhd.bin"   if BCMDHD_GENERIC
 	---help---
 	  Path to the firmware file.
 

@@ -24,6 +24,7 @@
 #include <linux/major.h>
 #include <linux/device.h>
 #include <linux/wakelock.h>
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
 #include "input-compat.h"
 
 struct evdev {
@@ -432,7 +433,28 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 
 		if (input_event_to_user(buffer + retval, &event))
 			return -EFAULT;
-
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+		if (event.type == EV_ABS) {
+			if (event.code == ABS_MT_POSITION_X) {
+				TRAPZ_DESCRIBE(TRAPZ_KERN_INP_TOUCH, EvDevX,
+				"Touch event in linux touch framework for x coord");
+				TRAPZ_LOG_PRINTF(TRAPZ_LOG_DEBUG,
+						 TRAPZ_CAT_KERNEL,
+						 TRAPZ_KERN_INP_TOUCH,
+						 EvDevX, "x=%d",
+						 event.value, 0, 0, 0);
+			} else if (event.code == ABS_MT_POSITION_Y) {
+				TRAPZ_DESCRIBE(TRAPZ_KERN_INP_TOUCH, EvDevY,
+				"Touch event in linux touch framework for y coord");
+				TRAPZ_LOG_PRINTF(TRAPZ_LOG_DEBUG,
+						 TRAPZ_CAT_KERNEL,
+						 TRAPZ_KERN_INP_TOUCH, EvDevY,
+						 "y=%d", event.value, 0, 0, 0);
+			}
+		}
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_END */
 		retval += input_event_size();
 	}
 

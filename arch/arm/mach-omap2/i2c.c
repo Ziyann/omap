@@ -43,9 +43,9 @@ void __init omap2_i2c_mux_pins(int bus_id)
 		return;
 
 	sprintf(mux_name, "i2c%i_scl.i2c%i_scl", bus_id, bus_id);
-	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
+	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT_PULLUP);
 	sprintf(mux_name, "i2c%i_sda.i2c%i_sda", bus_id, bus_id);
-	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
+	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT_PULLUP);
 }
 
 /**

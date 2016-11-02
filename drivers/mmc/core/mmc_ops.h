@@ -12,6 +12,42 @@
 #ifndef _MMC_MMC_OPS_H
 #define _MMC_MMC_OPS_H
 
+#define TOSHIBA_EMMC_MFID 0x11
+
+#define __swap32gen(x) ({						\
+	u_int32_t __swap32gen_x = (x);					\
+									\
+	(u_int32_t)((__swap32gen_x & 0xff) << 24 |			\
+	    (__swap32gen_x & 0xff00) << 8 |				\
+	    (__swap32gen_x & 0xff0000) >> 8 |				\
+	    (__swap32gen_x & 0xff000000) >> 24);			\
+})
+
+typedef struct
+{
+    unsigned char  sub_cmd_no; /* sub command no. */
+    unsigned char  reserved1; /* reserved */
+    unsigned char  reserved2; /* reserved */
+    unsigned char  status; /* status */
+    unsigned int mlc_write_erase_max;  /* mlc write erase maximum */
+    unsigned int mlc_write_erase_avg;  /* slc write erase avg */
+    unsigned int slc_write_erase_max;  /* mlc write erase maximum */
+    unsigned int slc_write_erase_avg;  /* slc write erase avg */
+}tsb_wear_info;
+
+typedef struct
+{
+    unsigned char  sub_cmd_no; /* sub command no. */
+    unsigned char  reserved1; /* reserved */
+    unsigned char  reserved2; /* reserved */
+    unsigned char  reserved3; /* reserved */
+    unsigned char  pwd1; /* reserved */
+    unsigned char  pwd2; /* reserved */
+    unsigned char  pwd3; /* reserved */
+    unsigned char  pwd4; /* reserved */
+
+}tsb_cmd_format;
+
 int mmc_select_card(struct mmc_card *card);
 int mmc_deselect_cards(struct mmc_host *host);
 int mmc_go_idle(struct mmc_host *host);

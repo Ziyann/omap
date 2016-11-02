@@ -772,6 +772,7 @@ static int gccmdthread(void *_gccorecontext)
 				GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
 					PREFETCH, headcmdbuf->count));
 
+			GCDBG(GCZONE_THREAD, "queue restarted.\n");
 			GCUNLOCK(&gcqueue->queuelock);
 			continue;
 		}

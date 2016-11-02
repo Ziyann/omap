@@ -258,6 +258,12 @@ static int hidinput_apple_event(struct hid_device *hid, struct input_dev *input,
 		}
 	}
 
+	/* WR - Filter Btn_0 and Btn_1 events for Apple keyboards */
+	if ((usage->code == BTN_0) || (usage->code == BTN_1)) {
+		return 1;
+	}
+
+
 	if (swap_opt_cmd) {
 		trans = apple_find_translation(swapped_option_cmd_keys, usage->code);
 		if (trans) {
@@ -273,6 +279,7 @@ static int apple_event(struct hid_device *hdev, struct hid_field *field,
 		struct hid_usage *usage, __s32 value)
 {
 	struct apple_sc *asc = hid_get_drvdata(hdev);
+
 
 	if (!(hdev->claimed & HID_CLAIMED_INPUT) || !field->hidinput ||
 			!usage->type)
@@ -431,6 +438,10 @@ static const struct hid_device_id apple_devices[] = {
 			APPLE_ISO_KEYBOARD },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER_JIS),
 		.driver_data = APPLE_NUMLOCK_EMULATION | APPLE_HAS_FN },
+    { HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_ALU_WIRELESS_2009_ANSI),
+        .driver_data = APPLE_NUMLOCK_EMULATION | APPLE_HAS_FN },
+    { HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_ALU_WIRELESS_2011_ANSI), 
+        .driver_data = APPLE_NUMLOCK_EMULATION | APPLE_HAS_FN }, 
 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER3_ANSI),
 		.driver_data = APPLE_NUMLOCK_EMULATION | APPLE_HAS_FN },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER3_ISO),

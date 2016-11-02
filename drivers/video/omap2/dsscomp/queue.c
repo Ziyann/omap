@@ -30,10 +30,12 @@
 #include <plat/dsscomp.h>
 
 #include <linux/debugfs.h>
+#include <linux/pm_qos.h>
 
 #include "dsscomp.h"
 /* queue state */
 
+struct pm_qos_request req;
 static DEFINE_MUTEX(mtx);
 
 /* free overlay structs */
@@ -429,7 +431,7 @@ static void dsscomp_mgr_delayed_cb(struct work_struct *work)
 	mutex_unlock(&mtx);
 }
 
-static u32 dsscomp_mgr_callback(void *data, int id, int status)
+u32 dsscomp_mgr_callback(void *data, int id, int status)
 {
 	struct dsscomp *comp = data;
 
@@ -447,6 +449,7 @@ static u32 dsscomp_mgr_callback(void *data, int id, int status)
 	/* get each callback only once */
 	return ~status;
 }
+EXPORT_SYMBOL(dsscomp_mgr_callback);
 
 static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 {
@@ -455,7 +458,7 @@ static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 
 /* apply composition */
 /* at this point the composition is not on any queue */
-static int dsscomp_apply(struct dsscomp *comp)
+int dsscomp_apply(struct dsscomp *comp)
 {
 	int i, r = -EFAULT;
 	u32 dmask, display_ix;
@@ -782,9 +785,15 @@ skip_ovl_set:
 		if (dssdev_manually_updated(dssdev) && drv->sync)
 			drv->update(dssdev, d->win.x, d->win.y, d->win.w,
 					d->win.h);
-		else
+		else {
 			/* wait for sync to do smooth animations */
 			mgr->wait_for_vsync(mgr);
+			/* Release OPP constraint on CORE when it posible */
+			if (!omap_dss_overlay_ensure_bw())
+				dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+			else
+				dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE);
+		}
 	}
 
 	return r;
@@ -793,6 +802,7 @@ err:
 done:
 	return r;
 }
+EXPORT_SYMBOL(dsscomp_apply);
 
 struct dsscomp_apply_work {
 	struct work_struct work;

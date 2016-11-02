@@ -16,20 +16,21 @@
 #include <linux/platform_device.h>
 
 #include "omap4_ion.h"
+#include "include/mach/omap-secure.h"
 
 static struct ion_platform_heap omap4_ion_heaps[] = {
 	{
 		.type = ION_HEAP_TYPE_CARVEOUT,
 		.id = OMAP_ION_HEAP_SECURE_INPUT,
 		.name = "secure_input",
-		.base = PHYS_ADDR_SMC_MEM -
+		.base = OMAP4_SECURE_WORKSPACE_BASE -
 				OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 		.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 	},
 	{	.type = OMAP_ION_HEAP_TILER,
 		.id = OMAP_ION_HEAP_TILER,
 		.name = "tiler",
-		.base = PHYS_ADDR_SMC_MEM -
+		.base = OMAP4_SECURE_WORKSPACE_BASE -
 				OMAP4_ION_HEAP_SECURE_INPUT_SIZE -
 				OMAP4_ION_HEAP_TILER_SIZE,
 		.size = OMAP4_ION_HEAP_TILER_SIZE,

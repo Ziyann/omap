@@ -60,8 +60,16 @@
 #include <linux/migrate.h>
 #include <linux/page-debug-flags.h>
 
+#include <linux/hashtable.h>
+#include <linux/kallsyms.h>
+#include <linux/spinlock.h>
+
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
+
+/* changed from "#include <asm/ftrace.h>" to conform to common-os rules */
+#include <linux/ftrace.h>
+
 #include "internal.h"
 
 #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
@@ -149,7 +157,9 @@ bool pm_suspended_storage(void)
 #ifdef CONFIG_HUGETLB_PAGE_SIZE_VARIABLE
 int pageblock_order __read_mostly;
 #endif
-
+#ifdef CONFIG_TRAPZ_PVA
+static unsigned long select_call_site(void);
+#endif
 static void __free_pages_ok(struct page *page, unsigned int order);
 
 /*
@@ -199,7 +209,6 @@ static char * const zone_names[MAX_NR_ZONES] = {
  */
 int min_free_kbytes = 1024;
 int min_free_order_shift = 1;
-
 /*
  * Extra memory for the system to try freeing. Used to temporarily
  * free memory, to make space for new workloads. Anyone can allocate
@@ -677,7 +686,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 			batch_free = to_free;
 
 		do {
-			int mt;	/* migratetype of the to-be-freed page */
+			int mt; /* migratetype of the to-be-freed page */
 
 			page = list_entry(list->prev, struct page, lru);
 			/* must delete as __free_one_page list manipulates */
@@ -732,6 +741,9 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 
 static void __free_pages_ok(struct page *page, unsigned int order)
 {
+#ifdef CONFIG_TRAPZ_PVA
+	struct allocation_detail detail;
+#endif
 	unsigned long flags;
 	int wasMlocked = __TestClearPageMlocked(page);
 
@@ -741,6 +753,16 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	local_irq_save(flags);
 	if (unlikely(wasMlocked))
 		free_page_mlock(page);
+#ifdef CONFIG_TRAPZ_PVA
+	detail = page->detail;
+	if (likely(detail.call_site)) {
+		int i;
+		struct allocation_detail detail = { 0, };
+		for (i = 0; i < (1 << order); ++i)
+			page[i].detail = detail;
+		__mod_zone_page_state(page_zone(page), NR_INUSE, -(1 << order));
+	}
+#endif
 	__count_vm_events(PGFREE, 1 << order);
 	free_one_page(page_zone(page), page, order,
 					get_pageblock_migratetype(page));
@@ -1302,6 +1324,9 @@ void mark_free_pages(struct zone *zone)
  */
 void free_hot_cold_page(struct page *page, int cold)
 {
+#ifdef CONFIG_TRAPZ_PVA
+	struct allocation_detail detail;
+#endif
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
@@ -1316,6 +1341,14 @@ void free_hot_cold_page(struct page *page, int cold)
 	local_irq_save(flags);
 	if (unlikely(wasMlocked))
 		free_page_mlock(page);
+#ifdef CONFIG_TRAPZ_PVA
+	detail = page->detail;
+	if (likely(detail.call_site)) {
+		struct allocation_detail detail = { 0, };
+		page->detail = detail;
+		__mod_zone_page_state(page_zone(page), NR_INUSE, -1);
+	}
+#endif
 	__count_vm_event(PGFREE);
 
 	/*
@@ -1372,6 +1405,9 @@ void free_hot_cold_page_list(struct list_head *list, int cold)
 void split_page(struct page *page, unsigned int order)
 {
 	int i;
+#ifdef CONFIG_TRAPZ_PVA
+	struct allocation_detail detail;
+#endif
 
 	VM_BUG_ON(PageCompound(page));
 	VM_BUG_ON(!page_count(page));
@@ -1384,9 +1420,19 @@ void split_page(struct page *page, unsigned int order)
 	if (kmemcheck_page_is_tracked(page))
 		split_page(virt_to_page(page[0].shadow), order);
 #endif
-
-	for (i = 1; i < (1 << order); i++)
+#ifdef CONFIG_TRAPZ_PVA
+	detail = page->detail;
+	if (!detail.call_site)
+		detail.call_site = (void *)0x0BA0BAB0;
+	detail.call_site = (void *)(((unsigned long)detail.call_site) & ~1);
+	page->detail = detail;
+#endif
+	for (i = 1; i < (1 << order); i++) {
 		set_page_refcounted(page + i);
+#ifdef CONFIG_TRAPZ_PVA
+		page[i].detail = detail;
+#endif
+	}
 }
 
 /*
@@ -1401,6 +1447,11 @@ void split_page(struct page *page, unsigned int order)
  */
 int split_free_page(struct page *page)
 {
+#ifdef CONFIG_TRAPZ_PVA
+	struct allocation_detail detail;
+	struct task_struct *cur_task;
+	unsigned long call_site;
+#endif
 	unsigned int order;
 	unsigned long watermark;
 	struct zone *zone;
@@ -1420,7 +1471,23 @@ int split_free_page(struct page *page)
 	zone->free_area[order].nr_free--;
 	rmv_page_order(page);
 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
+#ifdef CONFIG_TRAPZ_PVA
+	__mod_zone_page_state(zone, NR_INUSE, (1 << order));
 
+	call_site = select_call_site();
+	if (!call_site)
+		call_site = 0xBADFEED0;
+	detail.call_site = (void *)((call_site & ~1) + (order ? 1 : 0));
+	detail.allocation_pid = 0;
+	detail.last_mapper_pid = 0;
+
+	cur_task = current;
+	if (cur_task)
+		detail.allocation_pid = cur_task->tgid;
+	page->detail = detail;
+	if (order)
+		page[1].detail.call_site = (void *)order;
+#endif
 	/* Split into individual pages */
 	set_page_refcounted(page);
 	split_page(page, order);
@@ -2490,6 +2557,200 @@ got_pg:
 
 }
 
+#ifdef CONFIG_TRAPZ_PVA
+struct boring_name {
+	const char name[32];
+	struct hlist_node hlist;
+};
+
+static spinlock_t boring_table_lock;
+
+static DEFINE_HASHTABLE(boring_names, 6);
+static struct boring_name boring_name_nodes[] = {
+	{"__alloc_pages_nodemask", },
+	{"split_free_page", },
+	{"__get_user_pages", },
+	{"get_user_pages", },
+	{"get_arg_page", },
+	{"setup_arg_pages", },
+	{"insert_page", },
+	{"vm_insert_page", },
+	{"vm_insert_mixed", },
+	{"find_or_create_page", },
+	{"remap_pfn_range", },
+	{"__arm_ioremap_caller", },
+	{"__arm_ioremap_pfn_caller", },
+	{"ioremap_page_range", },
+	{"copy_page_range", },
+	{"__get_free_pages", },
+	{"get_zeroed_page", },
+	{"internal_get_zeroed_page", },
+	{"alloc_pages_exact", },
+	{"insert_pfn", },
+	{"__get_locked_pte", },
+	{"copy_pte_range", },
+	{"__dma_alloc", },
+	{"dma_alloc_coherent", },
+	{"dma_alloc_stronglyordered", },
+	{"dma_alloc_writecombine", },
+	{"__vmalloc_node_range", },
+	{"__vmalloc_node", },
+	{"__vmalloc", },
+	{"vmalloc", },
+	{"vzalloc", },
+	{"vmap_page_range_noflush", },
+	{"grab_cache_page_write_begin", },
+	{"grab_cache_page_nowait", },
+	{"pcpu_alloc", },
+	{"__alloc_cpu", },
+	{"__alloc_percpu", },
+	{"__getblk", },
+	{"mempool_alloc_pages", },
+	{"mempool_create_node", },
+	{"mempool_create", },
+	{"alloc_large_system_hash", },
+	{"__breadahead", },
+	{"__bread", },
+	{"jread", },
+	{"mm_init", },
+	{"mm_alloc", },
+	{"dup_mm", },
+	{"move_page_tables", },
+	{"copy_process", },
+	{"copy_strings", },
+	{"copy_strings_kernel", },
+	{"do_one_pass", },
+	{"__ext4_get_inode_loc", },
+	{"_VMallocWrapper", },
+	{"OSAllocMem_Impl", },
+	{"ReallocHandleArray", },
+	{"_Resize", },
+	{"AllocPages", },
+	{"NewVMallocLinuxMemArea", },
+	{"NewAllocPagesLinuxMemArea", },
+	{"OSAllocPages_Impl", },
+#if 0
+	{"BM_ImportMemory", },
+	{"XProcWorkaroundAllocShareable", },
+	{"RA_Alloc", },
+	{"BM_Alloc", },
+	{"AllocDeviceMem", },
+	{"_PVRSRVAllocDeviceMemKM", },
+	{"PVRSRVAllocDeviceMemBW", },
+#endif
+	{"ion_alloc", },
+	{"ion_system_heap_allocate", },
+	{"ion_iommu_heap_allocate", },
+	{"ion_page_pool_alloc", },
+	{"_gpumem_alloc", },
+	{"_kgsl_sharedmem_page_alloc", },
+	{"kgsl_sharedmem_page_alloc", },
+	{"kgsl_sharedmem_page_alloc_user", },
+	{"kgsl_allocate", },
+	{"kgsl_allocate_user", },
+	{"kgsl_allocate_contiguous", },
+	{"kmem_cache_alloc_trace", },
+	{"kmem_cache_alloc", },
+	{"kmalloc_order_trace", },
+	{"kmalloc_order", },
+	{"kmalloc_large", },
+	{"kmalloc", },
+	{"__kmalloc_track_caller", },
+	{"__kmalloc", },
+	{"kmemdup", },
+};
+
+static void __init init_boring_names(void)
+{
+	int i;
+	unsigned long flags;
+
+	spin_lock_init(&boring_table_lock);
+
+	spin_lock_irqsave(&boring_table_lock, flags);
+	for (i = 0; i < sizeof(boring_name_nodes)/sizeof(struct boring_name);
+	     ++i) {
+		unsigned int namehash = boring_name_nodes[i].name[2];
+		INIT_HLIST_NODE(&boring_name_nodes[i].hlist);
+		hash_add(boring_names, &boring_name_nodes[i].hlist, namehash);
+	}
+	spin_unlock_irqrestore(&boring_table_lock, flags);
+}
+
+static int is_boring_name(const char *sym)
+{
+	struct boring_name *cand;
+	struct hlist_node *node;
+	unsigned int symhash = sym[2];
+
+	hash_for_each_possible(boring_names, cand, node, hlist, symhash) {
+		if (!strcmp(cand->name, sym))
+			return 1;
+	}
+	return 0;
+}
+
+struct boring_call_site {
+	struct hlist_node hlist;
+	unsigned long call_site;
+};
+static DEFINE_HASHTABLE(boring_call_sites, 6);
+static DEFINE_HASHTABLE(nonboring_call_sites, 6);
+static struct boring_call_site bcs_pool[1024];
+static int next_bcs = 1023;
+
+static int is_boring(unsigned long call_site)
+{
+	struct boring_call_site *cand;
+	struct hlist_node *node;
+	int boring = 0;
+	char buf[KSYM_NAME_LEN];
+	const char *sym;
+
+	hash_for_each_possible(boring_call_sites, cand, node, hlist,
+			       call_site) {
+		if (cand->call_site == call_site)
+			return 1;
+	}
+	hash_for_each_possible(nonboring_call_sites, cand, node, hlist,
+			       call_site) {
+		if (cand->call_site == call_site)
+			return 0;
+	}
+
+	sym = kallsyms_lookup(call_site, NULL, NULL, NULL, buf);
+	boring = (sym && is_boring_name(sym));
+
+	if (next_bcs >= 0)
+		cand = &bcs_pool[next_bcs--];
+	else
+		return boring;
+	INIT_HLIST_NODE(&cand->hlist);
+	cand->call_site = call_site;
+	if (boring)
+		hash_add(boring_call_sites, &cand->hlist, call_site);
+	else
+		hash_add(nonboring_call_sites, &cand->hlist, call_site);
+	return boring;
+}
+
+static unsigned long select_call_site()
+{
+	unsigned int depth = 1;
+	unsigned long call_site = (unsigned long)return_address(depth);
+	unsigned long flags;
+
+	spin_lock_irqsave(&boring_table_lock, flags);
+
+	while (call_site && is_boring(call_site) && (depth < 20))
+		call_site = (unsigned long)return_address(++depth);
+
+	spin_unlock(&boring_table_lock);
+	local_irq_restore(flags);
+
+	return call_site;
+}
+#endif /* CONFIG_TRAPZ_PVA */
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
@@ -2497,6 +2758,12 @@ struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
 {
+#ifdef CONFIG_TRAPZ_PVA
+	unsigned long flags;
+	unsigned long call_site;
+	struct allocation_detail detail;
+	struct task_struct *cur_task;
+#endif
 	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
 	struct zone *preferred_zone;
 	struct page *page = NULL;
@@ -2540,7 +2807,27 @@ retry_cpuset:
 				preferred_zone, migratetype);
 
 	trace_mm_page_alloc(page, order, gfp_mask, migratetype);
+#ifdef CONFIG_TRAPZ_PVA
+	if (unlikely(!page))
+		goto out;
+	local_irq_save(flags);
+	__mod_zone_page_state(page_zone(page), NR_INUSE, (1 << order));
 
+	call_site = select_call_site();
+	if (!call_site)
+		call_site = 0xDEADBEEF;
+	detail.call_site = (void *)((call_site & ~1) + (order ? 1 : 0));
+	detail.allocation_pid = 0;
+	detail.last_mapper_pid = 0;
+
+	cur_task = current;
+	if (cur_task)
+		detail.allocation_pid = cur_task->tgid;
+	page->detail = detail;
+	if (order)
+		page[1].detail.call_site = (void *)order;
+	local_irq_restore(flags);
+#endif
 out:
 	/*
 	 * When updating a task's mems_allowed, it is possible to race with
@@ -2863,6 +3150,9 @@ void show_free_areas(unsigned int filter)
 			" unstable:%lukB"
 			" bounce:%lukB"
 			" writeback_tmp:%lukB"
+#ifdef CONFIG_TRAPZ_PVA
+			" inuse:%lukB"
+#endif
 			" pages_scanned:%lu"
 			" all_unreclaimable? %s"
 			"\n",
@@ -2892,6 +3182,9 @@ void show_free_areas(unsigned int filter)
 			K(zone_page_state(zone, NR_UNSTABLE_NFS)),
 			K(zone_page_state(zone, NR_BOUNCE)),
 			K(zone_page_state(zone, NR_WRITEBACK_TEMP)),
+#ifdef CONFIG_TRAPZ_PVA
+			K(zone_page_state(zone, NR_INUSE)),
+#endif
 			zone->pages_scanned,
 			(zone->all_unreclaimable ? "yes" : "no")
 			);
@@ -4970,6 +5263,9 @@ static int page_alloc_cpu_notify(struct notifier_block *self,
 
 void __init page_alloc_init(void)
 {
+#ifdef CONFIG_TRAPZ_PVA
+	init_boring_names();
+#endif
 	hotcpu_notifier(page_alloc_cpu_notify, 0);
 }
 
@@ -5071,7 +5367,6 @@ static void __setup_per_zone_wmarks(void)
 
 	for_each_zone(zone) {
 		u64 min, low;
-
 		spin_lock_irqsave(&zone->lock, flags);
 		min = (u64)pages_min * zone->present_pages;
 		do_div(min, lowmem_pages);
@@ -5104,10 +5399,10 @@ static void __setup_per_zone_wmarks(void)
 			zone->watermark[WMARK_MIN] = min;
 		}
 
-		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) +
-					low + (min >> 2);
-		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
-					low + (min >> 1);
+		zone->watermark[WMARK_LOW] = min_wmark_pages(zone) +
+                                        low + (min >> 2);
+                zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
+                                        low + (min >> 1);
 
 		zone->watermark[WMARK_MIN] += cma_wmark_pages(zone);
 		zone->watermark[WMARK_LOW] += cma_wmark_pages(zone);

@@ -23,6 +23,7 @@
 #include <linux/debugfs.h>
 #include <linux/remoteproc.h>
 #include <linux/rpmsg_resmgr.h>
+#include <linux/cpufreq.h>
 
 #define MAX_RES_SIZE 128
 #define MAX_MSG (sizeof(struct rprm_msg) + sizeof(struct rprm_request) +\
@@ -97,6 +98,13 @@ static int _set_constraints(struct device *dev, struct rprm_elem *e,
 		if (!e->res->ops->scale) {
 			ret = -ENOSYS;
 			goto err;
+		}
+
+		if (!strcmp(e->res->name, "iva")) {
+			if (c->frequency)
+				send_video_hint(1);
+			else
+				send_video_hint(0);
 		}
 
 		ret = e->res->ops->scale(dev, e->handle, c->frequency);
@@ -240,6 +248,15 @@ static int rprm_resource_release(struct rprm *rprm, int res_id)
 		goto out;
 	}
 
+	/*
+	 * Hint cpufreq governor that we have finished decoding
+	 * video. (In fact IVAHD is also in use when we are encoding
+	 * but that is OK.)
+	 */
+	if (!strcmp(e->res->name, "iva")) {
+		send_video_hint(0);
+	}
+
 	ret = _resource_release(rprm, e);
 	if (ret)
 		goto out;
@@ -307,6 +324,15 @@ static int rprm_resource_request(struct rprm *rprm, const char *name,
 	e->id = *res_id;
 	e->res = res;
 	list_add(&e->next, &rprm->res_list);
+
+	/*
+	 * Hint cpufreq governor that we have begun decoding video. (In
+	 * fact IVAHD is also in use when we are encoding but that is OK.)
+	*/
+	if (!strcmp(e->res->name, "iva")) {
+		send_video_hint(1);
+	}
+
 	mutex_unlock(&rprm->lock);
 
 	return 0;

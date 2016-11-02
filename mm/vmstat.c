@@ -19,6 +19,12 @@
 #include <linux/math64.h>
 #include <linux/writeback.h>
 #include <linux/compaction.h>
+#ifdef CONFIG_TRAPZ_PVA
+#include <linux/hashtable.h>
+#include <linux/kallsyms.h>
+#include <linux/uaccess.h>
+#include "internal.h"
+#endif
 
 #ifdef CONFIG_VM_EVENT_COUNTERS
 DEFINE_PER_CPU(struct vm_event_state, vm_event_states) = {{0}};
@@ -721,6 +727,9 @@ const char * const vmstat_text[] = {
 	"numa_local",
 	"numa_other",
 #endif
+#ifdef CONFIG_TRAPZ_PVA
+	"nr_inuse",
+#endif
 	"nr_anon_transparent_hugepages",
 	"nr_dirty_threshold",
 	"nr_dirty_background_threshold",
@@ -859,6 +868,319 @@ static int pagetypeinfo_showfree(struct seq_file *m, void *arg)
 	return 0;
 }
 
+#ifdef CONFIG_TRAPZ_PVA
+#define MAX_GREEDY_PIDS 32
+static pid_t greedy_pid[MAX_GREEDY_PIDS+1];
+
+static int is_greedy_pid(pid_t pid)
+{
+	int i;
+	for (i = 0; i < MAX_GREEDY_PIDS; ++i) {
+		if (greedy_pid[i] == 0)
+			return 0;
+		if (greedy_pid[i] == pid)
+			return 1;
+	}
+	return 0;
+}
+
+static int is_greedy_name(const char *sym)
+{
+#if 0
+	if (!strncmp(BM_, sym, 3))
+		return 0;
+	if (!strncmp(XProc, sym, 5))
+		return 0;
+#endif
+	if (!strncmp("ion_", sym, 4))
+		return 0;
+	if (!strncmp("kgsl_", sym, 5))
+		return 0;
+	return 1;
+}
+
+struct greedy_call_site {
+	struct hlist_node hlist;
+	unsigned long call_site;
+};
+static DEFINE_HASHTABLE(greedy_call_sites, 6);
+static DEFINE_HASHTABLE(nongreedy_call_sites, 6);
+static struct greedy_call_site gcs_pool[1024];
+static int next_gcs = 1023;
+
+static int is_greedy_call_site(unsigned long call_site)
+{
+	struct greedy_call_site *cand;
+	struct hlist_node *node;
+	int greedy = 0;
+	char buf[KSYM_NAME_LEN];
+	const char *sym;
+
+	hash_for_each_possible(nongreedy_call_sites,
+			       cand, node, hlist, call_site) {
+		if (cand->call_site == call_site)
+			return 0;
+	}
+	hash_for_each_possible(greedy_call_sites,
+			       cand, node, hlist, call_site) {
+		if (cand->call_site == call_site)
+			return 1;
+	}
+
+	sym = kallsyms_lookup(call_site, NULL, NULL, NULL, buf);
+	if (sym && !strncmp(sym, "new_slab", 8))
+		return 2;
+	greedy = (sym && is_greedy_name(sym));
+
+	if (next_gcs >= 0)
+		cand = &gcs_pool[next_gcs--];
+	else
+		return greedy;
+	INIT_HLIST_NODE(&cand->hlist);
+	cand->call_site = call_site;
+	if (greedy)
+		hash_add(greedy_call_sites, &cand->hlist, call_site);
+	else
+		hash_add(nongreedy_call_sites, &cand->hlist, call_site);
+	return greedy;
+}
+
+struct count_by_cs {
+	struct hlist_node hlist;
+	unsigned long call_site;
+	pid_t allocation_pid;
+	pid_t last_mapper_pid;
+	unsigned int pg_count;
+};
+static struct count_by_cs cs_pool[10240];
+
+static void pageinfo_showcallsites_print(struct seq_file *m,
+					pg_data_t *pgdat, struct zone *zone)
+{
+	unsigned int order;
+	unsigned long pfn;
+	unsigned long start_pfn = zone->zone_start_pfn;
+	unsigned long end_pfn = start_pfn + zone->spanned_pages;
+	unsigned long count[MAX_ORDER] = { 0, };
+	unsigned long fcount[MAX_ORDER] = { 0, };
+	unsigned long ftotal_byorder;
+	unsigned long total_byorder;
+	unsigned long total_bysite;
+	unsigned long bad_pfn_start = 0xFFFFFFFF;
+	unsigned long invalid_pfns = 0;
+	unsigned long hole_pfns = 0;
+	unsigned long reserved_pfns = 0;
+
+	DEFINE_HASHTABLE(pages_by_cs, 6);
+	int last_cs = 10240;
+	struct count_by_cs *cs;
+	struct hlist_node *node;
+	struct hlist_node *tnode;
+	int bkt;
+
+	seq_printf(m, "PFNs 0x%05lX (0x%08lX) to 0x%05lX (0x%08lX)\n",
+		   start_pfn, (unsigned long)pfn_to_page(start_pfn), end_pfn-1,
+		   (unsigned long)pfn_to_page(end_pfn-1));
+
+	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
+		struct page *page;
+		struct allocation_detail detail;
+		unsigned long call_site;
+		struct count_by_cs *cand;
+
+#define STRING_ONE  "Valid, not free, no call_site:\t0x%05lX to 0x%05lX-1\n"
+
+		if (!pfn_valid(pfn)) {
+			if (bad_pfn_start != 0xFFFFFFFF)
+				seq_printf(m, STRING_ONE, bad_pfn_start, pfn);
+			bad_pfn_start = pfn;
+			invalid_pfns++;
+			while (pfn+1 < end_pfn && !pfn_valid(pfn+1)) {
+				pfn++;
+				invalid_pfns++;
+			}
+			seq_printf(m, "Invalid:\t0x%05lX to 0x%05lX-1\n",
+				   bad_pfn_start, pfn+1);
+			bad_pfn_start = 0xFFFFFFFF;
+			continue;
+		}
+
+		page = pfn_to_page(pfn);
+
+		/* Watch for unexpected holes punched in the memmap */
+		if (!memmap_valid_within(pfn, page, zone)) {
+			hole_pfns++;
+			continue;
+		}
+
+		detail = page->detail;
+
+		if (PageReserved(page) && page_count(page) &&
+		    !(((unsigned long)detail.call_site) & ~1)) {
+			if (bad_pfn_start != 0xFFFFFFFF) {
+				seq_printf(m, STRING_ONE,
+					   bad_pfn_start, pfn);
+			}
+			bad_pfn_start = pfn;
+			reserved_pfns++;
+			while (pfn+1 < end_pfn &&
+			       pfn_valid(pfn+1) &&
+			       (page = pfn_to_page(pfn+1)) &&
+			       memmap_valid_within(pfn+1, page, zone) &&
+			       PageReserved(page) && page_count(page) &&
+			       !(((unsigned long)page->detail.call_site)
+				 & ~1)) {
+				pfn++;
+				reserved_pfns++;
+			}
+			seq_printf(m, "Reserved:\t0x%05lX to 0x%05lX-1\n",
+				   bad_pfn_start, pfn+1);
+			bad_pfn_start = 0xFFFFFFFF;
+			continue;
+		}
+
+		/* only count if page is in use */
+		order = 0;
+		if (page_count(page) == 0) {
+			if (PageBuddy(page)) {
+				order = page_order(page);
+				pfn += (1 << order) - 1;
+			}
+			fcount[order]++;
+			continue;
+		}
+
+#define STRING_TWO "Nasty race while reading allocation order at pfn %05lX\n"
+
+		if (((unsigned int)detail.call_site) & 1) {
+			order = (unsigned int)page[1].detail.call_site;
+			if (order >= MAX_ORDER) {
+				seq_printf(m, STRING_TWO, pfn+1);
+				order = 0;
+			}
+			pfn += (1 << order) - 1;
+		}
+		count[order]++;
+
+		call_site = ((unsigned long)detail.call_site) & ~1;
+		if (!call_site && (bad_pfn_start == 0xFFFFFFFF))
+			bad_pfn_start = pfn;
+		if (call_site && (bad_pfn_start != 0xFFFFFFFF)) {
+			seq_printf(m, STRING_ONE, bad_pfn_start, pfn);
+			bad_pfn_start = 0xFFFFFFFF;
+		}
+		cs = NULL;
+		hash_for_each_possible(pages_by_cs, cand, node, hlist,
+				       call_site) {
+			if (cand->call_site == call_site &&
+			    cand->allocation_pid == detail.allocation_pid &&
+			    cand->last_mapper_pid == detail.last_mapper_pid) {
+				cs = cand;
+				break;
+			}
+		}
+		if (!cs) {
+			if (!last_cs)
+				continue;
+			cs = &cs_pool[--last_cs];
+			INIT_HLIST_NODE(&cs->hlist);
+			cs->call_site = call_site;
+			cs->allocation_pid = detail.allocation_pid;
+			cs->last_mapper_pid = detail.last_mapper_pid;
+			cs->pg_count = 0;
+			hash_add(pages_by_cs, &cs->hlist, call_site);
+		}
+		cs->pg_count += 1 << order;
+	}
+	if (bad_pfn_start != 0xFFFFFFFF)
+		seq_printf(m, STRING_ONE, bad_pfn_start, pfn);
+
+
+	/* Print counts */
+	ftotal_byorder = 0;
+	total_byorder = 0;
+	total_bysite = 0;
+	seq_printf(m, "Node %2d, zone %8s, span %ld, invalid %ld,",
+		   pgdat->node_id, zone->name,
+		   zone->spanned_pages, invalid_pfns);
+	seq_printf(m, " holes %ld, reserved %ld\nIn use:  ",
+		   hole_pfns, reserved_pfns);
+	for (order = 0; order < MAX_ORDER; order++) {
+		total_byorder += count[order] << order;
+		seq_printf(m, "%7lu ", count[order]);
+	}
+	seq_printf(m, "\n  Free:  ");
+	for (order = 0; order < MAX_ORDER; order++) {
+		ftotal_byorder += fcount[order] << order;
+		seq_printf(m, "%7lu ", fcount[order]);
+	}
+	seq_putc(m, '\n');
+	hash_for_each_safe(pages_by_cs, bkt, node, tnode, cs, hlist) {
+		int is_shared = (cs->last_mapper_pid != 0) &&
+		  (cs->allocation_pid != (cs->last_mapper_pid & ~0x8000));
+		int is_greedy_cs = is_greedy_call_site(cs->call_site);
+		int is_greedy = 0;
+		pid_t true_pid = cs->last_mapper_pid & ~0x8000;
+		if (is_greedy_cs == 2) {
+			true_pid = 0;
+		} else if (true_pid == 0) {
+			true_pid = cs->allocation_pid;
+		} else if (is_greedy_cs && is_greedy_pid(cs->allocation_pid)) {
+			is_greedy = 1;
+			true_pid = cs->allocation_pid;
+		}
+		total_bysite += cs->pg_count;
+		seq_printf(m, "\t%7u\t%5u\t%5u\t%5u\t0x%08lX (%pS)%s%s%s\n",
+			   cs->pg_count, true_pid,
+			   cs->allocation_pid,
+			   (cs->last_mapper_pid & ~0x8000),
+			   cs->call_site, (void *)cs->call_site,
+			   (is_greedy ? "!" : ""),
+			   (cs->last_mapper_pid & 0x8000) ? "*" : "",
+			   (is_shared ? "&" : ""));
+	}
+	seq_printf(m, "\tTotal in use/free\t%7lu (%7lu:%7lu/%7lu:%7lu)\n",
+		   total_bysite, total_byorder, zone_page_state(zone, NR_INUSE),
+		   ftotal_byorder, zone_page_state(zone, NR_FREE_PAGES));
+}
+
+/* Print out the in-use pages at each order */
+static int pageinfo_showcallsites(struct seq_file *m, void *arg)
+{
+	pg_data_t *pgdat = (pg_data_t *)arg;
+
+	walk_zones_in_node(m, pgdat, pageinfo_showcallsites_print);
+
+	return 0;
+}
+
+/*
+ * This prints out statistics in relation to grouping pages by allocation site.
+ * It is expensive to collect so do not constantly read the file.
+ */
+static int pageinfo_show(struct seq_file *m, void *arg)
+{
+	pg_data_t *pgdat = (pg_data_t *)arg;
+	int i;
+
+	/* check memoryless node */
+	if (!node_state(pgdat->node_id, N_HIGH_MEMORY))
+		return 0;
+
+	seq_printf(m, "Greedy PIDs:");
+	for (i = 0; i < MAX_GREEDY_PIDS; ++i) {
+		if (greedy_pid[i] == 0)
+			break;
+		seq_printf(m, "\t%d", greedy_pid[i]);
+	}
+	seq_putc(m, '\n');
+
+	pageinfo_showcallsites(m, pgdat);
+
+	return 0;
+}
+#endif /* CONFIG_TRAPZ_PVA */
+
 static void pagetypeinfo_showblockcount_print(struct seq_file *m,
 					pg_data_t *pgdat, struct zone *zone)
 {
@@ -947,6 +1269,80 @@ static const struct file_operations fragmentation_file_operations = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
+
+#ifdef CONFIG_TRAPZ_PVA
+static const struct seq_operations pageinfo_op = {
+	.start	= frag_start,
+	.next	= frag_next,
+	.stop	= frag_stop,
+	.show	= pageinfo_show,
+};
+
+static int pageinfo_open(struct inode *inode, struct file *file)
+{
+	int ret_val;
+
+	ret_val = seq_open(file, &pageinfo_op);
+	if (ret_val)
+		return ret_val;
+	ret_val = seq_vreserve(file, 0x80000); /* reserve 512K */
+	return ret_val;
+}
+
+static ssize_t pageinfo_write(struct file *file, const char __user *buffer,
+			      size_t count, loff_t *pos)
+{
+	char buf[7];
+	size_t len = min_t(size_t, 6, count);
+	long pid_l;
+	int pid;
+
+	if (count == 0)
+		return count;
+	if (copy_from_user(buf, buffer, len))
+		return -EFAULT;
+	buf[len] = '\0';
+	if (kstrtol(buf, 0, &pid_l))
+		return count;
+	pid = (int)pid_l;
+	if (pid <= -0x8000 || pid >= 0x8000)
+		return count;
+
+	if (pid == 0) {
+		greedy_pid[0] = 0;
+	} else if (pid < 0) {
+		int i;
+		for (i = 0; i < MAX_GREEDY_PIDS; ++i) {
+			if (greedy_pid[i] == -pid) {
+				int j;
+				for (j = i; j < MAX_GREEDY_PIDS; ++j)
+					greedy_pid[j] = greedy_pid[j+1];
+				return count;
+			}
+		}
+	} else {
+		int i;
+		for (i = 0; i < MAX_GREEDY_PIDS; ++i) {
+			if (greedy_pid[i] == pid)
+				return count;
+			if (greedy_pid[i] == 0) {
+				greedy_pid[i] = pid;
+				greedy_pid[i+1] = 0;
+				return count;
+			}
+		}
+	}
+	return count;
+}
+
+static const struct file_operations pageinfo_file_ops = {
+	.open		= pageinfo_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+	.write		= pageinfo_write,
+};
+#endif /* CONFIG_TRAPZ_PVA */
 
 static const struct seq_operations pagetypeinfo_op = {
 	.start	= frag_start,
@@ -1212,6 +1608,11 @@ static int __init setup_vmstat(void)
 #endif
 #ifdef CONFIG_PROC_FS
 	proc_create("buddyinfo", S_IRUGO, NULL, &fragmentation_file_operations);
+#ifdef CONFIG_TRAPZ_PVA
+	greedy_pid[MAX_GREEDY_PIDS] = 0;
+	greedy_pid[0] = 0;
+	proc_create("pageinfo", S_IRUGO|S_IWUGO, NULL, &pageinfo_file_ops);
+#endif
 	proc_create("pagetypeinfo", S_IRUGO, NULL, &pagetypeinfo_file_ops);
 	proc_create("vmstat", S_IRUGO, NULL, &proc_vmstat_file_operations);
 	proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);

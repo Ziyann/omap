@@ -842,6 +842,7 @@ static void __init omap_tablet_init(void)
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 	init_duty_governor();
+	omap_die_governor_register_pdata(&omap_gov_pdata);
 
 	omap_init_dmm_tiler();
 	omap4_register_ion();

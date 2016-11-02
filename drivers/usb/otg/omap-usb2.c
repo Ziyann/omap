@@ -115,6 +115,9 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 	u32		ret;
 	struct omap_usb *phy = phy_to_omapusb(x);
 
+	dev_dbg(phy->dev, "%s(%d): phy->is_suspended=%d\n",
+		__func__, suspend, phy->is_suspended);
+
 	if (suspend && !phy->is_suspended) {
 		omap4_usb_phy_power(phy->control_dev, 0);
 
@@ -149,6 +152,8 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 		phy->is_suspended = 0;
 	}
 
+	dev_dbg(phy->dev, "%s(%d) Leaving gracefully: phy->is_suspended=%d\n",
+		__func__,  suspend, phy->is_suspended);
 	return 0;
 
 err1:
@@ -156,6 +161,8 @@ err1:
 err2:
 	clk_disable(phy->optclk);
 err3:
+	dev_dbg(phy->dev, "%s(%d) Leaving through ERROR path: phy->is_suspended=%d\n",
+		__func__, suspend, phy->is_suspended);
 	return ret;
 }
 

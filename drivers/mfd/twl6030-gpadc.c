@@ -402,6 +402,32 @@ static ssize_t set_offset(struct device *dev,
 	return status;
 }
 
+static ssize_t show_value(struct device *dev,
+	struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	int temp1 = 0;
+	int temp2 = 0;
+	int ret;
+	int status;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << attr->index);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[attr->index] > 0) {
+		temp1 = req.rbuf[attr->index];
+		temp2 = req.buf[attr->index].raw_code;
+	}
+	status = sprintf(buf, "%d\n", temp1);
+	return status;
+}
+
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)
 {
 	int ret;
@@ -906,7 +932,9 @@ static ssize_t show_raw_code(struct device *dev,
 static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
 	set_gain, index); \
 static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
-	set_offset, index)
+	set_offset, index); \
+static SENSOR_DEVICE_ATTR(in##index##_value, S_IROTH|S_IWUSR, show_value, \
+        NULL, index);
 
 in_gain(0);
 in_gain(1);
@@ -954,7 +982,8 @@ in_channel(18);
 
 #define IN_ATTRS(X)\
 	&sensor_dev_attr_in##X##_gain.dev_attr.attr,	\
-	&sensor_dev_attr_in##X##_offset.dev_attr.attr	\
+	&sensor_dev_attr_in##X##_offset.dev_attr.attr,	\
+	&sensor_dev_attr_in##X##_value.dev_attr.attr
 
 #define IN_ATTRS_CHANNEL(X)\
 	&sensor_dev_attr_in##X##_channel.dev_attr.attr,		\

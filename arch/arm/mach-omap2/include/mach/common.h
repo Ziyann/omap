@@ -19,8 +19,10 @@
 #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
 
 /* Notifier flags for core DPLL changes */
-#define OMAP_CORE_DPLL_PRECHANGE	1
-#define OMAP_CORE_DPLL_POSTCHANGE	2
+#define OMAP_CORE_DPLL_PREPARE		1
+#define OMAP_CORE_DPLL_PRECHANGE	2
+#define OMAP_CORE_DPLL_POSTCHANGE	3
+#define OMAP_CORE_DPLL_CLEANUP		4
 struct omap_dpll_notifier {
 	u32 rate;
 };

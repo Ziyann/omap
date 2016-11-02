@@ -1209,6 +1209,7 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &zero,
 	},
 	{
+
 		.procname	= "min_free_order_shift",
 		.data		= &min_free_order_shift,
 		.maxlen		= sizeof(min_free_order_shift),

@@ -105,16 +105,19 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
 			 * TODO: need to support 2 ion handles
 			 * per 1 pvr handle (NV12 case)
 			 */
-			struct ion_handle *ion_handle = NULL;
+			struct ion_buffer *ion_buffer = NULL;
 			int num_handles = 1;
-			if (omap_ion_share_fd_to_handles((int)reserved,
-							 rpc->ion_client,
-							 &ion_handle,
+			handle = NULL;
+			if (omap_ion_share_fd_to_buffers((int)reserved,
+							 &ion_buffer,
 							 &num_handles) < 0) {
 				goto to_va;
 			}
-
-			if (ion_handle && !ion_phys(rpc->ion_client, ion_handle,
+			if (ion_buffer) {
+				handle = ion_import(rpc->ion_client,
+						    ion_buffer);
+			}
+			if (handle && !ion_phys(rpc->ion_client, handle,
 						&paddr, &unused)) {
 				lpa = (phys_addr_t) paddr;
 				OMAPRPC_PRINT(OMAPRPC_ZONE_INFO,
@@ -132,7 +135,7 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
 			 * will make sure the buffer is not freed while
 			 * we are still using it
 			 */
-			if (ion_handle)
+			if (handle)
 				ion_free(rpc->ion_client, handle);
 		}
 	}

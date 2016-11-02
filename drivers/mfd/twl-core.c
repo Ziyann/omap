@@ -41,6 +41,7 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 
 #include <linux/regulator/machine.h>
 
@@ -49,6 +50,8 @@
 #include <linux/i2c/twl-rtc.h>
 
 #include "twl-core.h"
+
+#include <linux/proc_fs.h>
 
 /*
  * The TWL4030 "Triton 2" is one of a family of a multi-function "Power
@@ -218,6 +221,7 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define TWL6030_BASEADD_MEM		0x0017
 #define TWL6030_BASEADD_PM_MASTER	0x001F
 #define TWL6030_BASEADD_PM_SLAVE_MISC	0x0030 /* PM_RECEIVER */
+#define TWL6030_BASEADD_PM_SLAVE_RES	0x00AD
 #define TWL6030_BASEADD_PM_MISC		0x00E2
 #define TWL6030_BASEADD_PM_PUPD		0x00F0
 
@@ -258,6 +262,25 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 
 /* need to access USB_PRODUCT_ID_LSB to identify which 6030 varient we are */
 #define USB_PRODUCT_ID_LSB	0x02
+
+/* PMC Master Module */
+#define PHOENIX_START_CONDITION		0x1F
+#define START_COND_STRT_ON_PWRON 	BIT(0)
+#define START_COND_STRT_ON_RPWRON	BIT(1)
+#define START_COND_STRT_ON_USB_ID	BIT(2)
+#define START_COND_STRT_ON_PLUG_DET	BIT(3)
+#define START_COND_STRT_ON_RTC		BIT(4)
+#define START_COND_FIRST_SYS_INS	BIT(5)
+#define START_COND_RESTART_BB 		BIT(6)
+
+#define PHOENIX_STS_HW_CONDITIONS 	0x21
+#define PHOENIX_LAST_TURNOFF_STS 	0x22
+#define TURNOFF_DEVOFF_RPWRON 		BIT(6)
+#define TURNOFF_DEVOFF_SHORT 		BIT(5)
+#define TURNOFF_DEVOFF_WDT 		BIT(4)
+#define TURNOFF_DEVOFF_TSHUT 		BIT(3)
+#define TURNOFF_DEVOFF_BCK 		BIT(2)
+#define TURNOFF_DEVOFF_LPK 		BIT(1)
 
 /*----------------------------------------------------------------------*/
 /* Bit mask of implemented erratums and WAs */
@@ -368,6 +391,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_RTC },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_MEM },
 	{ SUB_CHIP_ID1, TWL6032_BASEADD_CHARGER },
+	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_RES },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MISC },
 };
 
@@ -1315,6 +1339,98 @@ static void clocks_init(struct device *dev,
 
 /*----------------------------------------------------------------------*/
 
+/*
+ * PROC FS entries for start condition and last turnoff reason
+ */
+#define TWL_BOOT_INFO_SIZE	256
+static char twl_start_condition[TWL_BOOT_INFO_SIZE];
+static char twl_turnoff_reason[TWL_BOOT_INFO_SIZE];
+
+#define TWL_PROC_DIRNAME		"twl"
+#define TWL_STARTCOND_PROCNAME		"start-condition"
+#define TWL_LAST_TURNOFF_PROCNAME	"turnoff-reason"
+
+static struct {
+	const char *str;
+	u32 mask;
+} start_cond_flags[] = {
+	{ "battery bounce",		START_COND_RESTART_BB },
+	{ "first batt. ins.",		START_COND_FIRST_SYS_INS },
+	{ "rtc alarm",			START_COND_STRT_ON_RTC },
+	{ "USB plug",			START_COND_STRT_ON_PLUG_DET },
+	{ "USB ID event",		START_COND_STRT_ON_USB_ID },
+	{ "remote power on",		START_COND_STRT_ON_RPWRON },
+	{ "power on",			START_COND_STRT_ON_PWRON },
+}, last_turnoff_flags[] = {
+	{ "remote power on",		TURNOFF_DEVOFF_RPWRON },
+	{ "shorted power resource",	TURNOFF_DEVOFF_SHORT },
+	{ "watchdog",			TURNOFF_DEVOFF_WDT },
+	{ "thermal shutdown",		TURNOFF_DEVOFF_TSHUT },
+	{ "battery bounce",		TURNOFF_DEVOFF_BCK },
+	{ "long key press",		TURNOFF_DEVOFF_LPK },
+};
+
+static int proc_startcond_read(char *page, char **start, off_t off, int count,
+				int *eof, void *data)
+{
+	strlcpy(page, twl_start_condition, sizeof(twl_start_condition));
+	*eof = 1;
+
+	return strlen(page);
+}
+
+static int proc_turnoff_sts_read(char *page, char **start, off_t off, int count,
+				int *eof, void *data)
+{
+	strlcpy(page, twl_turnoff_reason, sizeof(twl_turnoff_reason));
+	*eof = 1;
+
+	return strlen(page);
+}
+
+static void create_twl_proc_files(void)
+{
+	struct proc_dir_entry* twl_proc_dir = NULL;
+	struct proc_dir_entry *twl_proc_dir_entry = NULL;
+
+	twl_proc_dir = proc_mkdir(TWL_PROC_DIRNAME, NULL);
+	if (twl_proc_dir == NULL) {
+		return;
+	}
+
+	twl_proc_dir_entry = create_proc_entry(TWL_STARTCOND_PROCNAME, S_IRUGO, twl_proc_dir);
+	if (twl_proc_dir_entry != NULL) {
+		twl_proc_dir_entry->data = NULL;
+		twl_proc_dir_entry->read_proc = proc_startcond_read;
+		twl_proc_dir_entry->write_proc = NULL;
+	}
+
+	twl_proc_dir_entry = create_proc_entry(TWL_LAST_TURNOFF_PROCNAME, S_IRUGO, twl_proc_dir);
+	if (twl_proc_dir_entry != NULL) {
+		twl_proc_dir_entry->data = NULL;
+		twl_proc_dir_entry->read_proc = proc_turnoff_sts_read;
+		twl_proc_dir_entry->write_proc = NULL;
+	}
+}
+
+#ifdef CONFIG_PM
+static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	/* Un-mask low battery interrupt */
+	twl6030_interrupt_unmask(VLOW_INT_MASK, REG_INT_MSK_STS_A);
+#endif
+	return irq_set_irq_wake(client->irq, 1);
+}
+
+static int twl_resume(struct i2c_client *client)
+{
+	return irq_set_irq_wake(client->irq, 0);
+}
+#else
+#define twl_suspend	NULL
+#define twl_resume	NULL
+#endif
 
 /*
  * twl_load_regs_setup_script() - helper to setup a one-time regs configuration
@@ -1463,6 +1579,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	unsigned			i, num_slaves;
 	int				features;
 	u8				temp;
+	u8 twl_reg;
 
 	if (node && !pdata) {
 		/*
@@ -1581,6 +1698,45 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
 	}
 
+
+	/* Print some useful registers at boot up */
+	pr_info("TWL603x Boot Information:\n");
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_START_CONDITION);
+	memset(twl_start_condition, 0 , TWL_BOOT_INFO_SIZE);
+	for (i = 0; i < ARRAY_SIZE(start_cond_flags); i++)
+		if (twl_reg & start_cond_flags[i].mask)
+			strlcat(twl_start_condition, start_cond_flags[i].str,
+				sizeof(twl_start_condition));
+	pr_info("Start condition is %s (PHOENIX_START_CONDITION = 0x%02x)\n", twl_start_condition, twl_reg);
+
+	/* Clear register for next boot */
+	twl_reg = 0x7F; // Bit 8 is reserved
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, twl_reg, PHOENIX_STS_HW_CONDITIONS);
+
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_LAST_TURNOFF_STS);
+	memset(twl_turnoff_reason, 0 , TWL_BOOT_INFO_SIZE);
+
+	if (0x01 == twl_reg) {
+		/* Upon normal shutdown with power button, this register will be set to 0x1 */
+		snprintf(twl_turnoff_reason,  TWL_BOOT_INFO_SIZE, "normal shutdown");
+	}
+	else {
+		for (i = 0; i < ARRAY_SIZE(last_turnoff_flags); i++)
+			if (twl_reg & last_turnoff_flags[i].mask)
+				strlcat(twl_turnoff_reason, last_turnoff_flags[i].str,
+					sizeof(twl_turnoff_reason));
+	}
+	pr_info("Last turn off status is %s (PHOENIX_LAST_TURN_OFF_STATUS = 0x%02x)\n", twl_turnoff_reason, twl_reg);
+	/* Clear register for next boot */
+	twl_reg = 0xFE; // Bit 0 is read-only
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, twl_reg, PHOENIX_LAST_TURNOFF_STS);
+
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_STS_HW_CONDITIONS);
+	printk(KERN_INFO "Hardware Conditions (PHOENIX_STS_HW_CONDITIONS) is 0x%02x\n", twl_reg);
+
+	/* Create proc files */
+	create_twl_proc_files();
+
 	status = -ENODEV;
 	if (node)
 		status = of_platform_populate(node, NULL, NULL, &client->dev);
@@ -1621,6 +1777,8 @@ static struct i2c_driver twl_driver = {
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
 	.remove		= twl_remove,
+	.suspend	= twl_suspend,
+	.resume		= twl_resume,
 };
 
 static int __init twl_init(void)

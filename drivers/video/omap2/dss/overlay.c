@@ -38,6 +38,7 @@
 #include "dss_features.h"
 
 static int num_overlays;
+extern bool band_changed;
 static struct omap_overlay *overlays;
 
 static ssize_t overlay_name_show(struct omap_overlay *ovl, char *buf)
@@ -579,6 +580,7 @@ EXPORT_SYMBOL(omap_dss_get_overlay);
 void dss_init_overlays(struct platform_device *pdev)
 {
 	int i, r;
+	band_changed = false;
 
 	num_overlays = dss_feat_get_num_ovls();
 

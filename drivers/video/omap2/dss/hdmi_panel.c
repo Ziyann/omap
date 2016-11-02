@@ -182,18 +182,19 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 		goto done_err1;
 	}
 
-	r = gpio_request_one(priv->hpd_gpio, GPIOF_DIR_IN,
+	/*r = gpio_request_one(priv->hpd_gpio, GPIOF_DIR_IN,
 				"hdmi_gpio_hpd");
 	if (r) {
 		DSSERR("Could not get HDMI_HPD gpio\n");
 		goto done_hpd_err;
-	}
+	}*/
 
 	hdmi.hpd_gpio = priv->hpd_gpio;
 	r = request_threaded_irq(gpio_to_irq(hdmi.hpd_gpio),
 		NULL, hpd_enable_handler,
 		IRQF_DISABLED | IRQF_TRIGGER_RISING |
 		IRQF_TRIGGER_FALLING, "hpd", NULL);
+
 	if (r < 0) {
 		pr_err("hdmi: request_irq %d failed\n",
 			gpio_to_irq(hdmi.hpd_gpio));
@@ -203,8 +204,10 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	return 0;
 
 err_irq:
+#if 0
 	gpio_free(priv->hpd_gpio);
 done_hpd_err:
+#endif
 	gpio_free(priv->ls_oe_gpio);
 done_err1:
 	gpio_free(priv->ct_cp_hpd_gpio);

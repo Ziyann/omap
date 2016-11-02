@@ -167,7 +167,7 @@ static int rprm_rproc_release(void *handle)
 {
 	struct rprm_rproc_depot *rprocd = handle;
 
-	rproc_shutdown(rprocd->rp);
+	rproc_put(rprocd->rp);
 	kfree(rprocd);
 
 	return 0;

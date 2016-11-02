@@ -34,6 +34,8 @@
 #include <bcmsdbus.h>	/* bcmsdh to/from specific controller APIs */
 #include <sdiovar.h>	/* ioctl/iovars */
 
+#include <linux/gfp.h>
+
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio_func.h>
@@ -80,6 +82,11 @@ DHD_PM_RESUME_WAIT_INIT(sdioh_request_byte_wait);
 DHD_PM_RESUME_WAIT_INIT(sdioh_request_word_wait);
 DHD_PM_RESUME_WAIT_INIT(sdioh_request_packet_wait);
 DHD_PM_RESUME_WAIT_INIT(sdioh_request_buffer_wait);
+
+#define SDIO_PIO_CHECK_BUF(buf, len)	(offset_in_page(buf) + len > PAGE_SIZE)
+#define SDIO_PIO_BUFFER_SIZE		(PAGE_SIZE * 4)
+static struct page *sdio_pio_pages;
+static void *sdio_pio_buf;
 
 #define DMA_ALIGN_MASK	0x03
 #define MMC_SDIO_ABORT_RETRY_LIMIT 5
@@ -959,6 +966,8 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 	struct mmc_request mmc_req;
 	struct mmc_command mmc_cmd;
 	struct mmc_data mmc_dat;
+	void *ext_buffer;
+	int ext_len;
 
 	sd_trace(("%s: Enter\n", __FUNCTION__));
 
@@ -1067,6 +1076,7 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 				pkt_len -= xfred_len;
 				xfred_len = 0;
 			}
+			ext_len = pkt_len;
 
 			/* Align Patch
 			 *  read or small packet(ex:BDC header) skip 32 byte align
@@ -1076,6 +1086,23 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 				pkt_len = (pkt_len + 3) & 0xFFFFFFFC;
 			else if (pkt_len % blk_size)
 				pkt_len += blk_size - (pkt_len % blk_size);
+
+			/* Check for available aux. buffer and need to use */
+			if (sdio_pio_buf && SDIO_PIO_CHECK_BUF(buf, pkt_len)) {
+				WARN(pkt_len > SDIO_PIO_BUFFER_SIZE,
+					"size = %d", pkt_len);
+
+				/* Prepare content of send buffer */
+				if (write)
+					memcpy(sdio_pio_buf, buf, ext_len);
+
+				/* Remember original socket buffer */
+				ext_buffer = buf;
+
+				/* Replace with continuous memory buffer */
+				buf = sdio_pio_buf;
+			} else
+				ext_buffer = NULL;
 
 #ifdef CONFIG_MMC_MSM7X00A
 			if ((pkt_len % 64) == 32) {
@@ -1100,6 +1127,15 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 				err_ret = sdio_memcpy_fromio(
 						gInstance->func[func],
 						buf, addr, pkt_len);
+
+			if (ext_buffer) {
+				/* Recover original socket buffer */
+				buf = ext_buffer;
+
+				/* Copy data into socket buffer */
+				if (!write)
+					memcpy(buf, sdio_pio_buf, ext_len);
+			}
 
 			if (err_ret)
 				sd_err(("%s: %s FAILED %p[%d], addr=0x%05x, pkt_len=%d, ERR=%d\n",
@@ -1440,6 +1476,14 @@ sdioh_start(sdioh_info_t *si, int stage)
 	else
 		sd_err(("%s Failed\n", __FUNCTION__));
 
+	if (!sdio_pio_pages) {
+		sdio_pio_pages = alloc_pages(GFP_DMA,
+			get_order(SDIO_PIO_BUFFER_SIZE));
+		if (sdio_pio_pages)
+			sdio_pio_buf = page_address(sdio_pio_pages);
+		WARN_ON(!sdio_pio_buf);
+	}
+
 	return (0);
 }
 
@@ -1469,6 +1513,14 @@ sdioh_stop(sdioh_info_t *si)
 	}
 	else
 		sd_err(("%s Failed\n", __FUNCTION__));
+
+	if (sdio_pio_pages) {
+		free_pages((unsigned long)sdio_pio_buf,
+			get_order(SDIO_PIO_BUFFER_SIZE));
+		sdio_pio_pages = NULL;
+		sdio_pio_buf = NULL;
+	}
+
 	return (0);
 }
 

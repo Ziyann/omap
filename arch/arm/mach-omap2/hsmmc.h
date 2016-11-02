@@ -7,11 +7,13 @@
  */
 
 struct mmc_card;
+struct mmc_platform_data;
 
 struct omap2_hsmmc_info {
 	u8	mmc;		/* controller 1/2/3 */
 	u32	caps;		/* 4/8 wires and any additional host
 				 * capabilities OR'd (ref. linux/mmc/host.h) */
+	u32 caps2;
 	u32	pm_caps;	/* PM capabilities */
 	bool	transceiver;	/* MMC-2 option */
 	bool	ext_clock;	/* use external pin for input clock */
@@ -40,6 +42,8 @@ struct omap2_hsmmc_info {
 	void (*remux)(struct device *dev, int slot, int power_on);
 	/* init some special card */
 	void (*init_card)(struct mmc_card *card);
+	struct mmc_platform_data *mmc_data;
+	int housekeeping_ms;	/* [ms] Card require housekeeping */
 };
 
 #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)

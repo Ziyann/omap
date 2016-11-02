@@ -106,18 +106,25 @@ void __init omap4_pmic_init(const char *pmic_type,
 		    struct twl4030_platform_data *pmic_data,
 		    struct twl6040_platform_data *twl6040_data, int twl6040_irq)
 {
+	int i2c_slave_cnt = 1;
+
 	/* PMIC part*/
 	strncpy(omap4_i2c1_board_info[0].type, pmic_type,
 		sizeof(omap4_i2c1_board_info[0].type));
 	omap4_i2c1_board_info[0].irq = OMAP44XX_IRQ_SYS_1N;
 	omap4_i2c1_board_info[0].platform_data = pmic_data;
 
-	/* TWL6040 audio IC part */
-	twl6040_data->pdm_ul_errata = twl6040_pdm_ul_errata;
-	omap4_i2c1_board_info[1].irq = twl6040_irq;
-	omap4_i2c1_board_info[1].platform_data = twl6040_data;
+	/* TWL6040 audio IC part - TWL6040 is not always used */
+	if (twl6040_data) {
+		twl6040_data->pdm_ul_errata = twl6040_pdm_ul_errata;
+		omap4_i2c1_board_info[1].irq = twl6040_irq;
+		omap4_i2c1_board_info[1].platform_data = twl6040_data;
+		i2c_slave_cnt++;
+	} else {
+		pr_info("TWL6040 not used!\n");
+	}
 
-	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, 2);
+	omap_register_i2c_bus(1, 400, omap4_i2c1_board_info, i2c_slave_cnt);
 
 }
 
@@ -139,21 +146,28 @@ void __init omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
 			    const char *audio_type, int audio_irq,
 			    struct twl6040_platform_data *audio_data)
 {
+	int i2c_slave_cnt = 1;
+
 	/* PMIC part*/
 	strncpy(omap5_i2c1_generic_info[0].type, pmic_type,
 		sizeof(omap5_i2c1_generic_info[0].type));
 	omap5_i2c1_generic_info[0].irq = pmic_irq;
 	omap5_i2c1_generic_info[0].platform_data = pmic_data;
 
-	/* TWL6040 audio IC part */
-	strncpy(omap5_i2c1_generic_info[1].type, audio_type,
-		sizeof(omap5_i2c1_generic_info[1].type));
-	audio_data->pdm_ul_errata = twl6040_pdm_ul_errata;
-	omap5_i2c1_generic_info[1].irq = audio_irq;
-	omap5_i2c1_generic_info[1].platform_data = audio_data;
+	/* TWL6040 audio IC part - TWL6040 is not always used */
+	if (audio_data) {
+		strncpy(omap5_i2c1_generic_info[1].type, audio_type,
+			sizeof(omap5_i2c1_generic_info[1].type));
+		audio_data->pdm_ul_errata = twl6040_pdm_ul_errata;
+		omap5_i2c1_generic_info[1].irq = audio_irq;
+		omap5_i2c1_generic_info[1].platform_data = audio_data;
+		i2c_slave_cnt++;
+	} else {
+		pr_info("TWL6040 not used!\n");
+	}
 
 	i2c_register_board_info(bus_id, omap5_i2c1_generic_info,
-				ARRAY_SIZE(omap5_i2c1_generic_info));
+		i2c_slave_cnt);
 }
 
 void __init omap_pmic_late_init(void)
@@ -385,7 +399,7 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
+		.always_on		= false,
 		.state_mem = {
 			.disabled	= true,
 		},
@@ -408,9 +422,7 @@ static struct regulator_init_data omap4_vaux1_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.state_mem = {
-			.disabled	= true,
-		},
+		.always_on		= true,
 		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux_supply),
@@ -465,13 +477,17 @@ static struct regulator_init_data omap4_vaux3_idata = {
 
 static struct regulator_consumer_supply omap4_vmmc_supply[] = {
 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+	/* Add backlight IC voltage source from PMIC LDO5
+	 * since it will be phase in DVT build */
+	REGULATOR_SUPPLY("lp8557_ldo5", "lp8557"),
 };
 
 /* VMMC1 for MMC1 card */
 static struct regulator_init_data omap4_vmmc_idata = {
 	.constraints = {
 		.min_uV			= 1200000,
-		.max_uV			= 3000000,
+		/* Enlarge maximal voltage from backlight IC voltage source */
+		.max_uV			= 3300000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
@@ -669,7 +685,7 @@ static struct regulator_init_data omap4_regen1_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 		.state_mem = {
-			.disabled	= true,
+			.enabled	= true,
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},

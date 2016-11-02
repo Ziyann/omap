@@ -1764,12 +1764,15 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 		dstinfo = &gcbatch->dstinfo;
 		dstinfo->surfdirty
 			= ((gcbatch->batchflags & BVBATCH_DST) != 0);
-		dstinfo->cliprectdirty
-			= ((gcbatch->batchflags & BVBATCH_CLIPRECT) != 0);
 		dstinfo->destrectdirty
-			= ((gcbatch->batchflags & BVBATCH_DESTRECT) != 0);
-		dstinfo->rectdirty
-			= dstinfo->cliprectdirty || dstinfo->destrectdirty;
+			= ((gcbatch->batchflags & BVBATCH_DESTRECT) != 0) ||
+			  dstinfo->surfdirty;
+		dstinfo->cliprectdirty
+			= ((gcbatch->batchflags & BVBATCH_CLIPRECT) != 0) ||
+			  dstinfo->destrectdirty;
+		dstinfo->rectdirty = dstinfo->surfdirty ||
+				     dstinfo->cliprectdirty ||
+				     dstinfo->destrectdirty;
 
 		/* Verify the src1 parameters structure. */
 		if (src1used) {

@@ -42,6 +42,7 @@
 #include <linux/ethtool.h>
 #include <linux/fcntl.h>
 #include <linux/fs.h>
+#include <linux/trapz.h>
 
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -116,6 +117,32 @@ extern bool ap_fw_loaded;
 #endif
 
 #include <wl_android.h>
+
+/*
+ * defines for join pref processing
+ */
+#define WLC_JOIN_PREF_LEN_FIXED     2 	/* Length for the fixed portion of Join Pref TLV value */
+#define JOIN_RSSI_BAND      WLC_BAND_5G /* WLC_BAND_AUTO disables the feature */
+#define JOIN_RSSI_DELTA     20      	/* Positive value, in dB */
+#define JOIN_PREF_IOV_LEN   8       	/* 4 bytes each for RSSI Delta and mandatory RSSI */
+
+/* Construct the join pref TLV based on rssi and band */
+#define PREP_JOIN_PREF_RSSI_DELTA(_pref, _rssi, _band) \
+	do {                        \
+		(_pref)[0] = WL_JOIN_PREF_RSSI_DELTA;   \
+		(_pref)[1] = WLC_JOIN_PREF_LEN_FIXED;   \
+		(_pref)[2] = _rssi;         \
+		(_pref)[3] = _band;         \
+	} while (0)
+
+/* Construct the mandatory TLV for RSSI */
+#define PREP_JOIN_PREF_RSSI(_pref) \
+	do {                        \
+		(_pref)[0] = WL_JOIN_PREF_RSSI;     \
+		(_pref)[1] = WLC_JOIN_PREF_LEN_FIXED;   \
+		(_pref)[2] = 0;             \
+		(_pref)[3] = 0;             \
+	} while (0)
 
 #ifdef ARP_OFFLOAD_SUPPORT
 void aoe_update_host_ipv4_table(dhd_pub_t *dhd_pub, u32 ipa, bool add, int idx);
@@ -1531,10 +1558,21 @@ dhd_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 
 done:
-	if (ret)
+	if (ret) {
+		TRAPZ_DESCRIBE(TRAPZ_KERN_NET_WIFI, tx_drop_packet,
+			"Dropped a packet on wifi");
+		TRAPZ_LOG(TRAPZ_LOG_DEBUG, 0, TRAPZ_KERN_NET_WIFI,
+			tx_drop_packet, 0, 0, 0, 0);
 		dhd->pub.dstats.tx_dropped++;
-	else
+	} else {
+		TRAPZ_DESCRIBE(TRAPZ_KERN_NET_WIFI,
+			tx_packet, "Sent a packet on wifi");
+		TRAPZ_LOG_PRINTF(TRAPZ_LOG_DEBUG, 0,
+			TRAPZ_KERN_NET_WIFI, tx_packet,
+			"Packet type: %d size: %d",
+			skb->pkt_type, skb->len, 0, 0);
 		dhd->pub.tx_packets++;
+	}
 
 	DHD_OS_WAKE_UNLOCK(&dhd->pub);
 
@@ -1813,6 +1851,12 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 			ifp->net->last_rx = jiffies;
 
 		dhdp->dstats.rx_bytes += skb->len;
+		TRAPZ_DESCRIBE(TRAPZ_KERN_NET_WIFI, rx_packet,
+			"Received a packet on wifi");
+		TRAPZ_LOG_PRINTF(TRAPZ_LOG_DEBUG, 0,
+			TRAPZ_KERN_NET_WIFI, rx_packet,
+			"Packet type: %d size: %d",
+			skb->pkt_type, skb->len, 0, 0);
 		dhdp->rx_packets++; /* Local count */
 
 		if (in_interrupt()) {
@@ -3349,6 +3393,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	char eventmask[WL_EVENTING_MASK_LEN];
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 
+    uint band = WLC_BAND_5G;
 #if !defined(WL_CFG80211)
 	uint up = 0;
 #endif /* !defined(WL_CFG80211) */
@@ -3572,6 +3617,48 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0)
 		DHD_ERROR(("%s: roam fullscan period set failed %d\n", __FUNCTION__, ret));
 #endif /* ROAM_ENABLE */
+#if defined(FORCED_TO_2G_ONLY)
+    /* Set band */
+	DHD_ERROR(("%s: Setting band to 2.4G only\n", __FUNCTION__));
+    band = WLC_BAND_2G;
+    dhd_wl_ioctl_cmd(dhd, WLC_SET_BAND, (char *)&band, sizeof(band), TRUE, 0);
+#endif
+
+#if defined(FORCED_TO_5G_ONLY)
+    /* Set band */
+    DHD_ERROR(("%s: Setting band to 5G only\n", __FUNCTION__));
+    band = WLC_BAND_5G;
+    dhd_wl_ioctl_cmd(dhd, WLC_SET_BAND, (char *)&band, sizeof(band), TRUE, 0);
+#endif
+
+#if !defined(FORCED_TO_2G_ONLY) && !defined(FORCED_TO_5G_ONLY) && defined(PREFER_ASSOCIATION_5G)
+
+    /* Set default association preference to 5GHz.
+     * This is actually the "roaming-join preference".
+     */
+    band = WLC_BAND_5G;
+    dhd_wl_ioctl_cmd(dhd, WLC_SET_ASSOC_PREFER, (char *)&band, sizeof(band), TRUE, 0);
+    DHD_ERROR(("%s: Association preference set to 5GHz\n", __FUNCTION__));
+
+	/* Set the RSSI spread preference. 2GHz AP needs to be JOIN_RSSI_DELTA dB
+	 * stronger in order for the chip NOT to join a 5Ghz network.
+	 */
+	{
+		uint8 buf[JOIN_PREF_IOV_LEN];
+		uint8 *ptr = buf;
+		bzero(buf, sizeof(buf));
+
+		DHD_ERROR(("%s: Setting join_pref to %s, with %ddB spread\n", __FUNCTION__, (band==WLC_BAND_5G)?"5G":"2.4G", JOIN_RSSI_DELTA));
+
+		PREP_JOIN_PREF_RSSI(ptr);
+		ptr += (2 + WLC_JOIN_PREF_LEN_FIXED);
+		PREP_JOIN_PREF_RSSI_DELTA(ptr, JOIN_RSSI_DELTA, band);
+		bcm_mkiovar("join_pref", buf, JOIN_PREF_IOV_LEN, iovbuf, sizeof(iovbuf));
+		if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
+			DHD_ERROR(("%s Set join_pref failed %d\n", __FUNCTION__, ret));
+		}
+	}
+#endif
 
 	/* Set PowerSave mode */
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)&power_mode, sizeof(power_mode), TRUE, 0);
@@ -3703,14 +3790,12 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 
 #ifdef PKT_FILTER_SUPPORT
 	/* Setup default defintions for pktfilter , enable in suspend */
-	dhd->pktfilter_count = 5;
+	dhd->pktfilter_count = 4;
 	/* Setup filter to allow only unicast */
 	dhd->pktfilter[0] = "100 0 0 0 0x01 0x00";
 	dhd->pktfilter[1] = NULL;
 	dhd->pktfilter[2] = NULL;
 	dhd->pktfilter[3] = NULL;
-	/* Add filter to pass multicastDNS packet and NOT filter out as Broadcast */
-	dhd->pktfilter[4] = "104 0 0 0 0xFFFFFFFFFFFF 0x01005E0000FB";
 	dhd_set_packet_filter(dhd);
 #if defined(SOFTAP)
 	if (ap_fw_loaded) {
@@ -5066,7 +5151,7 @@ int dhd_os_send_hang_message(dhd_pub_t *dhdp)
 	if (dhdp) {
 		if (!dhdp->hang_was_sent) {
 			dhdp->hang_was_sent = 1;
-			schedule_work(&dhdp->info->work_hang);
+			queue_work(system_long_wq, &dhdp->info->work_hang);
 		}
 	}
 	return ret;

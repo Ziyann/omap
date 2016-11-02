@@ -298,7 +298,12 @@ __setup("reboot=", reboot_setup);
 void machine_shutdown(void)
 {
 #ifdef CONFIG_SMP
+#ifdef CONFIG_ARCH_OMAP
+	if (!in_atomic())
+		disable_nonboot_cpus();
+#else
 	smp_send_stop();
+#endif
 #endif
 }
 

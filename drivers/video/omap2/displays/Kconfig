@@ -92,8 +92,43 @@ config PANEL_TC358765
 config TC358765_DEBUG
 	bool "Toshiba TC358765 DSI-2-LVDS chip debug"
 	depends on PANEL_TC358765 && DEBUG_FS
+        select BACKLIGHT_CLASS_DEVICE
 	help
 	  Support of TC358765 DSI-2-LVDS chip register access via debugfs
+
+config PANEL_LG_LD089WX1
+       tristate "LG 1280x768  WUXGA LCD Panel"
+       depends on OMAP2_DSS_DSI && PANEL_TC358765
+       select BACKLIGHT_CLASS_DEVICE
+       help
+        LCD Panel used by Lab126
+
+config PANEL_SAMSUNG_LTL089CL01
+       tristate "Samsung 1920x1200 WUXGA LCD Panel"
+       depends on OMAP2_DSS_DSI && PANEL_TC358765
+       help
+        LCD Panel used by Lab126
+
+config PANEL_NT71391_HYDIS
+	tristate "NT71391 Hydis 1920x1200 WUXGA DSI LCD Panel"
+	depends on OMAP2_DSS_DSI
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  MIPI DSI LCD Panel used by Lab126
+
+config PANEL_SAMSUNG_LTL089CL01
+	tristate "Samsung DSI LCD Panel"
+	depends on OMAP2_DSS_DSI
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  MIPI DSI LCD Panel used by Lab126 bowser
+
+config PANEL_NT51012_LG
+	tristate "NT51012 LG 800x1280 DSI LCD Panel"
+	depends on OMAP2_DSS_DSI
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  MIPI DSI LCD Panel used by Lab126
 
 config PANEL_LP_101
         tristate "LP101 LCD Panel"

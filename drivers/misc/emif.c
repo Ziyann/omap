@@ -28,7 +28,6 @@
 #include <linux/pm.h>
 #include <mach/common.h>
 #include "emif.h"
-
 /**
  * struct emif_data - Per device static data for driver's use
  * @duplicate:			Whether the DDR devices attached to this EMIF
@@ -58,7 +57,6 @@ struct emif_data {
 	u8				temperature_level;
 	u8				lpmode;
 	struct list_head		node;
-	unsigned long			irq_state;
 	void __iomem			*base;
 	struct device			*dev;
 	const struct lpddr2_addressing	*addressing;
@@ -680,15 +678,17 @@ static u32 get_ddr_phy_ctrl_1_attilaphy_4d(const struct lpddr2_timings *timings,
 {
 	u32 phy = EMIF_DDR_PHY_CTRL_1_BASE_VAL_ATTILAPHY, val = 0;
 
-	val = RL + DIV_ROUND_UP(timings->tDQSCK_max, t_ck) - 1;
+	val = RL + DIV_ROUND_UP(timings->tDQSCK_max, t_ck);
 	phy |= val << READ_LATENCY_SHIFT_4D;
 
 	if (freq <= 100000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS_ATTILAPHY;
 	else if (freq <= 200000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ_ATTILAPHY;
-	else
+	else if (freq <= 400000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ_ATTILAPHY;
+	else
+		val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ_ATTILAPHY;
 
 	phy |= val << DLL_SLAVE_DLY_CTRL_SHIFT_4D;
 
@@ -974,15 +974,19 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
 	u32		old_temp_level;
 	irqreturn_t	ret = IRQ_HANDLED;
 	struct emif_custom_configs *custom_configs;
+	unsigned long flags;
 
-	spin_lock_irqsave(&emif_lock, irq_state);
+	spin_lock_irqsave(&emif_lock, flags);
 	old_temp_level = emif->temperature_level;
 	get_temperature_level(emif);
 
 	if (unlikely(emif->temperature_level == old_temp_level)) {
 		goto out;
 	} else if (!emif->curr_regs) {
-		dev_err(emif->dev, "temperature alert before registers are calculated, not de-rating timings\n");
+		dev_err(emif->dev, "temperature alert before registers are calculated, not de-rating timings, will try later\n");
+
+		/* Ensure the late_init hook will handle overheating events */
+		emif->temperature_level = SDRAM_TEMP_NOMINAL;
 		goto out;
 	}
 
@@ -1024,7 +1028,7 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
 	}
 
 out:
-	spin_unlock_irqrestore(&emif_lock, irq_state);
+	spin_unlock_irqrestore(&emif_lock, flags);
 	return ret;
 }
 
@@ -1067,6 +1071,7 @@ static irqreturn_t emif_interrupt_handler(int irq, void *dev_id)
 static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 {
 	struct emif_data	*emif = dev_id;
+	unsigned long		flags;
 
 	if (emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
 		dev_emerg(emif->dev, "SDRAM temperature exceeds operating limit.. Needs shut down!!!\n");
@@ -1080,7 +1085,7 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-	spin_lock_irqsave(&emif_lock, irq_state);
+	spin_lock_irqsave(&emif_lock, flags);
 
 	if (emif->curr_regs) {
 		setup_temperature_sensitive_regs(emif, emif->curr_regs);
@@ -1089,7 +1094,7 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		dev_err(emif->dev, "temperature alert before registers are calculated, not de-rating timings\n");
 	}
 
-	spin_unlock_irqrestore(&emif_lock, irq_state);
+	spin_unlock_irqrestore(&emif_lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -1120,7 +1125,7 @@ static void disable_and_clear_all_interrupts(struct emif_data *emif)
 	clear_all_interrupts(emif);
 }
 
-static int __init_or_module setup_interrupts(struct emif_data *emif, u32 irq)
+static int enable_interrupts(struct emif_data *emif)
 {
 	u32		interrupts, type;
 	void __iomem	*base = emif->base;
@@ -1141,6 +1146,13 @@ static int __init_or_module setup_interrupts(struct emif_data *emif, u32 irq)
 		interrupts = EN_ERR_LL_MASK;
 		writel(interrupts, base + EMIF_LL_OCP_INTERRUPT_ENABLE_SET);
 	}
+
+	return 0;
+}
+
+static int __init_or_module setup_interrupts(struct emif_data *emif, u32 irq)
+{
+	enable_interrupts(emif);
 
 	/* setup IRQ handlers */
 	return devm_request_threaded_irq(emif->dev, irq,
@@ -1185,10 +1197,8 @@ static void __init_or_module emif_onetime_settings(struct emif_data *emif)
 		device_info->cal_resistors_per_cs);
 	writel(zq, base + EMIF_SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG);
 
-	/* Check temperature level temperature level*/
-	get_temperature_level(emif);
-	if (emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
-		dev_emerg(emif->dev, "SDRAM temperature exceeds operating limit.. Needs shut down!!!\n");
+	/* Start with a dummy value signifying normal temperature. */
+	emif->temperature_level = SDRAM_TEMP_NOMINAL;
 
 	/* Init temperature polling */
 	temp_alert_cfg = get_temp_alert_config(addressing,
@@ -1409,6 +1419,18 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
 		goto error;
 	}
 
+	/* One-time actions taken on probing the first device */
+	if (!emif1) {
+		emif1 = emif;
+		spin_lock_init(&emif_lock);
+
+		/*
+		 * TODO: register notifiers for frequency and voltage
+		 * change here once the respective frameworks are
+		 * available
+		 */
+	}
+
 	list_add(&emif->node, &device_list);
 	emif->addressing = get_addressing_table(emif->plat_data->device_info);
 
@@ -1442,18 +1464,6 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
 	disable_and_clear_all_interrupts(emif);
 	setup_interrupts(emif, irq);
 
-	/* One-time actions taken on probing the first device */
-	if (!emif1) {
-		emif1 = emif;
-		spin_lock_init(&emif_lock);
-
-		/*
-		 * TODO: register notifiers for frequency and voltage
-		 * change here once the respective frameworks are
-		 * available
-		 */
-	}
-
 	dev_info(&pdev->dev, "%s: device configured with addr = %p and IRQ%d\n",
 		__func__, emif->base, irq);
 
@@ -1476,6 +1486,36 @@ static void emif_shutdown(struct platform_device *pdev)
 	struct emif_data	*emif = platform_get_drvdata(pdev);
 
 	disable_and_clear_all_interrupts(emif);
+}
+
+static int emif_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct emif_data *emif = platform_get_drvdata(pdev);
+
+	/*
+	 * We have to disable interrupts because a faulty DDR-SDRAM
+	 * temperature sensor might raise an MR4 IRQ during suspend,
+	 * which will keep PD_CORE from reaching OFF mode.
+	 *
+	 * We assume that DDR-SDRAM will not overheat during system
+	 * suspend.
+	 */
+	disable_and_clear_all_interrupts(emif);
+
+	return 0;
+}
+
+static int emif_resume(struct platform_device *pdev)
+{
+	struct emif_data *emif = platform_get_drvdata(pdev);
+
+	enable_interrupts(emif);
+
+	/* In the unlikely event of a changed MR4 during suspend: update. */
+	writel(TA_SYS_MASK,
+		emif->base + EMIF_SYSTEM_OCP_INTERRUPT_RAW_STATUS);
+
+	return 0;
 }
 
 static int get_emif_reg_values(struct emif_data *emif, u32 freq,
@@ -1675,6 +1715,7 @@ static int volt_notify_handling(struct notifier_block *nb,
 				unsigned long volt_state, void *data)
 {
 	struct emif_data *emif;
+	unsigned long flags;
 	u32 val;
 
 	/* If there are no devices, nothing for us to do */
@@ -1686,13 +1727,13 @@ static int volt_notify_handling(struct notifier_block *nb,
 	else
 		val =  DDR_VOLTAGE_STABLE;
 
-	spin_lock_irqsave(&emif_lock, irq_state);
+	spin_lock_irqsave(&emif_lock, flags);
 
 	list_for_each_entry(emif, &device_list, node)
 		do_volt_notify_handling(emif, val);
 	do_freq_update();
 
-	spin_unlock_irqrestore(&emif_lock, irq_state);
+	spin_unlock_irqrestore(&emif_lock, flags);
 
 	return 0;
 }
@@ -1733,13 +1774,11 @@ static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
  * available in mainline kernel. This function is un-used
  * right now.
  */
-static void freq_pre_notify_handling(u32 new_freq)
+static void freq_prepare_notify_handling(void)
 {
-	struct emif_data *emif;
-
 	/*
 	 * NOTE: we are taking the spin-lock here and releases it
-	 * only in post-notifier. This doesn't look good and
+	 * only in cleanup-notifier. This doesn't look good and
 	 * Sparse complains about it, but this seems to be
 	 * un-avoidable. We need to lock a sequence of events
 	 * that is split between EMIF and clock framework.
@@ -1757,6 +1796,11 @@ static void freq_pre_notify_handling(u32 new_freq)
 	 * a given frequency
 	 */
 	spin_lock_irqsave(&emif_lock, irq_state);
+}
+
+static void freq_pre_notify_handling(u32 new_freq)
+{
+	struct emif_data *emif;
 
 	list_for_each_entry(emif, &device_list, node)
 		do_freq_pre_notify_handling(emif, new_freq);
@@ -1784,10 +1828,13 @@ static void freq_post_notify_handling(void)
 
 	list_for_each_entry(emif, &device_list, node)
 		do_freq_post_notify_handling(emif);
+}
 
+static void freq_cleanup_notify_handling(void)
+{
 	/*
-	 * Lock is done in pre-notify handler. See freq_pre_notify_handling()
-	 * for more details
+	 * Lock is done in prepare-notify handler. See
+	 * freq_prepare_notify_handling() for more details
 	 */
 	spin_unlock_irqrestore(&emif_lock, irq_state);
 }
@@ -1803,11 +1850,17 @@ static int core_dpll_notify_handling(struct notifier_block *nb,
 		return 0;
 
 	switch (dpll_state) {
+	case OMAP_CORE_DPLL_PREPARE:
+		freq_prepare_notify_handling();
+		break;
 	case OMAP_CORE_DPLL_PRECHANGE:
 		freq_pre_notify_handling(notify->rate);
 		break;
 	case OMAP_CORE_DPLL_POSTCHANGE:
 		freq_post_notify_handling();
+		break;
+	case OMAP_CORE_DPLL_CLEANUP:
+		freq_cleanup_notify_handling();
 		break;
 	default:
 		WARN(1, "INVALID state usage - %ld\n", dpll_state);
@@ -1826,10 +1879,37 @@ static struct notifier_block emif_volt_notifier_block = {
 static struct platform_driver emif_driver = {
 	.remove		= __exit_p(emif_remove),
 	.shutdown	= emif_shutdown,
+	.suspend	= emif_suspend,
+	.resume		= emif_resume,
 	.driver = {
 		.name = "emif",
 	},
 };
+
+/* Execute slightly later to ensure that TWL poweroff hook is registered */
+static int __init_or_module emif_force_temperature_events_update(void)
+{
+	struct emif_data *emif;
+
+	list_for_each_entry(emif, &device_list, node) {
+		/*
+		 * Trigger a fake event in order to handle the current
+		 * temperature. We're forcing a Temperature Alert IRQ in
+		 * order to trigger handling of the current temperature.
+		 * This juggling is needed in case board boots with an
+		 * overheated SDRAM, in which case we won't get an EMIF IRQ
+		 * for a temperature change because there is no transition
+		 * from normal to overheated state.
+		 *
+		 * Without such artificial event we will not get TA when
+		 * board boots with t_sdram > 85C.
+		 */
+		writel(TA_SYS_MASK,
+			emif->base + EMIF_SYSTEM_OCP_INTERRUPT_RAW_STATUS);
+	}
+	return 0;
+}
+late_initcall(emif_force_temperature_events_update);
 
 static int __init_or_module emif_register(void)
 {

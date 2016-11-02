@@ -86,6 +86,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
@@ -2052,6 +2053,18 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next)
 {
 	struct mm_struct *mm, *oldmm;
+
+	/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+	/* The context switch is very chatty.  By stuffing the info into the lower 8 bits of extra 1 and 2,
+	 * only one trapz record is used, since values <= 255 only use the 'mini' extras built into the main record.
+	 * These are pulled out into separate vars b/c of a bug in trapztool.py */
+	int trapz_e1 = next->pid & 0xff;
+	int trapz_e2 = (next->pid >> 8) & 0xff;
+	TRAPZ_DESCRIBE(TRAPZ_KERN_SCHED, CtxSw, "Logs prev and next pids on a context switch.");
+	TRAPZ_LOG(TRAPZ_LOG_VERBOSE, 0, TRAPZ_KERN_SCHED, CtxSw, trapz_e1, trapz_e2, 0, 0);
+#endif /* CONFIG_TRAPZ_TP */
+	/* ACOS_MOD_END */
 
 	prepare_task_switch(rq, prev, next);
 
@@ -4252,7 +4265,9 @@ static bool check_same_owner(struct task_struct *p)
 }
 
 static int __sched_setscheduler(struct task_struct *p, int policy,
-				const struct sched_param *param, bool user)
+				int predicate_policy, int *old_policy,
+				const struct sched_param *param,
+				bool user)
 {
 	int retval, oldprio, oldpolicy = -1, on_rq, running;
 	unsigned long flags;
@@ -4347,6 +4362,21 @@ recheck:
 		task_rq_unlock(rq, p, &flags);
 		return -EINVAL;
 	}
+	/*
+	 * Return current policy if requested.
+	 */
+	if (old_policy != NULL)
+		*old_policy = p->policy;
+
+	/*
+	 * Check if caller wanted a compare and exchange, bail
+	 * silently if current policy is not the sought one.
+	 */
+	if (predicate_policy >= SCHED_NORMAL &&
+	    p->policy != predicate_policy) {
+		task_rq_unlock(rq, p, &flags);
+		return 0;
+	}
 
 	/*
 	 * If not changing anything there's no need to proceed further:
@@ -4417,9 +4447,20 @@ recheck:
 int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
-	return __sched_setscheduler(p, policy, param, true);
+	return __sched_setscheduler(p, policy, SCHED_NORMAL - 1, NULL, param,
+					true);
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);
+
+/* Like sched_setscheduler_nocheck but with compare and exchange */
+int sched_setscheduler_nocheck_ex(struct task_struct *p, int policy,
+					const struct sched_param *param,
+					int predicate_policy, int *old_policy)
+{
+	return __sched_setscheduler(p, policy, predicate_policy, old_policy,
+					param, false);
+}
+
 
 /**
  * sched_setscheduler_nocheck - change the scheduling policy and/or RT priority of a thread from kernelspace.
@@ -4435,7 +4476,8 @@ EXPORT_SYMBOL_GPL(sched_setscheduler);
 int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 			       const struct sched_param *param)
 {
-	return __sched_setscheduler(p, policy, param, false);
+	return __sched_setscheduler(p, policy, SCHED_NORMAL - 1, NULL,
+					param, false);
 }
 
 static int

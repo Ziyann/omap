@@ -23,16 +23,11 @@
 static struct omap_device_pad uart2_pads[] __initdata = {
 	{
 		.name	= "uart2_cts.uart2_cts",
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.flags  = OMAP_DEVICE_PAD_REMUX,
-		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			  OMAP_MUX_MODE0,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",
-		.flags  = OMAP_DEVICE_PAD_REMUX,
-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0
 	},
 	{
 		.name	= "uart2_tx.uart2_tx",
@@ -46,21 +41,14 @@ static struct omap_device_pad uart2_pads[] __initdata = {
 
 static struct omap_device_pad uart3_pads[] __initdata = {
 	{
-		.name	= "uart3_cts_rctx.uart3_cts_rctx",
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-	},
-	{
-		.name	= "uart3_rts_sd.uart3_rts_sd",
-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-	},
-	{
 		.name	= "uart3_tx_irtx.uart3_tx_irtx",
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.flags	= OMAP_DEVICE_PAD_REMUX,
+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0 |
+			  OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE,
 		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 };
@@ -101,6 +89,7 @@ static struct omap_uart_port_info uart2_info __initdata = {
 	.dma_rx_buf_size = 4096,
 	.dma_rx_poll_rate = 1,
 	.dma_rx_timeout = 3 * HZ,
+	.rts_mux_driver_control = 1,
 	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
 

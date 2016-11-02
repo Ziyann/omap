@@ -32,6 +32,7 @@
 #include "powerdomain.h"
 #include "pm.h"
 #include "abb.h"
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
 
 /**
  * DOC: Introduction
@@ -711,6 +712,15 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 			goto next;
 		}
 
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+		if (!strcmp(temp_dev->clk->name, "virt_dpll_mpu_ck")){
+			TRAPZ_DESCRIBE(TRAPZ_KERN_DVFS, DVFSChangeFreq, "Mpu Frequency Change");
+			TRAPZ_LOG_PRINTF(TRAPZ_LOG_DEBUG, 0, TRAPZ_KERN_DVFS, DVFSChangeFreq, "mpu freq=%d", freq, 0, 0, 0);
+		}
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_BEGIN */
+
 		r = clk_set_rate(temp_dev->clk, freq);
 		if (r < 0) {
 			dev_err(dev, "%s: clk set rate frq=%ld failed(%d)\n",
@@ -820,6 +830,11 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 	struct platform_device *pdev;
 	struct omap_device *od;
 	int ret = 0;
+#if defined CONFIG_CPU_FREQ_DEBUG || defined CONFIG_IVA_FREQ_DEBUG \
+				  || defined CONFIG_IVA_FREQ_DEBUG
+	char *opp_name;
+#endif
+
 	/*
 	 * For our internal tracking system - the request and target devices
 	 * are the same
@@ -867,6 +882,15 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 		goto out;
 	}
 	volt = opp_get_voltage(opp);
+#if defined CONFIG_CPU_FREQ_DEBUG || defined CONFIG_IVA_FREQ_DEBUG \
+				  || defined CONFIG_IVA_FREQ_DEBUG
+	opp_name = opp_get_name(opp);
+	if (!opp_name) {
+		rcu_read_unlock();
+		pr_warning("%s: error in get opp_name\n", __func__);
+		goto out;
+	}
+#endif
 	rcu_read_unlock();
 
 	tdvfs_info = _dev_to_dvfs_info(target_dev);
@@ -903,6 +927,26 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 		/* Fall through */
 	}
 	/* Fall through */
+
+	if (!ret) {
+#ifdef CONFIG_CPU_FREQ_DEBUG
+		if (!strcmp(pdev->name, "mpu"))
+			pr_info("freq-omap %s: %lu Hz --> %s\n",
+				pdev->name, rate, opp_name);
+#endif
+
+#ifdef CONFIG_IVA_FREQ_DEBUG
+		if (!strcmp(pdev->name, "iva"))
+			pr_info("freq-omap %s: %lu Hz --> %s\n",
+				pdev->name, rate, opp_name);
+#endif
+
+#ifdef CONFIG_CORE_FREQ_DEBUG
+		if (!strcmp(pdev->name, "l3_main_1"))
+			pr_info("freq-omap %s: %lu Hz --> %s\n",
+				pdev->name, rate, opp_name);
+#endif
+	}
 out:
 	/* Remove the latency requirement */
 	pm_qos_update_request(&omap_dvfs_pm_qos_handle, PM_QOS_DEFAULT_VALUE);

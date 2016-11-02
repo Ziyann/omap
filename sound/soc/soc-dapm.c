@@ -3518,7 +3518,7 @@ static void soc_dapm_shutdown_codec(struct snd_soc_dapm_context *dapm)
 	LIST_HEAD(down_list);
 	int powerdown = 0;
 
-	mutex_lock(&card->power_mutex);
+	mutex_lock(&card->dapm_mutex);
 
 	list_for_each_entry(w, &dapm->card->widgets, list) {
 		if (w->dapm != dapm)
@@ -3543,7 +3543,7 @@ static void soc_dapm_shutdown_codec(struct snd_soc_dapm_context *dapm)
 						    SND_SOC_BIAS_STANDBY);
 	}
 
-	mutex_unlock(&card->power_mutex);
+	mutex_unlock(&card->dapm_mutex);
 }
 
 /*

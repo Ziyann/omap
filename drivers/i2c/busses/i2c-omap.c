@@ -663,6 +663,18 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		goto err_pm;
 	}
 
+	/*
+	 * In certain cases Ducati leaves the I2C controller in an invalid state
+	 * Usually it's after Software Reset, where I2C stays off, but this *
+	 * is not expected from ARM. As a result, you will receive a message
+	 * "controller timed out" because the operation never complete.
+	 */
+	r = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) & OMAP_I2C_CON_EN;
+	if (!r)
+		dev_err(dev->dev,
+			"I2C was found disabled during initialization. "
+			"Check your Ducati I2C driver.");
+
 	/* We have the bus, enable IRQ */
 	enable_irq(dev->irq);
 
@@ -844,6 +856,7 @@ static int process_read_rdy(struct omap_i2c_dev *dev, u16 stat)
 {
 	u8 num_bytes = 1;
 	u16 w;
+	int ret = 0;
 
 	if (dev->errata & I2C_OMAP_ERRATA_I207)
 		i2c_omap_errata_i207(dev, stat);
@@ -870,17 +883,18 @@ static int process_read_rdy(struct omap_i2c_dev *dev, u16 stat)
 					dev->buf_len--;
 				}
 			}
-		} else {
+		} else if (!ret) {
+			/* these are noise */
 			if (stat & OMAP_I2C_STAT_RRDY)
 				dev_err(dev->dev,
 					"RRDY IRQ while no data requested\n");
 			if (stat & OMAP_I2C_STAT_RDR)
 				dev_err(dev->dev,
 					"RDR IRQ while no data requested\n");
-			return -EIO;
+			ret = -EIO;
 		}
 	}
-	return 0;
+	return ret;
 }
 
 static irqreturn_t
@@ -933,8 +947,27 @@ complete:
 			return IRQ_HANDLED;
 		}
 		if (stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR)) {
-			if (process_read_rdy(dev, stat) == -EIO)
+			if (process_read_rdy(dev, stat) == -EIO) {
+				/* if the error happened, we have an unwanted
+				 * stream of data. By now we've got all the
+				 * data we wanted, so let's just terminate
+				 * transaction.
+				 */
+				omap_i2c_ack_stat(dev, stat &
+					(OMAP_I2C_STAT_RRDY |
+					 OMAP_I2C_STAT_RDR |
+					OMAP_I2C_STAT_XRDY |
+					OMAP_I2C_STAT_XDR |
+					OMAP_I2C_STAT_ARDY));
+				/* even that we don't have loss of
+				 * arbitration, let's force this error,
+				 * to trigger controller reset.
+				 * This should abort unwanted
+				 * data stream. */
+				err |= OMAP_I2C_STAT_AL;
+				omap_i2c_complete_cmd(dev, err);
 				break;
+			}
 
 			omap_i2c_ack_stat(dev,
 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
@@ -968,6 +1001,7 @@ complete:
 						}
 					}
 				} else {
+					/* these are noise */
 					if (stat & OMAP_I2C_STAT_XRDY)
 						dev_err(dev->dev,
 							"XRDY IRQ while no "
@@ -1145,15 +1179,22 @@ omap_i2c_probe(struct platform_device *pdev)
 			       (1000 * dev->speed / 8);
 	}
 
+	/* To guarantee that Ducati doesn't use I2C controller
+	 * during initialization */
+	omap_i2c_hwspinlock_lock(dev);
+
 	/* reset ASAP, clearing any IRQs */
 	omap_i2c_init(dev);
 
+	omap_i2c_hwspinlock_unlock(dev);
+
 	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
 								   omap_i2c_isr;
-	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
+	r = request_threaded_irq(dev->irq, isr, 0,
+		IRQF_TRIGGER_RISING, pdev->name, dev);
+	disable_irq(dev->irq);
 
 	/* We enable IRQ only when request for I2C from master */
-	disable_irq(dev->irq);
 
 	if (r) {
 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);

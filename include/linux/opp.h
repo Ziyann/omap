@@ -33,6 +33,8 @@ unsigned long opp_get_freq(struct opp *opp);
 
 int opp_get_opp_count(struct device *dev);
 
+char *opp_get_name(struct opp *opp);
+
 struct opp *opp_find_freq_exact(struct device *dev, unsigned long freq,
 				bool available);
 
@@ -40,7 +42,8 @@ struct opp *opp_find_freq_floor(struct device *dev, unsigned long *freq);
 
 struct opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq);
 
-int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt);
+int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt,
+	char *opp_name);
 
 int opp_enable(struct device *dev, unsigned long freq);
 

@@ -236,6 +236,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 		}
 	}
 
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_PREPARE, (void *)&notify);
+
 	/* Configures MEMIF domain in SW_WKUP */
 	clkdm_wakeup(l3_emif_clkdm);
 
@@ -279,6 +282,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* Configures MEMIF domain back to HW_WKUP */
 	clkdm_allow_idle(l3_emif_clkdm);
+
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_CLEANUP, (void *)&notify);
 
 	if (i == MAX_FREQ_UPDATE_TIMEOUT) {
 		pr_err("%s: Frequency update for CORE DPLL M2 change failed\n",
@@ -560,7 +566,7 @@ int omap4470_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 
 		v = __raw_readl(dd->mult_div1_reg);
 		v &= ~OMAP4460_DCC_COUNT_MAX_MASK;
-		v |= (5 << OMAP4460_DCC_COUNT_MAX_SHIFT);
+		v |= (10 << OMAP4460_DCC_COUNT_MAX_SHIFT);
 		__raw_writel(v, dd->mult_div1_reg);
 
 		v |= OMAP4460_DCC_EN_MASK;

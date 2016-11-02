@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/pm_qos.h>
 #include <linux/mmc/host.h>
+#include <asm/mach/mmc.h>
 
 #include <plat/board.h>
 
@@ -193,7 +194,9 @@ struct omap_mmc_platform_data {
 		int (*card_detect)(struct device *dev, int slot);
 
 		unsigned int ban_openended:1;
+		struct mmc_platform_data mmc_data;
 
+		int housekeeping_ms;	/* [ms] Card require housekeeping */
 	} slots[OMAP_MMC_MAX_SLOTS];
 };
 

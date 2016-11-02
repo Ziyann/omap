@@ -23,7 +23,7 @@
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <linux/module.h>
-#include <linux/syscalls.h>
+#include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -32,20 +32,52 @@ static int num_heaps;
 static struct ion_heap **heaps;
 static struct ion_heap *tiler_heap;
 static struct ion_heap *nonsecure_tiler_heap;
+static struct ion_platform_data *pdata;
 
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
 {
-	return omap_tiler_alloc(tiler_heap, client, data);
+	u32 n_pages;
+
+	if (data->fmt == TILFMT_PAGE)
+	{
+		n_pages = round_up(data->w, PAGE_SIZE) >> PAGE_SHIFT;
+	}
+	else
+	{
+		n_pages = tiler_vsize(data->fmt, data->w, data->h) >> PAGE_SHIFT;
+	}
+
+	data->handle = ion_alloc(client, n_pages * PAGE_SIZE, PAGE_SIZE, OMAP_ION_HEAP_TILER_MASK,
+		(unsigned long)data);
+	if (IS_ERR(data->handle))
+		return PTR_ERR(data->handle);
+	return 0;
 }
 EXPORT_SYMBOL(omap_ion_tiler_alloc);
 
 int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
 {
+	u32 n_pages;
+
 	if (!nonsecure_tiler_heap)
 		return -ENOMEM;
-	return omap_tiler_alloc(nonsecure_tiler_heap, client, data);
+
+	if (data->fmt == TILFMT_PAGE)
+	{
+		n_pages = round_up(data->w, PAGE_SIZE) >> PAGE_SHIFT;
+	}
+	else
+	{
+		n_pages = tiler_vsize(data->fmt, data->w, data->h) >> PAGE_SHIFT;
+	}
+
+	data->handle = ion_alloc(client, n_pages * PAGE_SIZE, PAGE_SIZE, OMAP_ION_HEAP_NONSECURE_TILER_MASK,
+		(unsigned long) data);
+	if (IS_ERR(data->handle))
+		return PTR_ERR(data->handle);
+	return 0;
 }
 EXPORT_SYMBOL(omap_ion_nonsecure_tiler_alloc);
 
@@ -73,18 +105,32 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 			return -EFAULT;
 		break;
 	}
+	case OMAP_ION_PHYS_ADDR:
+	{
+		struct omap_ion_phys_addr_data data;
+		int ret;
+		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+			return -EFAULT;
+		ret = ion_phys(client, data.handle, &data.phys_addr, &data.size);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data,
+				 sizeof(data)))
+			return -EFAULT;
+		break;
+	}
 	default:
 		pr_err("%s: Unknown custom ioctl\n", __func__);
 		return -ENOTTY;
 	}
 	return 0;
 }
-
 static int omap_ion_probe(struct platform_device *pdev)
 {
-	struct ion_platform_data *pdata = pdev->dev.platform_data;
 	int err;
 	int i;
+
+	pdata = pdev->dev.platform_data;
 
 	num_heaps = pdata->nr;
 
@@ -153,7 +199,7 @@ static int omap_ion_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int (*export_fd_to_ion_handles)(int fd,
+static void (*export_fd_to_ion_handles)(int fd,
 		struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles);
@@ -164,79 +210,54 @@ void omap_ion_register_pvr_export(void *pvr_export_fd)
 }
 EXPORT_SYMBOL(omap_ion_register_pvr_export);
 
-int omap_ion_share_fd_to_handles(int fd, struct ion_client *client,
-				 struct ion_handle **handles, int *num_handles)
+int omap_ion_share_fd_to_fds(int fd, int *shared_fds, int *num_shared_fds)
 {
-	struct ion_handle **export_handles;
-	struct ion_client *export_client;
-	int i = 0, ret = 0, shared_fd = 0;
+	struct ion_handle **handles;
+	struct ion_client *client;
+	int i = 0, ret = 0;
 
-	export_handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+	handles = kzalloc(*num_shared_fds * sizeof(struct ion_handle *),
 			  GFP_KERNEL);
-	if (!export_handles)
+	if (!handles)
 		return -ENOMEM;
 
 	if (export_fd_to_ion_handles) {
-		ret = export_fd_to_ion_handles(fd,
-				&export_client,
-				export_handles,
-				num_handles);
-		if (ret) {
-			pr_err("%s: export_fd_to_ion_handles failed\n",
-			       __func__);
-			goto exit;
-		}
+		export_fd_to_ion_handles(fd,
+				&client,
+				handles,
+				num_shared_fds);
 	} else {
-		pr_err("%s: export_fd_to_ion_handles not initialized\n",
+		pr_err("%s: export_fd_to_ion_handles not initialized",
 				__func__);
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	for (i = 0; i < *num_handles; i++) {
-		handles[i] = NULL;
-		if (export_handles[i]) {
-			shared_fd = ion_share_dma_buf_fd(export_client,
-							 export_handles[i]);
-			if (shared_fd < 0) {
-				pr_err("%s: Failed to get buf fd, err = %d\n",
-				       __func__, shared_fd);
-				ret = shared_fd;
-				goto err;
-			}
-
-			handles[i] = ion_import_dma_buf(client, shared_fd);
-			if (IS_ERR(handles[i])) {
-				ret = PTR_ERR(handles[i]);
-				pr_err("%s: Failed to import buf, err = %d\n",
-				       __func__, ret);
-				sys_close(shared_fd);
-				handles[i] = NULL;
-				goto err;
-			}
-			sys_close(shared_fd);
-		}
+	for (i = 0; i < *num_shared_fds; i++) {
+		if (handles[i])
+			shared_fds[i] = ion_share_dma_buf_fd(client, handles[i]);
 	}
 
 exit:
-	kfree(export_handles);
+	kfree(handles);
 	return ret;
+}
+EXPORT_SYMBOL(omap_ion_share_fd_to_fds);
 
-err:
-	/* Clear allocated handles on error */
-	while (i) {
-		if (handles[--i]) {
-			ion_free(client, handles[i]);
-			handles[i] = NULL;
+struct ion_platform_heap *omap_ion_get2d_heap(void)
+{
+	int i;
+	if (!pdata)
+		return NULL;
+	for (i = 0; i < num_heaps; i++) {
+		struct ion_platform_heap *heap_data = &pdata->heaps[i];
+		if (!strcmp(heap_data->name,"tiler")) {
+				return heap_data;
 		}
 	}
-
-	kfree(export_handles);
-	return ret;
-
+	return NULL;
 }
-EXPORT_SYMBOL(omap_ion_share_fd_to_handles);
-
+EXPORT_SYMBOL(omap_ion_get2d_heap);
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,

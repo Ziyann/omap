@@ -1780,21 +1780,18 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 	/* Get a shortcut to the destination surface descriptor. */
 	dstinfo = &batch->dstinfo;
-
-	/* Did the destination surface change? */
-	if (dstinfo->surfdirty) {
+	/* Did clipping/destination rects change? */
+	if (dstinfo->rectdirty) {
 		struct bvsurfgeom *dstgeom;
 
 		/* Shortcut to the geometry. */
 		dstgeom = bvbltparams->dstgeom;
-
 		/* Initialize the destination descriptor. */
 		dstinfo->index = -1;
 		dstinfo->buf.desc = bvbltparams->dstdesc;
 		dstinfo->width = dstgeom->width;
 		dstinfo->height = dstgeom->height;
 		dstinfo->stride1 = dstgeom->virtstride;
-
 		/* Parse the destination format. */
 		if (parse_format(bvbltparams, dstgeom->format,
 				 &dstinfo->format) != BVERR_NONE) {
@@ -1815,7 +1812,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		 * the rectangles have been rotated, make sure they are
 		 * reset back to the original ones. */
 		if (dstinfo->adjangle != 0) {
-			dstinfo->rectdirty = true;
+			dstinfo->rectdirty = dstinfo->destrectdirty =
+					     dstinfo->cliprectdirty = true;
 
 			/* Reset destination adjust angle. */
 			dstinfo->adjangle = 0;

@@ -249,13 +249,18 @@ void __init omap_rproc_reserve_cma(int platform_type)
 #endif
 
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
+#ifdef CONFIG_OMAP4_IPU_CMA_SIZE
 	if (platform_type == RPROC_CMA_OMAP4) {
 		cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
 		cma_addr = OMAP4_RPROC_CMA_BASE_IPU;
-	} else if (platform_type == RPROC_CMA_OMAP5) {
+	}
+#endif
+#ifdef CONFIG_OMAP5_IPU_CMA_SIZE
+	if (platform_type == RPROC_CMA_OMAP5) {
 		cma_size = CONFIG_OMAP5_IPU_CMA_SIZE;
 		cma_addr = OMAP5_RPROC_CMA_BASE_IPU;
 	}
+#endif
 
 #ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
 	/* memblock_remove for OMAP4's M3 "ducati" remote processor */

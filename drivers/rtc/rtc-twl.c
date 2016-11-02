@@ -409,10 +409,15 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	struct twl_rtc_device *twl_rtc = dev_get_drvdata(dev);
 	unsigned char alarm_data[ALL_TIME_REGS + 1];
 	int ret;
+	struct timespec ts;
+	struct rtc_time tm;
 
 	ret = twl_rtc_alarm_irq_enable(dev, 0);
 	if (ret)
 		goto out;
+
+	if (!alm->enabled)
+		return ret;
 
 	alarm_data[1] = bin2bcd(alm->time.tm_sec);
 	alarm_data[2] = bin2bcd(alm->time.tm_min);
@@ -429,8 +434,21 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 		goto out;
 	}
 
-	if (alm->enabled)
-		ret = twl_rtc_alarm_irq_enable(dev, 1);
+	getnstimeofday(&ts);
+	rtc_time_to_tm(ts.tv_sec, &tm);
+	pr_info("RTC: Alarm set to %d-%02d-%02d %02d:%02d:%02d. "
+		"(Now is: %d-%02d-%02d %02d:%02d:%02d UTC)\n",
+		alm->time.tm_year + 1900,
+		alm->time.tm_mon + 1,
+		alm->time.tm_mday,
+		alm->time.tm_hour,
+		alm->time.tm_min,
+		alm->time.tm_sec,
+		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	ret = twl_rtc_alarm_irq_enable(dev, 1);
+
 out:
 	return ret;
 }
@@ -566,9 +584,6 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto out3;
 
-	/* Set device as wakeup capable */
-	device_init_wakeup(&pdev->dev, 1);
-
 	rtc = rtc_device_register(pdev->name,
 				  &pdev->dev, &twl_rtc_ops, THIS_MODULE);
 	if (IS_ERR(rtc)) {
@@ -588,6 +603,8 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 		goto out4;
 	}
 
+	/* Set device as wakeup capable */
+	device_init_wakeup(&pdev->dev, 1);
 	return 0;
 
 out4:

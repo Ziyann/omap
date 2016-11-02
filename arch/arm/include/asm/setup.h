@@ -18,6 +18,25 @@
 
 #define COMMAND_LINE_SIZE 1024
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+#define SERIAL16_SIZE	16
+#define REVISION16_SIZE	16
+#define MAC_ADDR_SIZE	16
+#define MAC_SEC_SIZE	32
+#define BOOTMODE_SIZE	16
+#define PRODUCTID_SIZE	32
+
+extern unsigned char system_rev16[REVISION16_SIZE+1];
+extern unsigned char system_serial16[SERIAL16_SIZE+1];
+extern unsigned char system_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_mac_sec[MAC_SEC_SIZE+1];
+extern unsigned char system_bootmode[BOOTMODE_SIZE+1];
+extern unsigned char system_postmode[BOOTMODE_SIZE+1];
+extern unsigned char system_bt_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_productid[PRODUCTID_SIZE+1];
+
+#endif //CONFIG_MACH_OMAP4_BOWSER
+
 /* The list ends with an ATAG_NONE node. */
 #define ATAG_NONE	0x00000000
 
@@ -126,6 +145,43 @@ struct tag_cmdline {
 	char	cmdline[1];	/* this is the minimum size */
 };
 
+#if defined (CONFIG_MACH_OMAP4_BOWSER)
+/* 16 byte id for serial number. "64-bits wasn't enough for us." */
+#define ATAG_SERIAL16	0x5441000a
+
+/* 16 byte id for a board revision. */
+#define ATAG_REVISION16	0x5441000b
+
+/* 16 digit alphanumeric id used for serial numbers, board ids, etc. */
+struct tag_id16 {
+	u8 data[16];
+};
+
+/* mac address / secret */
+#define ATAG_MACADDR	0x5441000c
+
+struct tag_macaddr {
+	u8 secret[32];
+	u8 wifi_addr[16];
+	u8 bt_addr[16];
+};
+
+/* bootmode/postmode variables */
+#define ATAG_BOOTMODE	0x5441000d
+
+struct tag_bootmode {
+   u8 boot[16];
+   u8 post[16];
+};
+
+/* product id variables */
+#define ATAG_PRODUCTID	0x5441000f
+struct tag_productid {
+   u8 pid[32];
+};
+
+#endif // (CONFIG_MACH_OMAP4_BOWSER)
+
 /* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
 
@@ -153,6 +209,12 @@ struct tag {
 		struct tag_initrd	initrd;
 		struct tag_serialnr	serialnr;
 		struct tag_revision	revision;
+#if defined (CONFIG_MACH_OMAP4_BOWSER)
+		struct tag_id16    	id16;
+		struct tag_macaddr	macaddr;
+		struct tag_bootmode	bootmode;
+		struct tag_productid	productid;
+#endif //CONFIG_MACH_OMAP4_BOWSER
 		struct tag_videolfb	videolfb;
 		struct tag_cmdline	cmdline;
 

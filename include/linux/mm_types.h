@@ -22,6 +22,13 @@
 
 struct address_space;
 
+struct allocation_detail {
+	void *call_site;
+	uint16_t allocation_pid;
+	uint16_t last_mapper_pid;
+};
+
+
 #define USE_SPLIT_PTLOCKS	(NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS)
 
 /*
@@ -159,6 +166,7 @@ struct page {
 	 */
 	void *shadow;
 #endif
+	struct allocation_detail detail;
 }
 /*
  * The struct page can be forced to be double word aligned so that atomic ops

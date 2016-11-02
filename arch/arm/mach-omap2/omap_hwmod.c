@@ -1574,7 +1574,6 @@ static int _ocp_softreset(struct omap_hwmod *oh)
 	ret = _clear_softreset(oh, &v);
 	if (ret)
 		goto dis_opt_clks;
-
 	_write_sysconfig(v, oh);
 
 	/*

@@ -304,6 +304,8 @@ struct omap_dss_dsi_videomode_data {
 	u16 vsa;
 	u16 vfp;
 	u16 vbp;
+	u16 ddr_clk_pre;
+	u16 ddr_clk_post;
 
 	/* DSI blanking modes */
 	int blanking_mode;
@@ -354,6 +356,15 @@ int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel);
 void dsi_disable_video_output(struct omap_dss_device *dssdev, int channel);
+void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
+int dsi_vc_gen_write_nosync_sclk(struct omap_dss_device *dssdev, int channel,
+                u8 *data, int len);
+int dsi_vc_gen_write_nosync(struct omap_dss_device *dssdev, int channel,
+		u8 *data, int len);
+
+int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type);
+void dsi_video_mode_disable(struct omap_dss_device *dssdev);
+
 
 /* Board specific data */
 struct omap_dss_board_info {
@@ -389,6 +400,18 @@ struct omap_video_timings {
 	u16 vfp;	/* Vertical front porch */
 	/* Unit: line clocks */
 	u16 vbp;	/* Vertical back porch */
+};
+
+struct omap_cio_timings {
+	u32 ths_prepare;
+	u32 ths_prepare_ths_zero;
+	u32 ths_trail;
+	u32 ths_exit;
+	u32 tlpx_half;
+	u32 tclk_trail;
+	u32 tclk_zero;
+	u32 tclk_prepare;
+	u32 reg_ttaget;
 };
 
 #ifdef CONFIG_OMAP2_DSS_VENC
@@ -744,6 +767,7 @@ struct omap_dss_device {
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;
+		struct omap_cio_timings dsi_cio_data;
 		u32 width_in_um;
 		u32 height_in_um;
 		u16 fb_xres;
@@ -756,6 +780,9 @@ struct omap_dss_device {
 	} ctrl;
 
 	int reset_gpio;
+	int hpd_gpio;
+
+	bool skip_init;
 
 	int max_backlight_level;
 
@@ -905,6 +932,7 @@ int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout);
 int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 		unsigned long timeout);
+int dss_set_dispc_clk(unsigned long freq);
 
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
@@ -951,6 +979,9 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 
 int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
 					 struct omapdss_ovl_cb *cb);
+bool omap_dss_overlay_ensure_bw(void);
+void dss_tput_request(u32 tput);
+
 
 /* generic callback handling */
 static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)

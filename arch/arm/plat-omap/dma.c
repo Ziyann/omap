@@ -35,6 +35,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/syscore_ops.h>
 
 #include <mach/hardware.h>
 #include <plat/dma.h>
@@ -2158,7 +2159,7 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int omap_dma_suspend(struct device *dev)
+static int omap_dma_suspend(void)
 {
 	if (p->dma_context_save)
 		p->dma_context_save();
@@ -2166,7 +2167,7 @@ static int omap_dma_suspend(struct device *dev)
 	return 0;
 }
 
-static int omap_dma_resume(struct device *dev)
+static void omap_dma_resume(void)
 {
 	/*
 	 * This may not restore sysconfig register if multiple DMA channels
@@ -2176,12 +2177,9 @@ static int omap_dma_resume(struct device *dev)
 	 */
 	if (p->dma_context_restore)
 		p->dma_context_restore();
-
-	return 0;
-
 }
 
-static const struct dev_pm_ops dma_pm_ops = {
+static struct syscore_ops omap_system_dma_sys_ops = {
 	.suspend	 = omap_dma_suspend,
 	.resume		 = omap_dma_resume,
 };
@@ -2191,18 +2189,21 @@ static struct platform_driver omap_system_dma_driver = {
 	.remove		= __devexit_p(omap_system_dma_remove),
 	.driver		= {
 		.name	= "omap_dma_system",
-		.pm     = &dma_pm_ops,
 	},
 };
 
 static int __init omap_system_dma_init(void)
 {
+	register_syscore_ops(&omap_system_dma_sys_ops);
+
 	return platform_driver_register(&omap_system_dma_driver);
 }
 arch_initcall(omap_system_dma_init);
 
 static void __exit omap_system_dma_exit(void)
 {
+	unregister_syscore_ops(&omap_system_dma_sys_ops);
+
 	platform_driver_unregister(&omap_system_dma_driver);
 }
 

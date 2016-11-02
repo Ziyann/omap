@@ -1438,6 +1438,18 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 	 *  - IT_CONFIG
 	 */
 
+	/* After monitoring with an oscilloscope it was observed that PMIC
+	 * signal LDO_LN is enabled after boot. After double checking in
+	 * PMIC register LDOLN_CFG_STATE (0x95) it was confirmed because value
+	 * is 0x01 (Switch ON). By dataseet reset value of this register
+	 * should be 0x00 (Switch OFF). To solve this problem we make this
+	 * warkaround, whose main task is to restore the expected
+	 * state (as dataseet) without changing referance counter.
+	 */
+	if (rdev->desc->name && !strcmp(rdev->desc->name, "LDOLN") &&
+	    !(twl_errata & TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON))
+		twl6030reg_disable(rdev);
+
 	return 0;
 }
 

@@ -352,6 +352,8 @@ static inline void __omap_dm_timer_reset(struct omap_dm_timer *timer,
 	if (wakeup)
 		l |= 1 << 2;
 
+	l |= 1 << 5;
+
 	__raw_writel(l, timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
 }
 

@@ -30,6 +30,84 @@
 
 #include "omap_l3_noc.h"
 
+static void dump_CPU1_stack(void *dummy)
+{
+	dump_stack();
+}
+
+static void l3_noc_show_status(int module_idx, void __iomem *base, u32 src_idx)
+{
+	char *target_name, *master_name = "UN IDENTIFIED";
+	void __iomem *tbase;	/* L3 TARG Base */
+	u32 k, std_err_main, masterid, clear, slave_offset;
+	int saved_oip = oops_in_progress;
+
+	/*
+	* As interrupts are handled on CPU0, and L3 error might come from
+	* CPU1, dump CPU1 stack too. Setting the oops_in_progress will
+	* eliminate a deadlock warning from smp_call_function_single,
+	* which cannot happen in our case.
+	*/
+	oops_in_progress = 1;
+	smp_call_function_single(1, &dump_CPU1_stack, NULL, 0);
+	oops_in_progress = saved_oip;
+
+	tbase = base + *(l3_targ[module_idx] + src_idx);
+	std_err_main =  __raw_readl(tbase + L3_TARG_STDERRLOG_MAIN);
+	slave_offset = __raw_readl(tbase + L3_TARG_STDERRLOG_SLVOFSLSB);
+	target_name = l3_targ_inst_name[module_idx][src_idx];
+	if (std_err_main & CUSTOM_ERROR)
+		masterid = __raw_readl(tbase + L3_TARG_STDERRLOG_CI_MSTADDR);
+	else
+		masterid = __raw_readl(tbase + L3_TARG_STDERRLOG_MSTADDR);
+
+	for (k = 0; k < NUM_OF_L3_MASTERS; k++) {
+		if (masterid == l3_masters[k].id)
+			master_name = l3_masters[k].name;
+	}
+
+	WARN(true, "L3 %s error: MASTER:%s TARGET:%s at offset 0x%08x\n"
+		"\tL3_TARG_STDHOSTHDR_COREREG\t\t%08X\n"
+		"\tL3_TARG_STDHOSTHDR_VERSIONREG\t\t%08X\n"
+		"\tL3_TARG_STDHOSTHDR_MAINCTLREG\t\t%08X\n"
+		"\tL3_TARG_STDHOSTHDR_NTTPADDR_0\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_SVRTSTDLVL\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_SVRTCUSTOMLVL\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_MAIN\t\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_HDR\t\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_MSTADDR\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_SLVADDR\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_INFO\t\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_SLVOFSLSB\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_SLVOFSMSB\t\t%08X\n"
+		"\tL3_TARG_STDERRLOG_CUSTOMINFO_INFO\t%08X\n"
+		"\tL3_TARG_STDERRLOG_CUSTOMINFO_MSTADDR\t%08X\n"
+		"\tL3_TARG_STDERRLOG_CUSTOMINFO_OPCODE\t%08X\n"
+		"\tL3_TARG_ADDRSPACESIZELOG\t\t%08X\n",
+		(std_err_main & CUSTOM_ERROR) ? "Custom" : "Standard",
+		master_name, target_name, slave_offset,
+		__raw_readl(tbase + L3_TARG_STDHOSTHDR_COREREG),
+		__raw_readl(tbase + L3_TARG_STDHOSTHDR_VERSIONREG),
+		__raw_readl(tbase + L3_TARG_STDHOSTHDR_MAINCTLREG),
+		__raw_readl(tbase + L3_TARG_STDHOSTHDR_NTTPADDR_0),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_SVRTSTDLVL),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_SVRTCUSTOMLVL),
+		std_err_main,
+		__raw_readl(tbase + L3_TARG_STDERRLOG_HDR),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_MSTADDR),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_SLVADDR),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_INFO),
+		slave_offset,
+		__raw_readl(tbase + L3_TARG_STDERRLOG_SLVOFSMSB),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_CI_INFO),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_CI_MSTADDR),
+		__raw_readl(tbase + L3_TARG_STDERRLOG_CI_OPCODE),
+		__raw_readl(tbase + L3_TARG_ADDRSPACESIZELOG));
+
+	/* clear the std error log */
+	clear = std_err_main | CLEAR_STDERR_LOG;
+	writel(clear, tbase + L3_TARG_STDERRLOG_MAIN);
+}
 /*
  * Interrupt Handler for L3 error detection.
  *	1) Identify the L3 clockdomain partition to which the error belongs to.
@@ -57,11 +135,9 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 {
 
 	struct omap4_l3 *l3 = _l3;
-	int inttype, i, k;
-	int err_src = 0;
-	u32 std_err_main, err_reg, clear, masterid;
-	void __iomem *base, *l3_targ_base;
-	char *target_name, *master_name = "UN IDENTIFIED";
+	void __iomem *base;
+	int inttype, i;
+	u32 err_reg;
 
 	/* Get the Type of interrupt */
 	inttype = irq == l3->app_irq ? L3_APPLICATION_ERROR : L3_DEBUG_ERROR;
@@ -76,54 +152,13 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 					+ L3_FLAGMUX_REGERR0 + (inttype << 3));
 
 		/* Get the corresponding error and analyse */
-		if (err_reg) {
-			/* Identify the source from control status register */
-			err_src = __ffs(err_reg);
+		if (!err_reg)
+			continue;
 
-			/* Read the stderrlog_main_source from clk domain */
-			l3_targ_base = base + *(l3_targ[i] + err_src);
-			std_err_main =  __raw_readl(l3_targ_base +
-					L3_TARG_STDERRLOG_MAIN);
-			masterid = __raw_readl(l3_targ_base +
-					L3_TARG_STDERRLOG_MSTADDR);
+		l3_noc_show_status(i, base, __ffs(err_reg));
 
-			switch (std_err_main & CUSTOM_ERROR) {
-			case STANDARD_ERROR:
-				target_name =
-					l3_targ_inst_name[i][err_src];
-				WARN(true, "L3 standard error: TARGET:%s at address 0x%x\n",
-					target_name,
-					__raw_readl(l3_targ_base +
-						L3_TARG_STDERRLOG_SLVOFSLSB));
-				/* clear the std error log*/
-				clear = std_err_main | CLEAR_STDERR_LOG;
-				writel(clear, l3_targ_base +
-					L3_TARG_STDERRLOG_MAIN);
-				break;
-
-			case CUSTOM_ERROR:
-				target_name =
-					l3_targ_inst_name[i][err_src];
-				for (k = 0; k < NUM_OF_L3_MASTERS; k++) {
-					if (masterid == l3_masters[k].id)
-						master_name =
-							l3_masters[k].name;
-				}
-				WARN(true, "L3 custom error: MASTER:%s TARGET:%s\n",
-					master_name, target_name);
-				/* clear the std error log*/
-				clear = std_err_main | CLEAR_STDERR_LOG;
-				writel(clear, l3_targ_base +
-					L3_TARG_STDERRLOG_MAIN);
-				break;
-
-			default:
-				/* Nothing to be handled here as of now */
-				break;
-			}
 		/* Error found so break the for loop */
 		break;
-		}
 	}
 	return IRQ_HANDLED;
 }

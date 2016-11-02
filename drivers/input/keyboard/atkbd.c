@@ -1066,8 +1066,10 @@ static void atkbd_set_device_attrs(struct atkbd *atkbd)
 			BIT_MASK(LED_MUTE) | BIT_MASK(LED_MISC);
 
 	if (!atkbd->softrepeat) {
-		input_dev->rep[REP_DELAY] = 250;
-		input_dev->rep[REP_PERIOD] = 33;
+                /* ACOS_MOD_BEGIN */
+		input_dev->rep[REP_DELAY] = 750;
+		input_dev->rep[REP_PERIOD] = 99;
+                /* ACOS_MOD_END */
 	}
 
 	input_dev->mscbit[0] = atkbd->softraw ? BIT_MASK(MSC_SCAN) :

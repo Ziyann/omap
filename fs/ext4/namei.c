@@ -1043,8 +1043,8 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, stru
 		inode = ext4_iget(dir->i_sb, ino);
 		if (inode == ERR_PTR(-ESTALE)) {
 			EXT4_ERROR_INODE(dir,
-					 "deleted inode referenced: %u",
-					 ino);
+					 "deleted inode referenced: %u %s",
+					 ino, dentry->d_name.name);
 			return ERR_PTR(-EIO);
 		}
 	}

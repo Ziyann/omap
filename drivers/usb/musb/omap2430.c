@@ -30,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/io.h>
+#include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
@@ -47,9 +48,13 @@ struct omap2430_glue {
 	struct device		*dev;
 	struct platform_device	*musb;
 	struct work_struct	omap_musb_mailbox_work;
+	struct workqueue_struct *work_queue;
 	struct device		*control_dev;
+	struct clk              *phy_clk;
 	enum omap_musb_vbus_id_status status;
-	struct wake_lock	omap_musb_wakelock;
+	u8		core_power_state:1;
+	struct mutex	core_power_mutex;
+	struct mutex	core_access_mutex;
 };
 #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 
@@ -233,10 +238,36 @@ static inline void omap2430_low_level_init(struct musb *musb)
 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
 }
 
+static void omap2430_otg_interface(struct musb *musb, int enable)
+{
+	u32 val;
+
+	val = musb_readl(musb->mregs, OTG_INTERFSEL);
+
+	if (enable) {
+		val &= ~ULPI_12PIN;	/* Disable ULPI */
+		val |= UTMI_8BIT;	/* Enable UTMI  */
+	} else {
+		val |= ULPI_12PIN;	/* Enable ULPI */
+		val &= ~UTMI_8BIT;	/* Disable UTMI  */
+	}
+
+	musb_writel(musb->mregs, OTG_INTERFSEL, val);
+}
+
 int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 {
 	struct omap2430_glue	*glue = _glue;
 	struct musb		*musb = glue_to_musb(glue);
+
+	/* After quickly calling this function is possibility to miss one event.
+	 * Because variable 'glue-> status' will be overwritten with the last
+	 * value. And work function will use exactly last value. This will affect
+	 * the balance of calls pm_runtime_get/_put. To avoid this a check for
+	 * pending and waiting to be completed previous event to the end.
+	 */
+	if (work_pending(&glue->omap_musb_mailbox_work))
+		flush_work(&glue->omap_musb_mailbox_work);
 
 	glue->status = status;
 	if (!musb) {
@@ -244,10 +275,7 @@ int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 		return -ENODEV;
 	}
 
-	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID)
-		wake_lock(&glue->omap_musb_wakelock);
-
-	schedule_work(&glue->omap_musb_mailbox_work);
+	queue_work(glue->work_queue, &glue->omap_musb_mailbox_work);
 
 	return 0;
 }
@@ -260,44 +288,104 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 	struct omap_musb_board_data *data = pdata->board_data;
 	struct usb_otg *otg = musb->xceiv->otg;
 	u32 val;
+	int status;
 
+	dev_dbg(dev, "PB %d::%s\n", __LINE__, __func__);
+	/* Since the fact that omap_musb_mailbox() might drop event we should
+	 * take care about duplicate events, which might lead to pm unbalance:
+	 * Double resume will break the pm usecount.
+	 * Double suspend enters the core in state which from it can't quit and
+	 * resume normal operation. */
+	mutex_lock(&glue->core_access_mutex);
 	switch (glue->status) {
 	case OMAP_MUSB_ID_GROUND:
 		dev_dbg(dev, "ID GND\n");
+
+		/* Protection of invalid sequence of mailbox settings */
+		if (musb->xceiv->last_event != USB_EVENT_NONE)
+			break;
 
 		otg->default_a = true;
 		musb->xceiv->state = OTG_STATE_A_IDLE;
 		musb->xceiv->last_event = USB_EVENT_ID;
 		if (!is_otg_enabled(musb) || musb->gadget_driver) {
+			dev_dbg(dev, "PB %d::%s\n", __LINE__, __func__);
 			pm_runtime_get_sync(dev);
 			if (glue->control_dev) {
 				val = AVALID | VBUSVALID;
 				omap4_usb_phy_mailbox(glue->control_dev, val);
 			}
 			omap2430_musb_set_vbus(musb, 1);
+			omap2430_otg_interface(musb, true);
 		}
 		break;
 
 	case OMAP_MUSB_VBUS_VALID:
 		dev_dbg(dev, "VBUS Connect\n");
 
+		/* Protection of invalid sequence of mailbox settings */
+		if ((musb->xceiv->last_event != USB_EVENT_NONE) ||
+			(glue->core_power_state))
+			break;
+
 		otg->default_a = false;
 		musb->xceiv->state = OTG_STATE_B_IDLE;
 		musb->xceiv->last_event = USB_EVENT_VBUS;
+		if (musb->gadget_driver) {
+			int err_ret = 0;
+			dev_dbg(dev, "PB %d::%s\n", __LINE__, __func__);
+			do {
+				dev_info(dev, "pm_runtime_resume from runtime_status: %d\n",
+					dev->power.runtime_status);
+				status = pm_runtime_get_sync(dev);
+				if (status < 0) {
+					dev_err(dev, "pm_runtime_get_sync FAILED %d\n",
+						status);
+					pm_runtime_put_noidle(dev);
+					if (++err_ret < 500) {
+						dev_dbg(dev, "will try again (%d/500)in 100ms...\n",
+							err_ret);
+						msleep(100);
+					} else {
+						dev_err(dev, "pm_runtime_get_sync FAILED: Quit.\n");
+						dev_dbg(dev, "dev->power.usage_count = %d\n",
+							dev->power.usage_count);
+						mutex_unlock(&glue->core_access_mutex);
+						return;
+					}
+				} else {
+					dev_info(dev, "pm_runtime_get_sync returned %d\n",
+						status);
+					dev_dbg(dev, "dev->power.usage_count = %d\n",
+						dev->power.usage_count);
+				}
+			} while (status < 0);
+		}
+
 		if (musb->gadget_driver)
-			pm_runtime_get_sync(dev);
+			omap2430_otg_interface(musb, true);
 
 		if (glue->control_dev) {
 			val = IDDIG | AVALID | VBUSVALID;
 			omap4_usb_phy_mailbox(glue->control_dev, val);
 		}
+
+		glue->core_power_state = 1;
 		break;
 
 	case OMAP_MUSB_ID_FLOAT:
 	case OMAP_MUSB_VBUS_OFF:
 		dev_dbg(dev, "VBUS Disconnect\n");
 
+		/* Protection of invalid sequence of mailbox settings */
+		if ((musb->xceiv->last_event == USB_EVENT_NONE) ||
+			(!glue->core_power_state))
+			break;
+
 		musb->xceiv->last_event = USB_EVENT_NONE;
+
+		if (musb->gadget_driver)
+			omap2430_otg_interface(musb, false);
 
 		if (is_otg_enabled(musb) || is_peripheral_enabled(musb))
 			if (musb->gadget_driver) {
@@ -316,12 +404,12 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 			omap4_usb_phy_mailbox(glue->control_dev, val);
 		}
 
-		wake_unlock(&glue->omap_musb_wakelock);
-
+		glue->core_power_state = 0;
 		break;
 	default:
 		dev_dbg(dev, "ID float\n");
 	}
+	mutex_unlock(&glue->core_access_mutex);
 }
 
 
@@ -334,12 +422,9 @@ static void omap_musb_mailbox_work(struct work_struct *mailbox_work)
 
 static int omap2430_musb_init(struct musb *musb)
 {
-	u32 l;
 	int status = 0;
 	struct device *dev = musb->controller;
 	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
-	struct musb_hdrc_platform_data *plat = dev->platform_data;
-	struct omap_musb_board_data *data = plat->board_data;
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
@@ -357,17 +442,8 @@ static int omap2430_musb_init(struct musb *musb)
 		goto err1;
 	}
 
-	l = musb_readl(musb->mregs, OTG_INTERFSEL);
-
-	if (data->interface_type == MUSB_INTERFACE_UTMI) {
-		/* OMAP4 uses Internal PHY GS70 which uses UTMI interface */
-		l &= ~ULPI_12PIN;       /* Disable ULPI */
-		l |= UTMI_8BIT;         /* Enable UTMI  */
-	} else {
-		l |= ULPI_12PIN;
-	}
-
-	musb_writel(musb->mregs, OTG_INTERFSEL, l);
+	/* Initial state of interface is ULPI state. Expected from TWL6030 */
+	omap2430_otg_interface(musb, false);
 
 	pr_debug("HS USB OTG: revision 0x%x, sysconfig 0x%02x, "
 			"sysstatus 0x%x, intrfsel 0x%x, simenable  0x%x\n",
@@ -381,13 +457,8 @@ static int omap2430_musb_init(struct musb *musb)
 
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
-	if (glue->status != OMAP_MUSB_UNKNOWN) {
-		if (glue->status == OMAP_MUSB_ID_GROUND ||
-				glue->status == OMAP_MUSB_VBUS_VALID)
-			wake_lock(&glue->omap_musb_wakelock);
-
+	if (glue->status != OMAP_MUSB_UNKNOWN)
 		omap_musb_set_mailbox(glue);
-	}
 
 	pm_runtime_put_sync(musb->controller);
 	return 0;
@@ -485,6 +556,7 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
 	struct platform_device		*musb;
 	struct omap2430_glue		*glue;
+	struct clk                      *phy_clk;
 	int				ret = -ENOMEM;
 
 	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
@@ -516,21 +588,48 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	 * REVISIT if we ever have two instances of the wrapper, we will be
 	 * in big trouble
 	 */
+
+	phy_clk = clk_get(&pdev->dev, "fck");
+
+	if (IS_ERR(phy_clk)) {
+                dev_err(&pdev->dev, "failed to get PHY clock\n");
+                ret = PTR_ERR(phy_clk);
+                goto err2;
+        }
+
+	ret = clk_enable(phy_clk);
+        if (ret) {
+                dev_err(&pdev->dev, "failed to enable PHY clock\n");
+                goto err3;
+        }
+
+	glue->phy_clk	= phy_clk;
+
 	_glue	= glue;
 
+
+	mutex_init(&glue->core_power_mutex);
+	mutex_init(&glue->core_access_mutex);
+
+	glue->work_queue = create_singlethread_workqueue("omap2430_wq");
+	if (!glue->work_queue) {
+		dev_err(&pdev->dev, "failed to create a workqueue\n");
+		ret = -ENOMEM;
+		goto err4;
+	}
 	INIT_WORK(&glue->omap_musb_mailbox_work, omap_musb_mailbox_work);
 
 	ret = platform_device_add_resources(musb, pdev->resource,
 			pdev->num_resources);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add resources\n");
-		goto err2;
+		goto errq;
 	}
 
 	ret = platform_device_add_data(musb, pdata, sizeof(*pdata));
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add platform_data\n");
-		goto err2;
+		goto errq;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -538,20 +637,21 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	ret = platform_device_add(musb);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register musb device\n");
-		goto err2;
+		goto errq;
 	}
-
-	wake_lock_init(&glue->omap_musb_wakelock, WAKE_LOCK_SUSPEND,
-		       "omap_musb_wakelock");
 
 	return 0;
 
-err2:
+errq:
+	destroy_workqueue(glue->work_queue);
+err4:
 	platform_device_put(musb);
-
+err3:
+	clk_disable(phy_clk);
+err2:
+	clk_put(phy_clk);
 err1:
 	kfree(glue);
-
 err0:
 	return ret;
 }
@@ -561,6 +661,10 @@ static int __devexit omap2430_remove(struct platform_device *pdev)
 	struct omap2430_glue		*glue = platform_get_drvdata(pdev);
 
 	cancel_work_sync(&glue->omap_musb_mailbox_work);
+	destroy_workqueue(glue->work_queue);
+
+	clk_disable(glue->phy_clk);
+	clk_put(glue->phy_clk);
 
 	platform_device_del(glue->musb);
 	platform_device_put(glue->musb);
@@ -576,13 +680,13 @@ static int omap2430_runtime_suspend(struct device *dev)
 	struct omap2430_glue		*glue = dev_get_drvdata(dev);
 	struct musb			*musb = glue_to_musb(glue);
 
+	dev_dbg(dev, "PB %d::%s\n", __LINE__, __func__);
+	mutex_lock(&glue->core_power_mutex);
 	if (musb) {
-		musb->context.otg_interfsel = musb_readl(musb->mregs,
-				OTG_INTERFSEL);
-		musb_writel(musb->mregs, OTG_INTERFSEL, ULPI_12PIN);
 		omap2430_low_level_exit(musb);
 		usb_phy_set_suspend(musb->xceiv, 1);
 	}
+	mutex_unlock(&glue->core_power_mutex);
 
 	return 0;
 }
@@ -592,18 +696,42 @@ static int omap2430_runtime_resume(struct device *dev)
 	struct omap2430_glue		*glue = dev_get_drvdata(dev);
 	struct musb			*musb = glue_to_musb(glue);
 
+	dev_dbg(dev, "PB %d::%s\n", __LINE__, __func__);
+	mutex_lock(&glue->core_power_mutex);
 	if (musb) {
 		omap2430_low_level_init(musb);
-		musb_writel(musb->mregs, OTG_INTERFSEL,
-				musb->context.otg_interfsel);
-
 		usb_phy_set_suspend(musb->xceiv, 0);
+		msleep(35);
 	}
+	mutex_unlock(&glue->core_power_mutex);
 
 	return 0;
 }
 
+static int omap2430_suspend_noirq(struct device *dev)
+{
+	struct omap2430_glue            *glue = dev_get_drvdata(dev);
+
+	clk_disable(glue->phy_clk);
+	return 0;
+}
+
+static int omap2430_resume_noirq(struct device *dev)
+{
+	struct omap2430_glue            *glue = dev_get_drvdata(dev);
+	int ret;
+
+	ret = clk_enable(glue->phy_clk);
+	if (ret) {
+		dev_err(dev, "failed to enable clock\n");
+		return ret;
+	}
+	return 0;
+}
+
 static struct dev_pm_ops omap2430_pm_ops = {
+	.resume_noirq = omap2430_resume_noirq,
+	.suspend_noirq = omap2430_suspend_noirq,
 	.runtime_suspend = omap2430_runtime_suspend,
 	.runtime_resume = omap2430_runtime_resume,
 };

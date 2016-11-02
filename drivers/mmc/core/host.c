@@ -327,6 +327,11 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	mmc_host_clk_init(host);
 
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	INIT_DELAYED_WORK(&host->metrics_delay_work,
+				mmc_host_metrics_work);
+#endif
+
 	spin_lock_init(&host->lock);
 	init_waitqueue_head(&host->wq);
 	wake_lock_init(&host->detect_wake_lock, WAKE_LOCK_SUSPEND,

@@ -69,7 +69,7 @@
 #ifdef WLMEDIA_HTSF
 extern void htsf_update(struct dhd_info *dhd, void *data);
 #endif
-int dhd_msg_level = DHD_ERROR_VAL;
+int dhd_msg_level = DHD_ERROR_VAL | DHD_EVENT_VAL;
 
 
 #include <wl_iw.h>
@@ -832,6 +832,7 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 			DHD_EVENT(("MACEVENT: %s, unexpected status %d\n",
 				event_name, (int)status));
 		}
+		DHD_EVENT(("Status:%d Reason: %d\n", status, reason));
 		break;
 
 	case WLC_E_BEACON_RX:
@@ -873,6 +874,10 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 	case WLC_E_PMKID_CACHE:
 		DHD_EVENT(("MACEVENT: %s\n", event_name));
 		break;
+
+	case WLC_E_ESCAN_RESULT:
+		DHD_TRACE(("MACEVENT: %s\n", event_name));
+		return;
 
 	case WLC_E_PFN_NET_FOUND:
 	case WLC_E_PFN_NET_LOST:

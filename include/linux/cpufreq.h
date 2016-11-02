@@ -176,6 +176,10 @@ struct cpufreq_governor {
 					 char *buf);
 	int	(*store_setspeed)	(struct cpufreq_policy *policy,
 					 unsigned int freq);
+#ifdef CONFIG_CPU_FREQ_USE_BOOST_HINT
+	void	(*store_video_hint)	(unsigned int hint);
+	void	(*store_panel_hint)	(unsigned int hint);
+#endif
 	unsigned int max_transition_latency; /* HW must be able to switch to
 			next freq faster than this value in nano secs or we
 			will fallback to performance governor */
@@ -311,6 +315,13 @@ __ATTR(_name, 0644, show_##_name, store_##_name)
  *********************************************************************/
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_update_policy(unsigned int cpu);
+#ifdef CONFIG_CPU_FREQ_USE_BOOST_HINT
+void send_panel_hint(int hint);
+void send_video_hint(int hint);
+#else
+static inline void send_panel_hint(int hint) {}
+static inline void send_video_hint(int hint) {}
+#endif
 
 #ifdef CONFIG_CPU_FREQ
 /* query the current CPU frequency (in kHz). If zero, cpufreq couldn't detect it */
@@ -407,6 +418,8 @@ void cpufreq_frequency_table_get_attr(struct cpufreq_frequency_table *table,
 				      unsigned int cpu);
 
 void cpufreq_frequency_table_put_attr(unsigned int cpu);
+
+void cpufreq_interactive_boostpulse(unsigned long boostpulse_duration_us);
 
 
 #endif /* _LINUX_CPUFREQ_H */

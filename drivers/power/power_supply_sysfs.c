@@ -156,6 +156,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_full),
 	POWER_SUPPLY_ATTR(charge_empty),
 	POWER_SUPPLY_ATTR(charge_now),
+	POWER_SUPPLY_ATTR(charge_now_design),
 	POWER_SUPPLY_ATTR(charge_avg),
 	POWER_SUPPLY_ATTR(charge_counter),
 	POWER_SUPPLY_ATTR(energy_full_design),
@@ -174,6 +175,11 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(time_to_full_avg),
 	POWER_SUPPLY_ATTR(type),
 	POWER_SUPPLY_ATTR(scope),
+	/* ACOS_MOD_BEGIN {metrics_log} */
+	POWER_SUPPLY_ATTR(suspend_drain),
+	POWER_SUPPLY_ATTR(suspend_drain_high),
+	POWER_SUPPLY_ATTR(suspend_realtime),
+	/* ACOS_MOD_END {metrics_log} */
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),

@@ -193,6 +193,18 @@ out:
 	return NULL;
 }
 
+static void
+on_error_emfile(struct task_struct *tsk, int nr)
+{
+	if (!tsk)
+		printk(KERN_INFO
+			"system-wide open file limit violation: n=%d\n", nr);
+	else
+		printk(KERN_INFO
+			"task-level open file limit violation: tsk=%p; n=%d\n",
+			tsk, nr);
+}
+
 /*
  * Expand the file descriptor table.
  * This function will allocate a new fdtable and both fd array and fdset, of
@@ -217,6 +229,9 @@ static int expand_fdtable(struct files_struct *files, int nr)
 	 */
 	if (unlikely(new_fdt->max_fds <= nr)) {
 		__free_fdtable(new_fdt);
+		spin_unlock(&files->file_lock);
+		on_error_emfile(NULL, nr);
+		spin_lock(&files->file_lock);
 		return -EMFILE;
 	}
 	/*
@@ -255,16 +270,20 @@ int expand_files(struct files_struct *files, int nr)
 	 * N.B. For clone tasks sharing a files structure, this test
 	 * will limit the total number of files that can be opened.
 	 */
-	if (nr >= rlimit(RLIMIT_NOFILE))
+	if (nr >= rlimit(RLIMIT_NOFILE)) {
+		on_error_emfile(current, nr);
 		return -EMFILE;
+	}
 
 	/* Do we need to expand? */
 	if (nr < fdt->max_fds)
 		return 0;
 
 	/* Can we expand? */
-	if (nr >= sysctl_nr_open)
+	if (nr >= sysctl_nr_open) {
+		on_error_emfile(NULL, nr);
 		return -EMFILE;
+	}
 
 	/* All good, so we try */
 	return expand_fdtable(files, nr);
@@ -334,6 +353,7 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 		/* beyond sysctl_nr_open; nothing to do */
 		if (unlikely(new_fdt->max_fds < open_files)) {
 			__free_fdtable(new_fdt);
+			on_error_emfile(NULL, open_files);
 			*errorp = -EMFILE;
 			goto out_release;
 		}

@@ -132,8 +132,8 @@ static inline void omap5_secure_workspace_addr_default(void)
  * For platforms that do not meet this need or use modified PPA
  * different from TI defaults, override from board file
  */
-#define OMAP4_SECURE_WORKSPACE_BASE	0xBFD00000
 #define OMAP4_SECURE_WORKSPACE_SIZE	(3 * SZ_1M)
+#define OMAP4_SECURE_WORKSPACE_BASE	(0x80000000 + SZ_1G - OMAP4_SECURE_WORKSPACE_SIZE)
 
 /**
  * omap4_secure_workspace_addr_default() - set default OMAP4 SMC address and size

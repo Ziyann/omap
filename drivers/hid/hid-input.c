@@ -650,7 +650,9 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 
 		case 0x51: /* ContactID */
+#if 0 /* hid-multitouch driver is not used in Soho kernel */
 			device->quirks |= HID_QUIRK_MULTITOUCH;
+#endif 
 			goto unknown;
 
 		default:  goto unknown;

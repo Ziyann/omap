@@ -35,6 +35,7 @@
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
 #include "internal.h"
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
 
 /*
  * FIXME: remove all knowledge of the buffer layer from the core VM
@@ -1275,6 +1276,14 @@ no_cached_page:
 			desc->error = -ENOMEM;
 			goto out;
 		}
+#ifdef CONFIG_TRAPZ_PVA
+		{
+			struct allocation_detail detail = page->detail;
+			detail.call_site
+			  = (void *)(((char *)mapping->a_ops->readpage) + 4);
+			page->detail = detail;
+		}
+#endif
 		error = add_to_page_cache_lru(page, mapping,
 						index, GFP_KERNEL);
 		if (error) {
@@ -1392,11 +1401,26 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	unsigned long seg = 0;
 	size_t count;
 	loff_t *ppos = &iocb->ki_pos;
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+	int iovlen;
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_END */
 
 	count = 0;
 	retval = generic_segment_checks(iov, &nr_segs, &count, VERIFY_WRITE);
 	if (retval)
 		return retval;
+
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+	iovlen = iov_length(iov, nr_segs);
+	TRAPZ_DESCRIBE(TRAPZ_KERN_FS_FIO, FIORead, "Generic File I/O Read");
+	TRAPZ_LOG_PRINTF(TRAPZ_LOG_INFO, 0, TRAPZ_KERN_FS_FIO, FIORead,
+		"Length=%d Begin-End=%d Dev=%d Inode=%d", iovlen, 1,
+		filp->f_dentry->d_inode->i_rdev, filp->f_dentry->d_inode->i_ino);
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_END */
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (filp->f_flags & O_DIRECT) {
@@ -1474,6 +1498,9 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			break;
 	}
 out:
+/* ACOS_MOD_BEGIN */
+	TRAPZ_LOG(TRAPZ_LOG_INFO, 0, TRAPZ_KERN_FS_FIO, FIORead, 0, 0, 0, 0);
+/* ACOS_MOD_END */
 	return retval;
 }
 EXPORT_SYMBOL(generic_file_aio_read);
@@ -1535,6 +1562,14 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 		page = page_cache_alloc_cold(mapping);
 		if (!page)
 			return -ENOMEM;
+#ifdef CONFIG_TRAPZ_PVA
+		{
+			struct allocation_detail detail = page->detail;
+			detail.call_site
+			  = (void *)(((char *)mapping->a_ops->readpage) + 8);
+			page->detail = detail;
+		}
+#endif
 
 		ret = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
 		if (ret == 0)
@@ -1806,6 +1841,13 @@ repeat:
 		page = __page_cache_alloc(gfp | __GFP_COLD);
 		if (!page)
 			return ERR_PTR(-ENOMEM);
+#ifdef CONFIG_TRAPZ_PVA
+		{
+			struct allocation_detail detail = page->detail;
+			detail.call_site = (void *)(((char *)filler) + 12);
+			page->detail = detail;
+		}
+#endif
 		err = add_to_page_cache_lru(page, mapping, index, gfp);
 		if (unlikely(err)) {
 			page_cache_release(page);
@@ -2606,10 +2648,26 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct inode *inode = file->f_mapping->host;
 	struct blk_plug plug;
 	ssize_t ret;
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+	int iovlen;
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_END */
 
 	BUG_ON(iocb->ki_pos != pos);
 
 	mutex_lock(&inode->i_mutex);
+
+/* ACOS_MOD_BEGIN */
+#ifdef CONFIG_TRAPZ_TP
+	iovlen = iov_length(iov, nr_segs);
+	TRAPZ_DESCRIBE(TRAPZ_KERN_FS_FIO, FIOWrite, "Generic File I/O Write");
+	TRAPZ_LOG_PRINTF(TRAPZ_LOG_INFO, 0, TRAPZ_KERN_FS_FIO, FIOWrite,
+		"Length=%d Begin-End=%d Dev=%d Inode=%d", iovlen, 1,
+		file->f_dentry->d_inode->i_rdev, file->f_dentry->d_inode->i_ino);
+#endif /* CONFIG_TRAPZ_TP */
+/* ACOS_MOD_END */
+
 	blk_start_plug(&plug);
 	ret = __generic_file_aio_write(iocb, iov, nr_segs, &iocb->ki_pos);
 	mutex_unlock(&inode->i_mutex);
@@ -2622,6 +2680,9 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 			ret = err;
 	}
 	blk_finish_plug(&plug);
+/* ACOS_MOD_BEGIN */
+	TRAPZ_LOG(TRAPZ_LOG_INFO, 0, TRAPZ_KERN_FS_FIO, FIOWrite, 0, 0, 0, 0);
+/* ACOS_MOD_END */
 	return ret;
 }
 EXPORT_SYMBOL(generic_file_aio_write);

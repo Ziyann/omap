@@ -28,6 +28,10 @@
 
 /*-------------------------------------------------------------------------*/
 #include <linux/usb/otg.h>
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/metricslog.h>
+#define EHCI_METRICS_STR_LEN 128
+#endif
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E|PORT_WKDISC_E|PORT_WKCONN_E)
 
@@ -676,6 +680,9 @@ static int ehci_hub_control (
 	int		retval = 0;
 	unsigned	selector;
 
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	char buff[EHCI_METRICS_STR_LEN];
+#endif
 	/*
 	 * FIXME:  support SetPortFeatures USB_PORT_FEAT_INDICATOR.
 	 * HCS_INDICATOR may say we can change LEDs to off/amber/green.
@@ -1078,6 +1085,28 @@ error:
 	}
 error_exit:
 	spin_unlock_irqrestore (&ehci->lock, flags);
+#ifdef CONFIG_AMAZON_METRICS_LOG
+	if (port_resume_error) {
+		printk(KERN_ERR "%s: port %d resume error %d count=%d\n",
+			__func__, wIndex + 1, retval_resume_error,
+			count_resume_error + 1);
+		snprintf(buff, sizeof(buff),
+			"%s:port%d:resume_error=%d;CT;1,count=%d;CT;1:NR\n",
+			__func__, wIndex + 1, retval_resume_error,
+			count_resume_error + 1);
+		log_to_metrics(ANDROID_LOG_INFO, "Ehci error", buff);
+		port_resume_error = 0;
+	}
+
+	if (phy_failed_exit_low_power_mode) {
+		snprintf(buff, sizeof(buff),
+			" %s:PHY:error=1;CT;1,phy_err_retries_low_power_mode=%d;CT;1:NR\n",
+			__func__,
+			phy_failed_exit_low_power_mode);
+		log_to_metrics(ANDROID_LOG_INFO, "PHY error", buff);
+		phy_failed_exit_low_power_mode = 0;
+	}
+#endif
 	return retval;
 }
 

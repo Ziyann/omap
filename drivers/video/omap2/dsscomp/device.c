@@ -39,6 +39,7 @@
 
 #include <video/omapdss.h>
 #include <video/dsscomp.h>
+#include <plat/android-display.h>
 #include <plat/dsscomp.h>
 #include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 #include "dsscomp.h"
@@ -521,6 +522,7 @@ static void fill_cache(struct dsscomp_dev *cdev)
 static void fill_platform_info(struct dsscomp_dev *cdev)
 {
 	struct dsscomp_platform_info *p = &platform_info;
+	struct sgx_omaplfb_config *fb_info;
 
 	p->max_xdecim_1d = 16;
 	p->max_xdecim_2d = 16;
@@ -543,7 +545,9 @@ static void fill_platform_info(struct dsscomp_dev *cdev)
 
 	p->tiler1d_slot_size = tiler1d_slot_size(cdev);
 
-	p->fbmem_type = DSSCOMP_FBMEM_TILER2D;
+	fb_info = sgx_omaplfb_get(0);
+	p->fbmem_type = fb_info->tiler2d_buffers ? DSSCOMP_FBMEM_TILER2D :
+						DSSCOMP_FBMEM_VRAM;
 }
 
 static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)

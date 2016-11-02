@@ -61,7 +61,7 @@ config OMAP2_DSS_VENC
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
 config OMAP4_DSS_HDMI
-	bool "HDMI support"
+	bool "OMAP4 HDMI support"
 	depends on ARCH_OMAP4 || ANDROID_SWITCH
 	select FB
 	select FB_MODE_HELPERS

@@ -60,6 +60,44 @@ pgprot_t pgprot_kernel;
 EXPORT_SYMBOL(pgprot_user);
 EXPORT_SYMBOL(pgprot_kernel);
 
+void set_pte_at(struct mm_struct *mm, unsigned long addr,
+		pte_t *ptep, pte_t pteval)
+{
+#ifdef CONFIG_TRAPZ_PVA
+	unsigned long pfn = pte_pfn(pteval);
+	if (pfn && pfn_valid(pfn)) {
+		struct page *page = pfn_to_page(pfn);
+		struct task_struct *cur_task;
+		cur_task = current;
+		if (cur_task && cur_task->tgid &&
+		    !(cur_task->flags & PF_KTHREAD)) {
+			pid_t current_pid = cur_task->tgid;
+			struct allocation_detail detail;
+			detail = page->detail;
+			if (detail.last_mapper_pid == 0
+			    || page_mapcount(page) <= 1
+			    || current_pid != detail.allocation_pid) {
+				detail.last_mapper_pid = current_pid;
+				if (pte_exec(pteval))
+					detail.last_mapper_pid |=
+						0x8000;
+				if (page_mapcount(page) <= 1)
+					detail.allocation_pid
+						= current_pid;
+				page->detail = detail;
+			}
+		}
+	}
+#endif
+	if (addr < TASK_SIZE && pte_present_user(pteval)) {
+		__sync_icache_dcache(pteval);
+		set_pte_ext(ptep, pteval, PTE_EXT_NG);
+	} else {
+		set_pte_ext(ptep, pteval, 0);
+	}
+}
+EXPORT_SYMBOL(set_pte_at);
+
 struct cachepolicy {
 	const char	policy[16];
 	unsigned int	cr_mask;

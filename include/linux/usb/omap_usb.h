@@ -107,14 +107,36 @@ static inline void omap_usb_writel(const void __iomem *addr, unsigned offset,
 }
 
 #if defined(CONFIG_TWL6030_USB)
+enum twl6030_usb_events {
+	TWL6030_USB_EVENT_VBUS_OFF = 0,
+	TWL6030_USB_EVENT_VBUS_ON,
+	TWL6030_USB_EVENT_VBUS_DETECT,
+	TWL6030_USB_EVENT_OTG_GND,
+	TWL6030_USB_EVENT_OTG_OFF,
+	TWL6030_USB_EVENT_COUNT,
+};
+
+/*
+ * Notifier parameters:
+ *   event				value
+ *   TWL6030_USB_EVENT_VBUS_ON		NULL
+ *   TWL6030_USB_EVENT_VBUS_OFF		NULL
+ *   TWL6030_USB_EVENT_VBUS_DETECT	enum power_supply_type *
+ *   TWL6030_USB_EVENT_ID_GORUND	NULL
+ */
 int twl6030_usb_register_notifier(struct notifier_block *nb);
 int twl6030_usb_unregister_notifier(struct notifier_block *nb);
+int twl6030_usb_event(enum twl6030_usb_events event);
 #else
 static inline int twl6030_usb_register_notifier(struct notifier_block *nb)
 {
 	return -EINVAL;
 }
 static inline int twl6030_usb_unregister_notifier(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
+static inline int twl6030_usb_event(enum twl6030_usb_events event)
 {
 	return -EINVAL;
 }

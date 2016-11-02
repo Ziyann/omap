@@ -25,6 +25,7 @@
 #include <linux/wait.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
+#include <linux/cpufreq.h>
 
 #include <linux/types.h>
 #include <linux/file.h>
@@ -193,7 +194,7 @@ static struct usb_endpoint_descriptor mtp_intr_desc = {
 	.bEndpointAddress       = USB_DIR_IN,
 	.bmAttributes           = USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize         = __constant_cpu_to_le16(INTR_BUFFER_SIZE),
-	.bInterval              = 6,
+	.bInterval              = 1,
 };
 
 static struct usb_ss_ep_comp_descriptor mtp_ss_intr_comp_desc = {
@@ -648,6 +649,7 @@ static ssize_t mtp_write(struct file *fp, const char __user *buf,
 
 		/* get an idle tx request to use */
 		req = 0;
+		cpufreq_interactive_boostpulse(1 * USEC_PER_SEC);
 		ret = wait_event_interruptible(dev->write_wq,
 			((req = mtp_req_get(dev, &dev->tx_idle))
 				|| dev->state != STATE_BUSY));
@@ -737,6 +739,7 @@ static void send_file_work(struct work_struct *data)
 
 		/* get an idle tx request to use */
 		req = 0;
+		cpufreq_interactive_boostpulse(1 * USEC_PER_SEC);
 		ret = wait_event_interruptible(dev->write_wq,
 			(req = mtp_req_get(dev, &dev->tx_idle))
 			|| dev->state != STATE_BUSY);
@@ -821,6 +824,7 @@ static void receive_file_work(struct work_struct *data)
 
 	while (count > 0 || write_req) {
 		if (count > 0) {
+			cpufreq_interactive_boostpulse(1 * USEC_PER_SEC);
 			/* queue a request */
 			read_req = dev->rx_req[cur_buf];
 			cur_buf = (cur_buf + 1) % RX_REQ_MAX;

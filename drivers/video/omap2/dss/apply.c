@@ -28,6 +28,13 @@
 
 #include "dss.h"
 #include "dss_features.h"
+#include <linux/pm_qos.h>
+#include <linux/trapz.h> /* ACOS_MOD_ONELINE */
+
+bool band_changed;
+static int pm_init_cstr = 0;
+extern struct pm_qos_request req;
+#define OVERLAY_AREA_BW_THRESHOLD (1920*1080)
 
 struct callback_states {
 	/*
@@ -123,6 +130,9 @@ struct mgr_priv_data {
 
 	/* callback data for the last 3 states */
 	struct callback_states cb;
+
+	bool skip_init;
+
 };
 
 static struct {
@@ -823,7 +833,11 @@ static void dss_set_go_bits(void)
 		if (!dss_data.irq_enabled && need_isr())
 			dss_register_vsync_isr();
 
-		dispc_mgr_go(mgr->id);
+		DSSDBG("%s %d\n",__FUNCTION__,mp->skip_init);
+		if(mp->skip_init)
+			mp->skip_init = false;
+		else
+			dispc_mgr_go(mgr->id);
 	}
 
 }
@@ -1166,6 +1180,14 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 
 	schedule_completion_irq();
 
+	/* ACOS_MOD_BEGIN */
+	TRAPZ_DESCRIBE(TRAPZ_KERN_DISP_DSS, DssIrqHandler,
+		"dss_apply_irq_handler: "
+		"Handle the VSYNC interrupt - acknowledge/clear CPU interrupt lines");
+	TRAPZ_LOG(TRAPZ_LOG_DEBUG, 0, TRAPZ_KERN_DISP_DSS, DssIrqHandler,
+		0, 0, 0, 0);
+	/* ACOS_MOD_END */
+
 	dss_write_regs();
 	dss_set_go_bits();
 
@@ -1350,6 +1372,19 @@ static void omap_dss_mgr_apply_mgr(struct omap_overlay_manager *mgr)
 	mp->user_info_dirty = false;
 	mp->info_dirty = true;
 	mp->info = mp->user_info;
+	mp->skip_init = mgr->device->skip_init;
+	DSSDBG("%s %d\n",__FUNCTION__,mp->skip_init);
+}
+
+void dss_tput_request(u32 tput)
+{
+	if(!pm_init_cstr) {
+		pm_qos_add_request(&req, PM_QOS_MEMORY_THROUGHPUT,
+					 tput);
+		pm_init_cstr = 1;
+	}
+	else
+		pm_qos_update_request(&req, tput);
 }
 
 int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
@@ -1362,6 +1397,11 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
 	mgr->get_manager_info(mgr, &info);
+
+	/* Set OPP constraint on CORE only when it needed */
+	if (mgr->device && (mgr->device->state == OMAP_DSS_DISPLAY_ACTIVE))
+		if (omap_dss_overlay_ensure_bw())
+			dss_tput_request(PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE);
 
 	spin_lock_irqsave(&data_lock, flags);
 
@@ -2199,3 +2239,39 @@ err:
 	return r;
 }
 
+bool omap_dss_overlay_ensure_bw(void)
+{
+	int i;
+	struct omap_overlay *ovl;
+	int num_planes_enabled = 0;
+	bool high_res_screen = false;
+	struct ovl_priv_data *op;
+	struct omap_overlay_info *oi;
+
+	/* Check if DSS need higher OPP on CORE or not */
+	for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+
+		ovl = omap_dss_get_overlay(i);
+		op = get_ovl_priv(ovl);
+		oi = &op->info;
+
+		if (!op->enabled)
+			continue;
+
+		/* Check for high resolution screes, 1080p */
+		if ((oi->width * oi->height) >= OVERLAY_AREA_BW_THRESHOLD)
+			high_res_screen = true;
+
+		++num_planes_enabled;
+	}
+
+	if ((num_planes_enabled > 1) && high_res_screen) {
+		if (!band_changed)
+			band_changed = true;
+		return true;
+	} else if (band_changed)
+		band_changed = false;
+
+	return false;
+}
+EXPORT_SYMBOL(omap_dss_overlay_ensure_bw);

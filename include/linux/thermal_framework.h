@@ -332,6 +332,14 @@ static inline int thermal_check_domain(const char *domain_name)
 /* Specific to governors */
 #ifdef CONFIG_CASE_TEMP_GOVERNOR
 extern int case_subzone_number;
+struct case_policy {
+	int sys_threshold_hot;
+	int sys_threshold_cold;
+	int case_subzone_number;
+	int sys_threshold_hot_inc;
+	int shutdown_zone_margin;
+};
+void set_case_policy(struct case_policy *policy);
 #else
 #define case_subzone_number	-1
 #endif

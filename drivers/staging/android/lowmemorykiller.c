@@ -37,6 +37,15 @@
 #include <linux/sched.h>
 #include <linux/rcupdate.h>
 #include <linux/notifier.h>
+#ifdef CONFIG_AMAZON_METRICS_LOG
+#include <linux/workqueue.h>
+#include <linux/slab.h>
+#include <linux/logger.h>
+#include <linux/metricslog.h>
+#define LMK_METRIC_TAG "kernel"
+#define METRICS_BUFFER_LEN 192
+#endif
+#include <linux/trapz.h>
 
 static uint32_t lowmem_debug_level = 1;
 static int lowmem_adj[6] = {
@@ -61,6 +70,44 @@ static unsigned long lowmem_deathpending_timeout;
 		if (lowmem_debug_level >= (level))	\
 			printk(x);			\
 	} while (0)
+
+#ifdef CONFIG_AMAZON_METRICS_LOG
+struct log_kill_data_struct {
+	struct work_struct work;
+	int pid;
+	int tasksize;
+	int oom_score_adj;
+	char comm[20];
+};
+
+static void log_kill_wq(struct work_struct *work)
+{
+	char logcatbuf[METRICS_BUFFER_LEN];
+	struct log_kill_data_struct *log_kill_data;
+	log_kill_data = container_of(work, struct log_kill_data_struct, work);
+
+	/* We log to both metrics and main log buffers */
+	/* here so we can get access   */
+	/* to this info everywhere.    */
+	snprintf(logcatbuf, METRICS_BUFFER_LEN,
+		"lowmem:sigkill:count=1;CT;1,"
+		"sigskill_name=%s;DV;1,"
+		"pid=%d;DV;1,adj=%d;DV;1,size=%d;DV;1:NR",
+		log_kill_data->comm, log_kill_data->pid,
+		log_kill_data->oom_score_adj, log_kill_data->tasksize);
+	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatbuf);
+
+	snprintf(logcatbuf, METRICS_BUFFER_LEN,
+		"lowmemkiller sending sigkill to %d (%s), adj %d, size %d\n",
+		log_kill_data->pid, log_kill_data->comm,
+		log_kill_data->oom_score_adj, log_kill_data->tasksize);
+	alog_main(4, LMK_METRIC_TAG, logcatbuf);
+}
+
+static struct log_kill_data_struct log_kill_data = {
+	.work = __WORK_INITIALIZER(log_kill_data.work, log_kill_wq),
+};
+#endif
 
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
@@ -147,6 +194,21 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		lowmem_print(1, "send sigkill to %d (%s), adj %d, size %d\n",
 			     selected->pid, selected->comm,
 			     selected_oom_score_adj, selected_tasksize);
+		TRAPZ_DESCRIBE(TRAPZ_KERN_MEM, lmkk,
+				"Low memory killer killed");
+		TRAPZ_LOG(TRAPZ_LOG_VERBOSE, 0, TRAPZ_KERN_MEM, lmkk,
+				selected->pid, selected_tasksize, 0, 0);
+#ifdef CONFIG_AMAZON_METRICS_LOG
+		/* We log to adb on a work queue     */
+		/* since adb logcat acquires a mutex */
+		/* and thus can go to sleep.         */
+		log_kill_data.pid = selected->pid;
+		log_kill_data.tasksize = selected_tasksize;
+		log_kill_data.oom_score_adj = selected_oom_score_adj;
+		snprintf(log_kill_data.comm, 20, selected->comm);
+
+		schedule_work(&log_kill_data.work);
+#endif
 		lowmem_deathpending_timeout = jiffies + HZ;
 		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);

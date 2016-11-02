@@ -26,7 +26,7 @@ static int ctr_running;
 static enum hrtimer_restart oprofile_hrtimer_notify(struct hrtimer *hrtimer)
 {
 	oprofile_add_sample(get_irq_regs(), 0);
-	hrtimer_forward_now(hrtimer, ns_to_ktime(TICK_NSEC));
+	hrtimer_forward_now(hrtimer, ns_to_ktime(TICK_NSEC/8));
 	return HRTIMER_RESTART;
 }
 
@@ -40,7 +40,7 @@ static void __oprofile_hrtimer_start(void *unused)
 	hrtimer_init(hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hrtimer->function = oprofile_hrtimer_notify;
 
-	hrtimer_start(hrtimer, ns_to_ktime(TICK_NSEC),
+	hrtimer_start(hrtimer, ns_to_ktime(TICK_NSEC/8),
 		      HRTIMER_MODE_REL_PINNED);
 }
 

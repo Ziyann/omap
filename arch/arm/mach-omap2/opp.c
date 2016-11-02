@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/opp.h>
 #include <linux/clk.h>
+#include <linux/slab.h>
 
 #include <plat/omap_device.h>
 #include <plat/clock.h>
@@ -101,7 +102,8 @@ int omap_opp_register(struct device *dev, const char *hwmod_name)
 					__func__, opp_def->dev_info->clk_name);
 				continue; /* skip Bad OPP */
 			}
-			r = opp_add(dev, opp_def->freq, opp_def->u_volt);
+			r = opp_add(dev, opp_def->freq, opp_def->u_volt,
+				opp_def->opp_name);
 			if (r) {
 				dev_err(dev,
 					"%s: add OPP %ld failed for %s [%d] result=%d\n",

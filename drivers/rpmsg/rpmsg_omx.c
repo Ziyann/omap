@@ -135,15 +135,16 @@ static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 					   struct rpmsg_buffer *buffer)
 {
-	struct scatterlist *sg;
-	struct sg_table *sglist;
+	struct sg_table *sgtable;
+	struct scatterlist *sglist, *sg;
 	int n_pages;
 	int i;
 
 	if (buffer->page_list)
 		return;
 
-	sglist = ion_sg_table(omx->ion_client, buffer->ion_handle);
+	sgtable = ion_sg_table(omx->ion_client, buffer->ion_handle);
+	sglist = sgtable->sgl;
 	if (sglist == NULL) {
 		dev_warn(omx->omxserv->dev,
 			 "%s: failed to get scatter/gather list for ion "
@@ -152,7 +153,7 @@ static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 	}
 
 	/* get number of pages */
-	for_each_sg(sglist->sgl, sg, INT_MAX, n_pages) {
+	for_each_sg(sglist, sg, INT_MAX, n_pages) {
 		if (!sg)
 			break;
 	}
@@ -165,12 +166,13 @@ static void _rpmsg_buffer_update_page_list(struct rpmsg_omx_instance *omx,
 	if (buffer->page_list == NULL) {
 		dev_warn(omx->omxserv->dev,
 			 "%s: failed to allocate page list\n", __func__);
+		ion_unmap_kernel(omx->ion_client, buffer->ion_handle);
 		return;
 	}
 
-	for_each_sg(sglist->sgl, sg, n_pages, i)
+	for_each_sg(sglist, sg, n_pages, i) {
 		buffer->page_list[i] = sg_phys(sg);
-
+	}
 	wmb();
 }
 
@@ -225,6 +227,7 @@ _rpmsg_buffer_free(struct rpmsg_omx_instance *omx, struct rpmsg_buffer *buffer)
 	if (buffer->page_list) {
 		dma_free_coherent(NULL, sizeof(phys_addr_t) * buffer->n_pages,
 				  buffer->page_list, buffer->page_list_pa);
+		ion_unmap_kernel(omx->ion_client, buffer->ion_handle);
 	}
 	if (buffer->ion_handle)
 		ion_free(omx->ion_client, buffer->ion_handle);
@@ -402,7 +405,7 @@ static int rpmsg_omx_connect(struct rpmsg_omx_instance *omx, char *omxname)
 	int ret;
 
 	if (omx->state == OMX_CONNECTED) {
-		dev_dbg(omxserv->dev, "endpoint already connected\n");
+		dev_err(omxserv->dev, "endpoint already connected\n");
 		return -EISCONN;
 	}
 
@@ -436,12 +439,14 @@ static int rpmsg_omx_connect(struct rpmsg_omx_instance *omx, char *omxname)
 	if (omx->state == OMX_CONNECTED) {
 		ret = 0;
 	} else if (omx->state == OMX_FAIL) {
+		dev_err(omxserv->dev, "OMX failed: %d\n", ret);
 		ret = -ENXIO;
 	} else if (omx->state == OMX_UNCONNECTED) {
 		if (ret) {
 			dev_err(omxserv->dev, "premature wakeup: %d\n", ret);
 			ret = -EIO;
 		} else {
+			dev_err(omxserv->dev, "reply timeout: %d\n", ret);
 			ret = -ETIMEDOUT;
 		}
 	}
@@ -501,11 +506,11 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
+
 	case OMX_IOCPVRREGISTER:
 	{
-		struct omx_pvr_data data;
-		struct ion_handle *ion_handles[2] = { NULL, NULL };
-		int num_handles = 2, i = 0;
+		struct ion_fd_data data;
+		int i;
 
 		if (copy_from_user(&data, (char __user *)arg, sizeof(data))) {
 			dev_err(omxserv->dev,
@@ -516,28 +521,25 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		if (!fcheck(data.fd)) {
 			dev_err(omxserv->dev,
-				"%s: %d: invalid fd: %d\n", __func__,
+				"%s: %d: fd is invalid: %d\n", __func__,
 				_IOC_NR(cmd), ret);
 			return -EBADF;
 		}
 
-		data.handles[0] = data.handles[1] = NULL;
-		if (!omap_ion_share_fd_to_handles(data.fd, omx->ion_client,
-						  ion_handles, &num_handles)) {
-			unsigned int size = ARRAY_SIZE(data.handles);
-			for (i = 0; (i < num_handles) && (i < size); i++) {
-				if (IS_ERR_OR_NULL(ion_handles[i]))
-					continue;
+		struct ion_handle *handle
+				= ion_import_dma_buf(omx->ion_client, data.fd);
 
-				if (_is_page_list(omx, ion_handles[i]))
-					data.handles[i] = (void *)
-						_rpmsg_buffer_new(omx,
-								ion_handles[i]);
-				else
-					data.handles[i] = ion_handles[i];
-			}
+		if (IS_ERR_OR_NULL(handle)) {
+			dev_err(omxserv->dev,
+				"%s: %d: import handle fail\n",
+				__func__, data.fd);
+			return -EINVAL;
 		}
-		data.num_handles = i;
+
+		if (_is_page_list(omx, handle))
+			data.handle = (void *) _rpmsg_buffer_new(omx, handle);
+		else
+			data.handle = handle;
 
 		if (copy_to_user((char __user *)arg, &data, sizeof(data))) {
 			dev_err(omxserv->dev,
@@ -547,6 +549,7 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
+
 	case OMX_IOCIONUNREGISTER:
 	{
 		struct ion_fd_data data;
@@ -635,7 +638,7 @@ static int rpmsg_omx_open(struct inode *inode, struct file *filp)
 #ifdef CONFIG_ION_OMAP
 	omx->ion_client = ion_client_create(omap_ion_device,
 					    (1 << ION_HEAP_TYPE_CARVEOUT) |
-					    (1 << OMAP_ION_HEAP_TYPE_TILER) |
+					    (1 << OMAP_ION_HEAP_TILER) |
 					    (1 << ION_HEAP_TYPE_SYSTEM),
 					    "rpmsg-omx");
 #endif
@@ -708,8 +711,10 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 	 * only destroy ept if omx state != OMX_FAIL. Otherwise, it is not
 	 * needed because it was already destroyed by rpmsg_omx_remove function
 	 */
-	if (omx->state != OMX_FAIL)
+	if (omx->state != OMX_FAIL) {
 		rpmsg_destroy_ept(omx->ept);
+		omx->ept = NULL;
+	}
 	mutex_unlock(&omxserv->lock);
 	kfree(omx);
 
@@ -917,6 +922,13 @@ serv_up:
 
 	dev_info(omxserv->dev, "new OMX connection srv channel: %u -> %u!\n",
 						rpdev->src, rpdev->dst);
+	if (!strcmp("rpmsg-omx1", dev_name(omxserv->dev))) {
+		void rproc_secure_complete(struct rproc *rproc);
+		struct rproc *rproc = vdev_to_rproc(rpdev->vrp->vdev);
+
+		rproc_secure_complete(rproc);
+	}
+
 	mutex_unlock(&rpmsg_omx_services_lock);
 	return 0;
 
@@ -939,10 +951,10 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 
 	dev_info(omxserv->dev, "rpmsg omx driver is removed\n");
 
-	if (rproc->state != RPROC_CRASHED) {
+	if (list_empty(&omxserv->list)) {
+		mutex_lock(&rpmsg_omx_services_lock);
 		device_destroy(rpmsg_omx_class, MKDEV(major, omxserv->minor));
 		cdev_del(&omxserv->cdev);
-		mutex_lock(&rpmsg_omx_services_lock);
 		idr_remove(&rpmsg_omx_services, omxserv->minor);
 		mutex_unlock(&rpmsg_omx_services_lock);
 		kfree(omxserv);
@@ -960,7 +972,15 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 		/* unblock any pending omx thread */
 		complete_all(&omx->reply_arrived);
 		wake_up_interruptible(&omx->readq);
-		rpmsg_destroy_ept(omx->ept);
+
+		/*
+		 * Userspace might have not had the time to recover from
+		 * the rproc crash, so check whether endpoint is alive.
+		 */
+		if (omx->ept) {
+			rpmsg_destroy_ept(omx->ept);
+			omx->ept = NULL;
+		}
 	}
 	omxserv->rpdev = NULL;
 	mutex_unlock(&omxserv->lock);

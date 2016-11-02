@@ -870,6 +870,9 @@ out:
 		 * migrated will have kepts its references and be
 		 * restored.
 		 */
+#ifdef CONFIG_TRAPZ_PVA
+		newpage->detail = page->detail;
+#endif
 		list_del(&page->lru);
 		dec_zone_page_state(page, NR_ISOLATED_ANON +
 				page_is_file_cache(page));

@@ -26,7 +26,7 @@ struct gcmmucontext;
 
 /* Enables internal gccore logging backend. */
 #if !defined(GCDEBUG_ENABLE)
-#define GCDEBUG_ENABLE 1 /* enabled for development branch only */
+#define GCDEBUG_ENABLE 0
 #endif
 
 /* Enables linux builtin logging backend. */

@@ -85,6 +85,7 @@
 #define TWL_MODULE_RTC		TWL4030_MODULE_RTC
 #define TWL_MODULE_PWM		TWL4030_MODULE_PWM0
 #define TWL6030_MODULE_CHARGER TWL4030_MODULE_MAIN_CHARGE
+#define TWL_MODULE_PM_SLAVE_RES	TWL6030_MODULE_SLAVE_RES
 
 #define TWL6030_MODULE_GASGAUGE 0x0B
 #define TWL6030_MODULE_ID0	0x0D
@@ -105,6 +106,7 @@
  * Offset from TWL6030_IRQ_BASE / pdata->irq_base
  */
 #define PWR_INTR_OFFSET		0
+#define TWL_VLOW_INTR_OFFSET	6
 #define HOTDIE_INTR_OFFSET	12
 #define SMPSLDO_INTR_OFFSET	13
 #define BATDETECT_INTR_OFFSET	14
@@ -161,6 +163,8 @@
 #define TWL6030_CFG_INPUT_PUPD3	0xF2
 #define MMC_PU				(0x1 << 3)
 #define MMC_PD				(0x1 << 2)
+
+#define VLOW_INT_MASK			(0x1 << 2)
 
 #define TWL_SIL_TYPE(rev)		((rev) & 0x00FFFFFF)
 #define TWL_SIL_REV(rev)		((rev) >> 24)
@@ -468,6 +472,17 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 #define TWL6030_PHOENIX_DEV_ON			0x06
 
 #define TWL6030_PM_MASTER_MSK_TRANSITION	0x01
+#define TWL6030_VBATMIN_HI_THRESHOLD		0x05
+
+/*
+ * PM Slave resource module register offsets (use TWL6030_MODULE_SLAVE_RES)
+ */
+
+#define REG_VBATMIN_HI_CFG_STATE		0x1D
+
+#define VBATMIN_VLOW_EN				0x21
+
+/*----------------------------------------------------------------------*/
 
 /*
 * PMC Slave SMPS Register Map (use TWL6030_MODULE_ID0)

@@ -82,7 +82,7 @@ config OMAP_REMOTEPROC_WATCHDOG
 # wasted in case we're not loading the remote processors.
 config OMAP4_IPU_CMA_SIZE
 	hex "Cortex M3 physically contiguous memory pool size (in bytes)"
-	depends on OMAP_REMOTEPROC_IPU
+	depends on (OMAP_REMOTEPROC_IPU && ARCH_OMAP4)
 	default 0x7000000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
@@ -91,7 +91,7 @@ config OMAP4_IPU_CMA_SIZE
 
 config OMAP5_IPU_CMA_SIZE
 	hex "Cortex M4 physically contiguous memory pool size (in bytes)"
-	depends on OMAP_REMOTEPROC_IPU
+	depends on (OMAP_REMOTEPROC_IPU && ARCH_OMAP5)
 	default 0xA400000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)

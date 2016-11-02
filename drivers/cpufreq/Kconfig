@@ -206,6 +206,14 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_USE_BOOST_HINT
+	bool "use hints for boosting cpu frequency"
+	depends on CPU_FREQ_GOV_INTERACTIVE
+	help
+	  when interactive governor is selected as cpufreq policy governor, this
+	  option can be enabled so that drivers can influence cpu frequency by means
+	  of providing boosting hints.
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"

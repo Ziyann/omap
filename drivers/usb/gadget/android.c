@@ -162,6 +162,9 @@ static struct usb_configuration android_config_driver = {
 	.unbind		= android_unbind_config,
 	.bConfigurationValue = 1,
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.bMaxPower	= 0x01, /* 2ma */
+#endif
 };
 
 static void android_work(struct work_struct *data)
@@ -873,8 +876,38 @@ static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
 					mass_storage_inquiry_show,
 					mass_storage_inquiry_store);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static ssize_t mass_storage_cdrom_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	int cdrom = config->common->luns[0].cdrom;
+	return sprintf(buf, "%d\n", cdrom);
+}
+
+static ssize_t mass_storage_cdrom_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int cdrom = 0;
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	sscanf(buf, "%d", &cdrom);
+	if(cdrom) config->common->luns[0].cdrom = 1;
+	else config->common->luns[0].cdrom = 0;
+	return size;
+}
+
+static DEVICE_ATTR(cdrom, S_IRUGO | S_IWUSR,
+					mass_storage_cdrom_show,
+					mass_storage_cdrom_store);
+#endif
+
 static struct device_attribute *mass_storage_function_attributes[] = {
 	&dev_attr_inquiry_string,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	&dev_attr_cdrom,
+#endif
 	NULL
 };
 
@@ -1443,11 +1476,12 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	if (gadget->speed == USB_SPEED_SUPER)
 		android_config_driver.bMaxPower = 0x70; /* ~900 mA */
 	else
 		android_config_driver.bMaxPower = 0xFA; /* 500 mA */
-
+#endif
 	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
 		if (f->ctrlrequest) {
 			value = f->ctrlrequest(f, cdev, c);
@@ -1468,10 +1502,10 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!dev->connected) {
 		dev->connected = 1;
-		schedule_work(&dev->work);
+		queue_work(system_long_wq, &dev->work);
 	} else if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
 						cdev->config) {
-		schedule_work(&dev->work);
+		queue_work(system_long_wq, &dev->work);
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
@@ -1494,7 +1528,7 @@ static void android_disconnect(struct usb_gadget *gadget)
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (dev->connected) {
 		dev->connected = 0;
-		schedule_work(&dev->work);
+		queue_work(system_long_wq, &dev->work);
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }

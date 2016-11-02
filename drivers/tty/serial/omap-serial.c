@@ -40,6 +40,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 
+#include <linux/uaccess.h>
+
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-serial.h>
@@ -974,10 +976,12 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
 	unsigned char efr;
+	unsigned char lcr;
 
 	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->port.line);
 
 	serial_omap_port_enable(up);
+	lcr = serial_in(up, UART_LCR);
 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
 	efr = serial_in(up, UART_EFR);
 	serial_out(up, UART_EFR, efr | UART_EFR_ECB);
@@ -986,7 +990,7 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	serial_out(up, UART_IER, (state != 0) ? UART_IERX_SLEEP : 0);
 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
 	serial_out(up, UART_EFR, efr);
-	serial_out(up, UART_LCR, 0);
+	serial_out(up, UART_LCR, lcr);
 
 	if (!state && pdata->enable_wakeup)
 		pdata->enable_wakeup(up->pdev, true);
@@ -1221,6 +1225,39 @@ static inline void serial_omap_add_console_port(struct uart_omap_port *up)
 
 #endif
 
+void bcm_bt_lpm_exit_lpm(struct uart_port *uport, int exit_lpm);
+extern unsigned long bt_wake_level;
+
+static int
+serial_omap_ioctl(struct uart_port *uport, unsigned int cmd, unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+
+	if (uport->line != 1 /* UART2 */)
+		return 0;
+
+	switch (cmd) {
+		case 0x8003 /* ASSERT_BT_WAKE */:
+			bcm_bt_lpm_exit_lpm(uport, 1);
+			break;
+
+		case 0x8004 /* DEASSERT_BT_WAKE */:
+			bcm_bt_lpm_exit_lpm(uport, 0);
+			break;
+
+		case 0x8005 /* GET_BT_WAKE_STATE */:
+			if (copy_to_user(argp, &bt_wake_level,
+				sizeof(bt_wake_level)))
+				return -EFAULT;
+			break;
+
+		default:
+			return -ENOIOCTLCMD;
+	}
+
+	return 0;
+}
+
 static struct uart_ops serial_omap_pops = {
 	.tx_empty	= serial_omap_tx_empty,
 	.set_mctrl	= serial_omap_set_mctrl,
@@ -1244,6 +1281,7 @@ static struct uart_ops serial_omap_pops = {
 	.poll_put_char  = serial_omap_poll_put_char,
 	.poll_get_char  = serial_omap_poll_get_char,
 #endif
+	.ioctl	= serial_omap_ioctl,
 };
 
 static struct uart_driver serial_omap_reg = {

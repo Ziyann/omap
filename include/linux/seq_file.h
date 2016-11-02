@@ -26,6 +26,7 @@ struct seq_file {
 	const struct seq_operations *op;
 	int poll_event;
 	void *private;
+	int is_vmalloc;
 };
 
 struct seq_operations {
@@ -77,6 +78,7 @@ static inline void seq_commit(struct seq_file *m, int num)
 
 char *mangle_path(char *s, const char *p, const char *esc);
 int seq_open(struct file *, const struct seq_operations *);
+int seq_vreserve(struct file *, size_t);
 ssize_t seq_read(struct file *, char __user *, size_t, loff_t *);
 loff_t seq_lseek(struct file *, loff_t, int);
 int seq_release(struct inode *, struct file *);

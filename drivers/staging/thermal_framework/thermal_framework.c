@@ -542,7 +542,7 @@ static int thermal_pm_notifier_cb(struct notifier_block *notifier,
 		cancel_delayed_work_sync(&stats->avg_sensor_temp_work);
 		break;
 	case PM_POST_SUSPEND:
-		schedule_work(&stats->avg_sensor_temp_work.work);
+		queue_work(system_long_wq, &stats->avg_sensor_temp_work.work);
 		break;
 	}
 
@@ -842,7 +842,7 @@ static void thermal_average_sensor_temperature_work_fn(struct work_struct *work)
 
 	thermal_average_sensor_temperature(stats);
 
-	schedule_delayed_work(&stats->avg_sensor_temp_work,
+	queue_delayed_work(system_long_wq, &stats->avg_sensor_temp_work,
 		msecs_to_jiffies(stats->avg_period));
 }
 
@@ -869,8 +869,7 @@ int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
 		pr_err("%s:stats pm registration failed!\n",
 							__func__);
 
-	schedule_work(&tdev->stats->
-			avg_sensor_temp_work.work);
+	queue_work(system_long_wq, &tdev->stats->avg_sensor_temp_work.work);
 	tdev->stats->accumulation_enabled = 1;
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 	(void) debugfs_create_file("report_delay_ms",
@@ -1080,6 +1079,11 @@ int thermal_lookup_temp(const char *name)
 	thermal_domain = thermal_domain_find(name);
 	if (!thermal_domain) {
 		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	if (!thermal_domain->temp_sensor) {
+		pr_debug("%s: Temperature sensor not registered for domain %s\n", __func__, name);
 		return ret;
 	}
 

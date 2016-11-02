@@ -46,6 +46,7 @@ config ARM
 
 config ARM_HAS_SG_CHAIN
 	bool
+	default y
 
 config HAVE_PWM
 	bool

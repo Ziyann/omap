@@ -599,29 +599,34 @@ static void omap4_set_volt_ramp_time(struct voltagedomain *voltdm,
 
 {
 	u32 val;
-	u32 ramp;
+	u32 rampu, rampd;
 	int offset;
 
 	if (off_mode) {
-		ramp = omap4_calc_volt_ramp(voltdm,
+		rampu = rampd = omap4_calc_volt_ramp(voltdm,
 			voltdm->vc_param->on - voltdm->vc_param->off,
 			voltdm->pmic->switch_on_time, voltdm->sys_clk.rate);
 		offset = voltdm->vfsm->voltsetup_off_reg;
 	} else {
-		ramp = omap4_calc_volt_ramp(voltdm,
+		rampu = rampd = omap4_calc_volt_ramp(voltdm,
 			voltdm->vc_param->on - voltdm->vc_param->ret,
 			0, voltdm->sys_clk.rate);
+		if (!strcmp(voltdm->name, "mpu")) {
+			rampu = omap4_calc_volt_ramp(voltdm,
+				voltdm->vc_param->on - voltdm->vc_param->ret,
+				100, voltdm->sys_clk.rate);
+		}
 		offset = voltdm->vfsm->voltsetup_reg;
 	}
 
-	if (!ramp)
+	if (!rampd || !rampu)
 		return;
 
 	val = voltdm->read(offset);
 
-	val |= ramp << OMAP4430_RAMP_DOWN_COUNT_SHIFT;
+	val |= rampd << OMAP4430_RAMP_DOWN_COUNT_SHIFT;
 
-	val |= ramp << OMAP4430_RAMP_UP_COUNT_SHIFT;
+	val |= rampu << OMAP4430_RAMP_UP_COUNT_SHIFT;
 
 	voltdm->write(val, offset);
 }

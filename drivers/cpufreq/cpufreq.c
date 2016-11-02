@@ -612,6 +612,62 @@ EXPORT_SYMBOL(cpufreq_global_kobject);
 #define to_policy(k) container_of(k, struct cpufreq_policy, kobj)
 #define to_attr(a) container_of(a, struct freq_attr, attr)
 
+#ifdef CONFIG_CPU_FREQ_USE_BOOST_HINT
+/**
+ * send_video_hint - provide video hint to governor
+ */
+void send_video_hint(int hint)
+{
+	struct cpufreq_policy *policy;
+
+	policy = cpufreq_cpu_get(0);
+	if (!policy)
+		return;
+
+	if (lock_policy_rwsem_write(policy->cpu) < 0)
+		goto fail;
+
+	if (!policy->governor || !policy->governor->store_video_hint)
+		goto fail_unlock;
+
+	policy->governor->store_video_hint(!!hint);
+
+fail_unlock:
+	unlock_policy_rwsem_write(policy->cpu);
+fail:
+	cpufreq_cpu_put(policy);
+	return;
+}
+EXPORT_SYMBOL(send_video_hint);
+
+/**
+ * send_panel_hint - provide panel hint to governor
+ */
+void send_panel_hint(int hint)
+{
+	struct cpufreq_policy *policy;
+
+	policy = cpufreq_cpu_get(0);
+	if (!policy)
+		return;
+
+	if (lock_policy_rwsem_write(policy->cpu) < 0)
+		goto fail;
+
+	if (!policy->governor || !policy->governor->store_panel_hint)
+		goto fail_unlock;
+
+	policy->governor->store_panel_hint(!!hint);
+
+fail_unlock:
+	unlock_policy_rwsem_write(policy->cpu);
+fail:
+	cpufreq_cpu_put(policy);
+	return;
+}
+EXPORT_SYMBOL(send_panel_hint);
+#endif
+
 static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 {
 	struct cpufreq_policy *policy = to_policy(kobj);

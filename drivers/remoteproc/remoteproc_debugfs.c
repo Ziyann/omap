@@ -47,6 +47,9 @@ static ssize_t rproc_trace_read(struct file *filp, char __user *userbuf,
 						size_t count, loff_t *ppos)
 {
 	struct rproc_mem_entry *trace = filp->private_data;
+	if (!trace)
+		return 0;
+
 	int len = strnlen(trace->va, trace->len);
 
 	return simple_read_from_buffer(userbuf, count, ppos, trace->va, len);

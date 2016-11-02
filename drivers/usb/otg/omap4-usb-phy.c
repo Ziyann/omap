@@ -47,16 +47,22 @@ int omap4_usb_phy_power(struct device *dev, bool on)
 	u32 val;
 	int ret;
 
+	dev_dbg(dev, "%s(%d):Entered\n", __func__, (int)on);
+
 	if (on) {
 		ret = omap_control_readl(dev, CONTROL_DEV_CONF, &val);
 		if (!ret && (val & PHY_PD)) {
 			ret = omap_control_writel(dev, ~PHY_PD,
 						  CONTROL_DEV_CONF);
+			dev_dbg(dev, "ON Written\n");
 			mdelay(200);
 		}
 	} else {
 		ret = omap_control_writel(dev, PHY_PD, CONTROL_DEV_CONF);
+		dev_dbg(dev, "OFF Written\n");
 	}
+
+	dev_dbg(dev, "%s(%d):Left\n", __func__, (int)on);
 
 	return ret;
 }

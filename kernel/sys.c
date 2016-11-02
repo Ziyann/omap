@@ -117,6 +117,9 @@ int C_A_D = 1;
 struct pid *cad_pid;
 EXPORT_SYMBOL(cad_pid);
 
+static struct workqueue_struct *off_wq;
+static struct delayed_work off_task;
+
 /*
  * If set, this is used for preparing the system to power off.
  */
@@ -423,6 +426,12 @@ void kernel_halt(void)
 
 EXPORT_SYMBOL_GPL(kernel_halt);
 
+static void off_work_func(struct work_struct *work)
+{
+	pr_err("%s:Power OFF device\n", __func__);
+	machine_power_off();
+}
+
 /**
  *	kernel_power_off - power_off the system
  *
@@ -430,6 +439,11 @@ EXPORT_SYMBOL_GPL(kernel_halt);
  */
 void kernel_power_off(void)
 {
+	/* Schedule Workqueue to switch off device in * 20s in case of
+	 * systyem hang */
+	if (off_wq && !delayed_work_pending(&off_task))
+		queue_delayed_work(off_wq, &off_task, msecs_to_jiffies(20000));
+
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
 	if (pm_power_off_prepare)
 		pm_power_off_prepare();
@@ -2025,7 +2039,7 @@ SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
 	return err ? -EFAULT : 0;
 }
 
-char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/sbin/poweroff";
+char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/system/bin/reboot -p";
 
 static void argv_cleanup(struct subprocess_info *info)
 {
@@ -2051,6 +2065,12 @@ int orderly_poweroff(bool force)
 	int ret = -ENOMEM;
 	struct subprocess_info *info;
 
+	/* Protection of double execution of kernel_power_off */
+	if (delayed_work_pending(&off_task)) {
+		pr_err("Function %s are executed twice\n", __func__);
+		return -EBUSY;
+	}
+
 	if (argv == NULL) {
 		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
 		       __func__, poweroff_cmd);
@@ -2065,7 +2085,12 @@ int orderly_poweroff(bool force)
 
 	call_usermodehelper_setfns(info, NULL, argv_cleanup, NULL);
 
-	ret = call_usermodehelper_exec(info, UMH_NO_WAIT);
+	/* Schedule Workqueue to switch off device in 20s in case of
+	 * systyem hang */
+	if (off_wq)
+		queue_delayed_work(off_wq, &off_task, msecs_to_jiffies(20000));
+
+	ret = call_usermodehelper_exec(info, UMH_WAIT_EXEC);
 
   out:
 	if (ret && force) {
@@ -2082,3 +2107,13 @@ int orderly_poweroff(bool force)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(orderly_poweroff);
+
+int __init kernel_sys_init(void)
+{
+	/* Create the work queue and queue the off task */
+	off_wq = create_singlethread_workqueue("off_wq");
+	INIT_DELAYED_WORK(&off_task, off_work_func);
+
+	return 0;
+}
+subsys_initcall(kernel_sys_init);
