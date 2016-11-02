@@ -740,10 +740,7 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 	datalen = ntoh32(event->datalen);
 
 	/* debug dump of event messages */
-	snprintf(eabuf, sizeof(eabuf), "%02x:%02x:%02x:%02x:%02x:%02x",
-	        (uchar)event->addr.octet[0]&0xff,
-	        (uchar)event->addr.octet[1]&0xff,
-	        (uchar)event->addr.octet[2]&0xff,
+	snprintf(eabuf, sizeof(eabuf), "xx:xx:xx:%02x:%02x:%02x",
 	        (uchar)event->addr.octet[3]&0xff,
 	        (uchar)event->addr.octet[4]&0xff,
 	        (uchar)event->addr.octet[5]&0xff);
@@ -1031,11 +1028,11 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 			{
 		uint8* ea = pvt_data->eth.ether_dhost;
 		WLFC_DBGMESG(("WLC_E_IF: idx:%d, action:%s, iftype:%s, "
-		              "[%02x:%02x:%02x:%02x:%02x:%02x]\n",
-		              ifevent->ifidx,
+			      "[xx:xx:xx:%02x:%02x:%02x]\n",
+			      ifevent->ifidx,
 		              ((ifevent->action == WLC_E_IF_ADD) ? "ADD":"DEL"),
 		              ((ifevent->is_AP == 0) ? "STA":"AP "),
-		              ea[0], ea[1], ea[2], ea[3], ea[4], ea[5]));
+			      ea[3], ea[4], ea[5]));
 		(void)ea;
 		if (ifevent->action == WLC_E_IF_CHANGE)
 			dhd_wlfc_interface_event(dhd_pub->info,
