@@ -10,7 +10,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DBCMDRIVER                     \
 	-DEMBEDDED_PLATFORM -DENABLE_INSMOD_NO_FW_LOAD -DPNO_SUPPORT          \
 	-DSET_RANDOM_MAC_SOFTAP -DROAM_ENABLE                                 \
 	-DWL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST                            \
-	-DESCAN_RESULT_PATCH -DPASS_ARP_PACKET                                \
+	-DESCAN_RESULT_PATCH -DPASS_ARP_PACKET -DSUPPORT_PM2_ONLY             \
 	-DDHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT                           \
 	-DPREFER_ASSOCIATION_5G -DBCM4330_CHIP                                \
 	-Idrivers/net/wireless/bcmdhd -Idrivers/net/wireless/bcmdhd/include

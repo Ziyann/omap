@@ -178,6 +178,16 @@ static struct gpio_keys_button bowser_gpio_keys_buttons[] = {
 		.wakeup			= 0,
 		.debounce_interval	= 0,
 		},
+#ifdef CONFIG_INPUT_BTN_SHORTCUT
+	[2] = {
+		.code			= KEY_POWER,
+		.gpio			= 7,
+		.desc			= "SW4",
+		.active_low		= 0,
+		.wakeup			= 0,
+		.debounce_interval	= 0,
+	},
+#endif
 	};
 
 static struct gpio_keys_platform_data bowser_gpio_keys = {

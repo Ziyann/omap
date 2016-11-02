@@ -245,7 +245,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	if (!--abe->active) {
 		omap_aess_disable_irq(abe->aess);
-		synchronize_irq(abe->irq);
 		abe_pm_save_context(abe);
 		omap_abe_pm_shutdown(platform);
 	} else {
@@ -253,6 +252,7 @@ static int aess_close(struct snd_pcm_substream *substream)
 		 * if ABE is still active */
 		abe_opp_recalc_level(abe);
 	}
+	synchronize_irq(abe->irq);
 	omap_abe_pm_runtime_put_sync(abe);
 
 	mutex_unlock(&abe->mutex);

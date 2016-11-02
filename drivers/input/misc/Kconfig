@@ -717,4 +717,13 @@ config INPUT_BU52061_HALLSENSOR
 	help
 	  Say Y here if you want to use hall sensor Rohm BU52061NVX.
 
+config INPUT_BTN_SHORTCUT
+    tristate "Button shortcuts"
+    depends on INPUT
+    ---help---
+      Say Y here if you want to enable button shorcuts;
+
+      To compile this driver as a module, choose M here: the
+      module will be called input-btn-shortcut.
+
 endif

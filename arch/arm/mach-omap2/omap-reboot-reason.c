@@ -20,23 +20,15 @@
 #include "common.h"
 #include "omap4-sar-layout.h"
 
-static int omap_reboot_notifier_call(struct notifier_block *this,
-				     unsigned long code, void *cmd)
+int omap_sar_reason(char *reason)
 {
 	char __iomem *sar_base;
-	char *reason = "normal";
 	int offset = 0;
 
 	sar_base = omap4_get_sar_ram_base();
 
 	if (!sar_base)
 		return notifier_from_errno(-ENOMEM);
-
-	/* Save reboot mode in scratch memory */
-	if (code == SYS_RESTART && cmd != NULL && *(char *)cmd)
-		reason = cmd;
-	else if (code == SYS_POWER_OFF)
-		reason = "off";
 
 	if (cpu_is_omap44xx())
 		offset = OMAP4_REBOOT_REASON_OFFSET;
@@ -49,7 +41,25 @@ static int omap_reboot_notifier_call(struct notifier_block *this,
 
 	/* always end with terminal symbol */
 	*(sar_base + offset + OMAP_REBOOT_REASON_SIZE - 1) = '\0';
-	return NOTIFY_DONE;
+
+	return 0;
+}
+
+static int omap_reboot_notifier_call(struct notifier_block *this,
+				     unsigned long code, void *cmd)
+{
+	char *reason = "normal";
+	int ret;
+
+	/* Save reboot mode in scratch memory */
+	if (code == SYS_RESTART && cmd != NULL && *(char *)cmd)
+		reason = cmd;
+	else if (code == SYS_POWER_OFF)
+		reason = "off";
+
+	ret = omap_sar_reason(reason);
+
+	return notifier_from_errno(ret);
 }
 
 static struct notifier_block omap_reboot_notifier = {
