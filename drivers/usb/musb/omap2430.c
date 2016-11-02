@@ -701,7 +701,6 @@ static int omap2430_runtime_resume(struct device *dev)
 	if (musb) {
 		omap2430_low_level_init(musb);
 		usb_phy_set_suspend(musb->xceiv, 0);
-		msleep(35);
 	}
 	mutex_unlock(&glue->core_power_mutex);
 

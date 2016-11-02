@@ -92,7 +92,7 @@ static void log_kill_wq(struct work_struct *work)
 	snprintf(logcatbuf, METRICS_BUFFER_LEN,
 		"lowmem:sigkill:count=1;CT;1,"
 		"sigskill_name=%s;DV;1,"
-		"pid=%d;DV;1,adj=%d;DV;1,size=%d;DV;1:NR",
+		"pid=%d;DV;1,adj%d=1;CT;1,size=%d;DV;1:NR",
 		log_kill_data->comm, log_kill_data->pid,
 		log_kill_data->oom_score_adj, log_kill_data->tasksize);
 	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatbuf);

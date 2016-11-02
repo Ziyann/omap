@@ -88,6 +88,7 @@ static struct omap_pm omap_pm = {
 };
 
 bool omap_pm_is_ready_status;
+bool omap_pm_is_prepared_status;
 
 /**
  * omap_pm_setup_oscillator() - setup the system oscillator time
@@ -488,11 +489,25 @@ static void omap_pm_finish(void)
 		omap_prcm_irq_complete();
 }
 
+static int omap_pm_prepare_late(void)
+{
+	omap_pm_is_prepared_status = false;
+
+	return 0;
+}
+
+static void omap_pm_prepare_wake(void)
+{
+	omap_pm_is_prepared_status = true;
+}
+
 static const struct platform_suspend_ops omap_pm_ops = {
 	.begin		= omap_pm_begin,
 	.end		= omap_pm_end,
 	.enter		= omap_pm_enter,
 	.finish		= omap_pm_finish,
+	.prepare_late	= omap_pm_prepare_late,
+	.wake		= omap_pm_prepare_wake,
 	.valid		= suspend_valid_only_mem,
 };
 
@@ -673,6 +688,7 @@ next:
 	set_device_opp();
 
 	omap_pm_is_ready_status = true;
+	omap_pm_is_prepared_status = true;
 	/* let the other CPU know as well */
 	smp_wmb();
 

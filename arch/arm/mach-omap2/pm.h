@@ -243,8 +243,19 @@ static inline bool omap_pm_is_ready(void)
 {
 	return omap_pm_is_ready_status;
 }
+
+extern bool omap_pm_is_prepared_status;
+static inline bool omap_pm_is_prepared(void)
+{
+	return omap_pm_is_prepared_status;
+}
 #else
 static inline bool omap_pm_is_ready(void)
+{
+	return false;
+}
+
+static inline bool omap_pm_is_prepared(void)
 {
 	return false;
 }

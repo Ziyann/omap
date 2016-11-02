@@ -31,6 +31,7 @@
 #include <linux/device.h>
 #endif
 #include <linux/platform_device.h>
+#include <linux/wakelock.h>
 
 #include "tf_protocol.h"
 #include "tf_protocol_tee.h"
@@ -47,6 +48,7 @@
 #endif
 
 #include "s_version.h"
+struct wake_lock g_tf_wake_lock_timeout;
 
 /*----------------------------------------------------------------------------
  * Forward Declarations
@@ -311,6 +313,8 @@ static int __devinit tf_device_register(struct platform_device *pdev)
 		printk(KERN_ERR "%s(): No platform data\n", __func__);
 		goto module_init_failed;
 	}
+
+	wake_lock_init(&g_tf_wake_lock_timeout, WAKE_LOCK_SUSPEND, "tf_driver_ext");
 
 	/*
 	 * Initialize the device

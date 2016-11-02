@@ -180,6 +180,8 @@ static struct omap_hwmod *mpu_oh;
 /* io_chain_lock: used to serialize reconfigurations of the I/O chain */
 static DEFINE_SPINLOCK(io_chain_lock);
 
+static const ktime_t invalkt = {0};	/* Invalid kernel time */
+
 /* Private functions */
 
 /**
@@ -1741,6 +1743,19 @@ static int _enable(struct omap_hwmod *oh)
 
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
+	if (oh->flags & HWMOD_MIN_TIME_STABLE && omap_pm_is_prepared()) {
+		s64 tm;
+
+		/* Mandatory apply this delay if last_switch is invallid */
+		if (ktime_equal(oh->last_switch, invalkt))
+			oh->last_switch = ktime_get();
+
+		tm = ktime_to_us(ktime_sub(ktime_get(), oh->last_switch));
+
+		if (tm > 0 && tm < oh->min_time_stable)
+			udelay(oh->min_time_stable - tm);
+	}
+
 	/*
 	 * hwmods with HWMOD_INIT_NO_IDLE flag set are left
 	 * in enabled state at init.
@@ -1837,6 +1852,9 @@ static int _enable(struct omap_hwmod *oh)
 			clkdm_hwmod_disable(oh->clkdm, oh);
 	}
 
+	if (oh->flags & HWMOD_MIN_TIME_STABLE)
+		oh->last_switch = omap_pm_is_prepared() ? ktime_get() : invalkt;
+
 	return r;
 }
 
@@ -1857,6 +1875,19 @@ static int _idle(struct omap_hwmod *oh)
 		WARN(1, "omap_hwmod: %s: idle state can only be entered from enabled state\n",
 			oh->name);
 		return -EINVAL;
+	}
+
+	if (oh->flags & HWMOD_MIN_TIME_STABLE && omap_pm_is_prepared()) {
+		s64 tm;
+
+		/* Mandatory apply this delay if last_switch is invallid */
+		if (ktime_equal(oh->last_switch, invalkt))
+			oh->last_switch = ktime_get();
+
+		tm = ktime_to_us(ktime_sub(ktime_get(), oh->last_switch));
+
+		if (tm > 0 && tm < oh->min_time_stable)
+			udelay(oh->min_time_stable - tm);
 	}
 
 	if (oh->class->sysc)
@@ -1902,6 +1933,9 @@ static int _idle(struct omap_hwmod *oh)
 	}
 
 	oh->_state = _HWMOD_STATE_IDLE;
+
+	if (oh->flags & HWMOD_MIN_TIME_STABLE)
+		oh->last_switch = omap_pm_is_prepared() ? ktime_get() : invalkt;
 
 	return 0;
 }

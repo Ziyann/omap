@@ -27,6 +27,7 @@
 #include <linux/vmalloc.h>
 #include <linux/jiffies.h>
 #include <linux/freezer.h>
+#include <linux/wakelock.h>
 
 #include "tf_defs.h"
 #include "tf_comm.h"
@@ -110,6 +111,8 @@
 
 #define TIME_IMMEDIATE (0x0000000000000000ULL)
 #define TIME_INFINITE  (0xFFFFFFFFFFFFFFFFULL)
+
+extern struct wake_lock g_tf_wake_lock_timeout;
 
 /*---------------------------------------------------------------------------
  * atomic operation definitions
@@ -1748,6 +1751,12 @@ int tf_send_receive(struct tf_comm *comm,
 
 	answerStructure.answer = answer;
 	answerStructure.answer_copied = false;
+
+	/* Prevent sleep during and shortly after
+	 * communication with the secure world. This
+	 * workarounds some SMC PPA crashes. */
+	wake_lock_timeout(&g_tf_wake_lock_timeout, 3 * HZ);
+
 
 	if (command != NULL)
 		command->header.operation_id = (u32) &answerStructure;

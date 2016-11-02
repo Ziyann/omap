@@ -35,6 +35,7 @@
 #include <linux/list.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
+#include <linux/ktime.h>
 #include <plat/cpu.h>
 
 struct omap_device;
@@ -432,6 +433,7 @@ struct omap_hwmod_omap4_prcm {
 #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
 #define HWMOD_16BIT_REG				(1 << 8)
 #define HWMOD_ACCESS_DISABLED			(1 << 9)
+#define HWMOD_MIN_TIME_STABLE			(1 << 10)
 
 /*
  * omap_hwmod._int_flags definitions
@@ -572,6 +574,8 @@ struct omap_hwmod {
 	u8				_int_flags;
 	u8				_state;
 	u8				_postsetup_state;
+	u32				min_time_stable;	/* us */
+	ktime_t				last_switch;
 };
 
 int omap_hwmod_register(struct omap_hwmod **ohs);
