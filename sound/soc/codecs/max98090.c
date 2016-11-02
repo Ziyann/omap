@@ -29,6 +29,7 @@
 #define EXTMIC_METHOD_TEST
 
 
+static struct i2c_client *private_max98090_client;
 
 /* Allows for sparsely populated register maps */
 static struct reg_default max98090_reg[] = {
@@ -3139,6 +3140,7 @@ static int max98090_i2c_probe(struct i2c_client *i2c,
 
 	pr_info("%s\n", __func__);
 
+	private_max98090_client = i2c;
 	max98090 = kzalloc(sizeof(struct max98090_priv), GFP_KERNEL);
 	if (max98090 == NULL)
 		return -ENOMEM;
@@ -3212,8 +3214,9 @@ MODULE_DEVICE_TABLE(i2c, max98090_i2c_id);
  */
 void max98090_switches_closed(struct i2c_client *client)
 {
-	pr_info("%s\n", __func__);
 	struct max98090_priv *max98090_ptr = dev_get_drvdata(&client->dev);
+
+	pr_info("%s\n", __func__);
 	regmap_write(max98090_ptr->regmap, M98090_REG_2C_LVL_HP_LEFT, 0x00);
 	regmap_write(max98090_ptr->regmap, M98090_REG_2D_LVL_HP_RIGHT, 0x00);
 	regmap_write(max98090_ptr->regmap, M98090_REG_2B_MIX_HP_CNTL, 0x00);
@@ -3222,6 +3225,14 @@ void max98090_switches_closed(struct i2c_client *client)
 	regmap_write(max98090_ptr->regmap, M98090_REG_30_MIX_SPK_CNTL, 0x00);
 	regmap_write(max98090_ptr->regmap, M98090_REG_13_MIC_CFG1, 0x00);
 	regcache_sync(max98090_ptr->regmap);
+}
+
+/*
+ * Wrapper for max98090_switches_closed
+ */
+void wrapper_max98090_switches_closed(void)
+{
+	max98090_switches_closed(private_max98090_client);
 }
 
 static struct i2c_driver max98090_i2c_driver = {

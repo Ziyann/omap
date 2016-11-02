@@ -34,6 +34,8 @@
 #include <linux/rpmsg.h>
 #include <linux/mutex.h>
 
+#include <linux/remoteproc.h>
+
 /*
  * virtio rpmsg bus driver requests
  * NOTE: These need to be matched with the definitions in remoteproc_virtio.c
@@ -96,6 +98,14 @@ struct rpmsg_channel_info {
 
 /* Address 53 is reserved for advertising remote services */
 #define RPMSG_NS_ADDR			(53)
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+/*
+ * Custom message to notify ducati that the NS endpoint is registered
+ * Defined in drivers/remoteproc/omap_remoteproc.h
+ */
+#define RP_MBOX_READY_FOR_NS_CREATE (0xFFFFFF14)
+#endif
 
 /* sysfs show configuration fields */
 #define rpmsg_show_attr(field, path, format_string)			\
@@ -997,6 +1007,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	void *bufs_va;
 	int err = 0, i, vproc_id;
 	unsigned int bufs[2];
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	struct rproc *rproc;
+#endif
 
 	vrp = kzalloc(sizeof(*vrp), GFP_KERNEL);
 	if (!vrp)
@@ -1107,6 +1120,26 @@ static int rpmsg_probe(struct virtio_device *vdev)
 
 	/* tell the remote processor it can start sending messages */
 	virtqueue_kick(vrp->rvq);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	/*
+	 * The endpoint rpmsg_ns_cb is now registered by __rpmsg_create_ept
+	 * (see above lines!)
+	 * This new message RP_MBOX_READY_FOR_NS_CREATE is used to notify
+	 * Ducati that the kernel can receive the RPMSG_NS_CREATE message.
+	 * Without this notification the Ducati could send messages earlier
+	 * when the kernel is not able to serve them, rpmsg channels are
+	 * not created and as a result the device /dev/rpmsg-omx1
+	 * is not created.
+	 * The following notification messages resolve this race condition.
+	 */
+	rproc = vdev_to_rproc(vdev);
+	if (RPROC_RUNNING == rproc->state) {
+		dev_info(&vdev->dev,
+			"Sending MBOX_READY_FOR_NS_CREATE to Ducati.");
+		rproc->ops->kick(rproc, RP_MBOX_READY_FOR_NS_CREATE);
+	}
+#endif
 
 	dev_info(&vdev->dev, "rpmsg host is online\n");
 

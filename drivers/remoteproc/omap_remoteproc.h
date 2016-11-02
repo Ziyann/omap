@@ -69,6 +69,10 @@
  *
  * @P_MBOX_SUSPEND_CANCEL: remote processor canceled suspend request
  *
+ * @RP_MBOX_READY_FOR_NS_CREATE: notify remote processor that
+ * the rpmsg_ns_cb endpoint is registered and we are ready to
+ * receive message with flag NS_CREATE for creating rpmsg-omx1 channel.
+ *
  * Intoduce new message definitions if any here.
  *
  * @RP_MBOX_END_MSG: Indicates end of known/defined messages from remote core
@@ -87,7 +91,12 @@ enum omap_rp_mbox_messages {
 	RP_MBOX_SUSPEND_FORCED	= 0xFFFFFF11,
 	RP_MBOX_SUSPEND_ACK	= 0xFFFFFF12,
 	RP_MBOX_SUSPEND_CANCEL	= 0xFFFFFF13,
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	RP_MBOX_READY_FOR_NS_CREATE = 0xFFFFFF14,
+	RP_MBOX_END_MSG		= 0xFFFFFF15,
+#else
 	RP_MBOX_END_MSG		= 0xFFFFFF14,
+#endif
 };
 
 /**

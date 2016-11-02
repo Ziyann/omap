@@ -30,15 +30,22 @@ typedef enum {
 	ANDROID_LOG_SILENT,
 } android_LogPriority;
 
+typedef enum {
+	VITALS_NORMAL = 0,
+	VITALS_FGTRACKING,
+	VITALS_TIME_BUCKET,
+} vitals_type;
+
 void log_to_metrics(android_LogPriority priority, const char *domain, const char *logmsg);
+
 void log_counter_to_vitals(android_LogPriority priority,
 	const char *domain, const char *program,
-	const char *source, const char *discrete_value,
-	long counter_value, const char *unit, bool screen_state);
+	const char *source, const char *key,
+	long counter_value, const char *unit, vitals_type type);
 void log_timer_to_vitals(android_LogPriority priority,
 	const char *domain, const char *program,
-	const char *source, const char *discrete_value,
-	long timer_value, const char *unit, bool screen_state);
+	const char *source, const char *key,
+	long timer_value, const char *unit, vitals_type type);
 #endif
 
 #endif // _LINUX_METRICSLOG_H

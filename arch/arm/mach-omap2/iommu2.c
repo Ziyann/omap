@@ -102,6 +102,8 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 	if (pdata->has_bus_err_back)
 		iommu_write_reg(obj, MMU_BUS_ERR_BACK_EN, MMU_GP_REG);
 
+	dev_info(obj->dev, "%s: Enable finished.\n", obj->name);
+
 	return 0;
 }
 

@@ -686,6 +686,7 @@ void omap_mcbsp_start(struct omap_mcbsp *mcbsp, int tx, int rx)
 
 	/*Disable and Re-enable transmitter if ready */
 	if (tx && (MCBSP_READ(mcbsp, SPCR2) & XRDY)) {
+		dev_err(mcbsp->dev, "Disable re-enable transmitter\n");
 		MCBSP_WRITE(mcbsp, SPCR2,
 				MCBSP_READ_CACHE(mcbsp, SPCR2) &
 				(~XRST));
@@ -695,6 +696,7 @@ void omap_mcbsp_start(struct omap_mcbsp *mcbsp, int tx, int rx)
 	}
 	/*Disable and Re-enable receiver if ready */
 	if (rx && (MCBSP_READ(mcbsp, SPCR1) & RRDY)) {
+		dev_err(mcbsp->dev, "Disable re-enable receiver\n");
 		MCBSP_WRITE(mcbsp, SPCR1,
 				MCBSP_READ_CACHE(mcbsp, SPCR1) &
 				(~RRST));

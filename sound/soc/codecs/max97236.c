@@ -813,6 +813,7 @@ static void max97236_jack_work(struct work_struct *work)
 	max97236->status_1 = snd_soc_read(codec, MAX97236_STATUS_1);
 	max97236->status_2 = snd_soc_read(codec, MAX97236_STATUS_2);
 
+
 	if (max97236->status_1 & MAX97236_STATUS_1_JACKSW_BIT) {
 		wake_lock(&max97236->wakelock);
 		max97236_detection_manual_0(max97236);
@@ -840,6 +841,15 @@ static void max97236_jack_work(struct work_struct *work)
 		snd_soc_update_bits(codec, MAX97236_ENABLE_1,
 				MAX97236_ENABLE_1_SHDN_MASK, 0x00);
 	}
+
+	/* get most up-to-date status.
+	* this will also clear any pending irq from max97236 */
+	max97236->status_1 = snd_soc_read(codec, MAX97236_STATUS_1);
+	max97236->status_2 = snd_soc_read(codec, MAX97236_STATUS_2);
+
+	if (max97236->status_2 != 0x0)
+		dev_err(codec->dev, "Status register 2 in bad state!\n");
+
 }
 
 void max97236_detect_jack(struct snd_soc_codec *codec)

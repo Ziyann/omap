@@ -70,7 +70,6 @@ static struct case_policy *extern_policy;
 
 #ifdef CONFIG_AMZN_VITALS
 #define       VITAL_STR_LEN  16
-static struct timespec       last_thermal_zone_time;
 #endif
 
 #ifdef CONFIG_AMAZON_METRICS_LOG
@@ -154,9 +153,8 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 #endif
 
 #ifdef CONFIG_AMZN_VITALS
-       struct       timespec curr_thermal_zone_time;
-       char         buff[VITAL_STR_LEN];
-       static int   last_thermal_zone ;
+	char    buff[VITAL_STR_LEN];
+	struct  timespec curr_time;
 #endif
 
 	pr_debug("%s: temp: %d thot: %d level: %d sys_thot: %d sys_tcold: %d",
@@ -232,15 +230,13 @@ update:
 #endif
 
 #ifdef CONFIG_AMZN_VITALS
-        /* Vital for thermal zone duration */
-        get_monotonic_boottime(&curr_thermal_zone_time);
-        snprintf(buff, VITAL_STR_LEN, "zone%d",  last_thermal_zone);
-        log_counter_to_vitals(ANDROID_LOG_INFO, "thermal engine", "thermal",
-                "time_in_thermal_bucket", buff, curr_thermal_zone_time.tv_sec - last_thermal_zone_time.tv_sec, "s", false);
-        last_thermal_zone_time = curr_thermal_zone_time;
-        last_thermal_zone = case_gov->cooling_level;
+	/* Vital for thermal zone change*/
+	get_monotonic_boottime(&curr_time);
+	snprintf(buff, VITAL_STR_LEN, "zone%d",  case_gov->cooling_level);
+	log_timer_to_vitals(ANDROID_LOG_INFO, "thermal engine", "thermal",
+		"time_in_thermal_bucket", buff, curr_time.tv_sec,
+		"s", VITALS_TIME_BUCKET);
 #endif
-
         return 0;
 }
 
@@ -316,10 +312,7 @@ static int __init case_governor_init(void)
 	struct device *dev;
 	int tmp, opps;
 
-#ifdef CONFIG_AMZN_VITALS
-        get_monotonic_boottime(&last_thermal_zone_time);
-#endif
-        dev = omap_device_get_by_hwmod_name("mpu");
+	dev = omap_device_get_by_hwmod_name("mpu");
 	if (!dev) {
 		pr_err("%s: domain does not know the amount of throttling",
 			__func__);

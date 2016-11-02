@@ -1705,10 +1705,9 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
 
 	if (!fw) {
 #ifdef CONFIG_AMAZON_METRICS_LOG
-		char buf[128], buf2[128];
+		char buf[128];
 		struct vmalloc_info vmi;
 		get_vmalloc_info(&vmi);
-		strcpy(buf2, "remoteproc:ducati-loading-failure:reason=");
 		sprintf(buf,
 			"remoteproc:ducati-loading-failure:reason_Largest_Chunk_kB=%ld;CT;1,Used_kB=%ld;CT;1:NR",
 			vmi.largest_chunk >> 10, vmi.used >> 10);

@@ -888,8 +888,7 @@ static int emmcmetrics_read(struct mmc_host *host)
 		{
 			/*report max-avg write/erase cnt as metrics*/
 			snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
-                                "emmcTSB:def:monitor=1;CT;1,mlc_max=%d;CT;1,"
-                                "mlc_avg:%d;CT;1:NR",
+				"emmcmlc:def:max=%d;CT;1,avg=%d;CT;1:NR",
 				__swap32gen(hbblk->mlc_write_erase_max),
 				__swap32gen(hbblk->mlc_write_erase_avg));
 
@@ -938,7 +937,7 @@ static int emmcmetrics_read(struct mmc_host *host)
 
 	/*report minReservedBlocks as metrics*/
 	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
-		"emmcSMG:def:monitor=1;CT;1,minReservedBlocks:%d;1;CT;1:NR",
+		"emmcmlc:def:minReservedBlocks=%d;CT;1:NR",
 		card->minReservedBlocks);
 	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
 
@@ -947,8 +946,8 @@ static int emmcmetrics_read(struct mmc_host *host)
 
 	/*report max- avg EraseCount MLC as metrics*/
 	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
-		"emmcSMG:def:monitor=1;CT;1,mlc max_erase:%d;CT;1,"
-		" avg_erase:%d;1;CT;1:NR",card->maxEraseCountMLC,
+		"emmcmlc:def:max=%d;CT;1,avg=%d;1;CT;1:NR",
+		card->maxEraseCountMLC,
 		card->avgEraseCountMLC);
 	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
 
@@ -957,8 +956,8 @@ static int emmcmetrics_read(struct mmc_host *host)
 
 	/*report max- avg EraseCount SLC as metrics*/
 	snprintf(logcatemmc_data, METRICS_emmc_data_LEN,
-		"emmcSMG:def:monitor=1;CT;1,slc max_erase:%d;CT;1,"
-		"avg_erase:%d;1;CT;1:NR",card->maxEraseCountSLC,
+		"emmcslc:def:max=%d;CT;1,avg=%d;1;CT;1:NR",
+		card->maxEraseCountSLC,
 		card->avgEraseCountSLC);
 	log_to_metrics(ANDROID_LOG_INFO, LMK_METRIC_TAG, logcatemmc_data);
 

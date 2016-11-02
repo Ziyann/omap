@@ -856,21 +856,21 @@ void log_to_vitals(android_LogPriority priority,
 
 void log_counter_to_vitals(android_LogPriority priority,
 			const char *domain, const char *program,
-			const char *source, const char *discrete_value,
-			long counter_value, const char *unit, bool screen_state)
+			const char *source, const char *key,
+			long counter_value, const char *unit, vitals_type type)
 {
 	char str[VITAL_ENTRY_MAX_PAYLOAD];
-	/* format (program):(source):[value=(discrete_value);
+	/* format (program):(source):[key=(key);
 	   DV;1,]counter=(counter_value);1,unit=(unit);DV;1:HI */
-	if (discrete_value != NULL) {
+	if (key != NULL) {
 		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:screenState=%s;DV;1,value=%s;DV;1,counter=%ld;CT;1,unit=%s;DV;1:HI",
-			program, source, screen_state ? "true" : "false",
-			discrete_value, counter_value, unit);
+			"%s:%s:type=%d;DV;1,key=%s;DV;1,counter=%ld;CT;1,unit=%s;DV;1:HI",
+			program, source, type,
+			key, counter_value, unit);
 	}	else {
 		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:screenState=%s;DV;1,counter=%ld;CT;1,unit=%s;DV;1:HI",
-			program, source, screen_state ? "true" : "false",
+			"%s:%s:type=%d;DV;1,counter=%ld;CT;1,unit=%s;DV;1:HI",
+			program, source, type,
 			counter_value, unit);
 	}
 	log_to_vitals(priority, domain, str);
@@ -878,21 +878,21 @@ void log_counter_to_vitals(android_LogPriority priority,
 
 void log_timer_to_vitals(android_LogPriority priority,
 			const char *domain, const char *program,
-			const char *source, const char *discrete_value,
-			long timer_value, const char *unit, bool screen_state)
+			const char *source, const char *key,
+			long timer_value, const char *unit, vitals_type type)
 {
 	char str[VITAL_ENTRY_MAX_PAYLOAD];
-	/* format (program):(source):[value=(discrete_value);
+	/* format (program):(source):[key=(key);
 	   DV;1,]timer=(timer_value);1,unit=(unit);DV;1:HI */
-	if (discrete_value != NULL) {
+	if (key != NULL) {
 		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:screenState=%s;DV;1,value=%s;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
-			program, source, screen_state ? "true" : "false",
-			discrete_value, timer_value, unit);
+			"%s:%s:type=%d;DV;1,key=%s;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
+			program, source, type,
+			key, timer_value, unit);
 	}	else {
 		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:screenState=%s;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
-			program, source, screen_state ? "true" : "false",
+			"%s:%s:type=%d;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
+			program, source, type,
 			timer_value, unit);
 	}
 	log_to_vitals(priority, domain, str);

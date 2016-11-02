@@ -155,7 +155,7 @@ int abe_pm_restore_context(struct omap_abe *abe)
 	if (context_loss != abe->context_loss) {
 		ret = omap_aess_reload_fw(abe->aess, abe->firmware);
 		if (ret) {
-			dev_dbg(abe->dev, "failed to reload firmware\n");
+			dev_err(abe->dev, "failed to reload firmware\n");
 			return ret;
 		}
 	}
@@ -289,7 +289,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 
 	ret = omap_aess_reload_fw(abe->aess, abe->firmware);
 	if (ret) {
-		dev_dbg(abe->dev, "failed to reload firmware\n");
+		dev_err(abe->dev, "failed to reload firmware\n");
 		goto out;
 	}
 
