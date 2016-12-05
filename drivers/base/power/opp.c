@@ -311,6 +311,7 @@ struct opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq)
 
 	return opp;
 }
+EXPORT_SYMBOL(opp_find_freq_ceil);
 
 /**
  * opp_find_freq_floor() - Search for a rounded floor freq
