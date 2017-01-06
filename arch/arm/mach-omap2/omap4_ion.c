@@ -42,8 +42,8 @@ static struct ion_platform_heap omap4_ion_heaps[] = {
 		.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 	},
 	{
-		.type = ION_HEAP_TYPE_SYSTEM,
-		.id = ION_HEAP_TYPE_SYSTEM,
+		.type = ION_HEAP_TYPE_SYSTEM_CONTIG,
+		.id = ION_HEAP_TYPE_SYSTEM_CONTIG,
 		.name = "system",
 	},
 	{

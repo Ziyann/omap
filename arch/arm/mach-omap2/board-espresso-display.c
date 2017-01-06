@@ -115,6 +115,10 @@ static struct sgx_omaplfb_config espresso_omaplfb_config[] = {
 		.tiler2d_buffers = 2,
 		.swap_chain_length = 2,
 	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
 };
 
 static struct sgx_omaplfb_platform_data espresso_omaplfb_plat_data = {
@@ -128,13 +132,17 @@ static struct omapfb_platform_data espresso_fb_pdata = {
 	},
 };
 
+static struct dsscomp_platform_data dsscomp_config_x7k = {
+	.tiler1d_slotsz = SZ_16M,
+};
+
 void __init omap4_espresso_memory_display_init(void)
 {
 	if (board_is_espresso10())
 		espresso_dss_data.devices[0]->panel = espresso10_lcd_config.panel;
 
 	omap_android_display_setup(&espresso_dss_data,
-				   NULL,
+				   &dsscomp_config_x7k,
 				   &espresso_omaplfb_plat_data,
 				   &espresso_fb_pdata);
 }

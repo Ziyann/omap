@@ -24,6 +24,7 @@
 #include "omap_ion_priv.h"
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -36,16 +37,47 @@ static struct ion_heap *nonsecure_tiler_heap;
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
 {
-	return omap_tiler_alloc(tiler_heap, client, data);
+	u32 n_pages;
+
+	if (data->fmt == TILFMT_PAGE)
+	{
+		n_pages = round_up(data->w, PAGE_SIZE) >> PAGE_SHIFT;
+	}
+	else
+	{
+		n_pages = tiler_vsize(data->fmt, data->w, data->h) >> PAGE_SHIFT;
+	}
+
+	data->handle = ion_alloc(client, n_pages * PAGE_SIZE, PAGE_SIZE, OMAP_ION_HEAP_TILER_MASK,
+		(unsigned long)data);
+	if (IS_ERR(data->handle))
+		return PTR_ERR(data->handle);
+	return 0;
 }
 EXPORT_SYMBOL(omap_ion_tiler_alloc);
 
 int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
 {
+	u32 n_pages;
+
 	if (!nonsecure_tiler_heap)
 		return -ENOMEM;
-	return omap_tiler_alloc(nonsecure_tiler_heap, client, data);
+
+	if (data->fmt == TILFMT_PAGE)
+	{
+		n_pages = round_up(data->w, PAGE_SIZE) >> PAGE_SHIFT;
+	}
+	else
+	{
+		n_pages = tiler_vsize(data->fmt, data->w, data->h) >> PAGE_SHIFT;
+	}
+
+	data->handle = ion_alloc(client, n_pages * PAGE_SIZE, PAGE_SIZE, OMAP_ION_HEAP_NONSECURE_TILER_MASK,
+		(unsigned long) data);
+	if (IS_ERR(data->handle))
+		return PTR_ERR(data->handle);
+	return 0;
 }
 EXPORT_SYMBOL(omap_ion_nonsecure_tiler_alloc);
 
@@ -68,7 +100,6 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 		ret = omap_ion_tiler_alloc(client, &data);
 		if (ret)
 			return ret;
-		data.handle = (struct ion_handle *)data.handle->id;
 		if (copy_to_user((void __user *)arg, &data,
 				 sizeof(data)))
 			return -EFAULT;
@@ -237,7 +268,6 @@ err:
 
 }
 EXPORT_SYMBOL(omap_ion_share_fd_to_handles);
-
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
