@@ -251,8 +251,8 @@ static struct omap_uart_port_info uart2_info __initdata = {
 	.dma_rx_poll_rate	= 1,
 	.dma_rx_timeout		= 3 * HZ,
 	.autosuspend_timeout	= 0,
-#if 0
 	.wake_peer		= bcm_bt_lpm_exit_lpm_locked,
+#if 0
 	.rts_mux_driver_control	= 1,
 #endif
 };
