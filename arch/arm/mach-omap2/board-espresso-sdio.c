@@ -21,7 +21,6 @@
 #include <plat/irqs.h>
 #include <plat/mmc.h>
 
-#include "common.h"
 #include "hsmmc.h"
 #include "board-espresso.h"
 
@@ -45,6 +44,7 @@ static struct omap2_hsmmc_info espresso_mmc_info[] = {
 		.name		= "omap_wlan",
 		.mmc		= 5,
 		.caps		= MMC_CAP_4_BIT_DATA,
+		.caps2		= MMC_CAP2_BROKEN_VOLTAGE,
 		.gpio_wp	= -EINVAL,
 		.gpio_cd	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195 | MMC_VDD_20_21,
@@ -54,7 +54,51 @@ static struct omap2_hsmmc_info espresso_mmc_info[] = {
 	{}	/* Terminator */
 };
 
+static int espresso_hsmmc_late_init(struct device *dev)
+{
+	int irq = 0;
+	struct platform_device *pdev =
+		container_of(dev, struct platform_device, dev);
+	struct omap_mmc_platform_data *pdata = dev->platform_data;
+
+	/* Setting MMC1 Card detect IRQ */
+	if (pdev->id == 0) {
+		irq = twl6030_mmc_card_detect_config();
+		if (irq < 0) {
+			pr_err("%s: failed configuring MMC1 card detect (%d)\n",
+				__func__, irq);
+			return irq;
+		}
+		pdata->slots[0].card_detect_irq = irq;
+		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
+	}
+	return 0;
+}
+
+static void __init espresso_hsmmc_set_late_init(struct device *dev)
+{
+	struct omap_mmc_platform_data *pdata;
+
+	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
+	if (!dev) {
+		pr_err("%s: failed!\n", __func__);
+		return;
+	}
+
+	pdata = dev->platform_data;
+	pdata->init = espresso_hsmmc_late_init;
+}
+
+static void __init espresso_hsmmc_init(struct omap2_hsmmc_info *controllers)
+{
+	struct omap2_hsmmc_info *c;
+
+	omap_hsmmc_init(controllers);
+	for (c = controllers; c->mmc; c++)
+		espresso_hsmmc_set_late_init(&c->pdev->dev);
+}
+
 void __init omap4_espresso_sdio_init(void)
 {
-	omap4_twl6030_hsmmc_init(espresso_mmc_info);
+	espresso_hsmmc_init(espresso_mmc_info);
 }
