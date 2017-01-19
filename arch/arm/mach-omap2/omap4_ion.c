@@ -14,6 +14,9 @@
 #include <linux/memblock.h>
 #include <linux/omap_ion.h>
 #include <linux/platform_device.h>
+#ifdef CONFIG_CMA
+#include <linux/dma-contiguous.h>
+#endif
 
 #include "omap4_ion.h"
 
@@ -86,4 +89,8 @@ void __init omap4_ion_init(void)
 				       omap4_ion_data.heaps[i].size,
 				       omap4_ion_data.heaps[i].base);
 		}
+
+#if defined(CONFIG_CMA) && defined(CONFIG_ION_OMAP_TILER_DYNAMIC_ALLOC)
+	dma_declare_contiguous(&omap4_ion_device.dev, SZ_64M, 0, 0);
+#endif
 }

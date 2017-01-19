@@ -28,6 +28,9 @@
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
 
+struct device *omap_cma_device;
+EXPORT_SYMBOL(omap_cma_device);
+
 static int num_heaps;
 static struct ion_heap **heaps;
 static struct ion_heap *tiler_heap;
@@ -86,6 +89,8 @@ static int omap_ion_probe(struct platform_device *pdev)
 	struct ion_platform_data *pdata = pdev->dev.platform_data;
 	int err;
 	int i;
+
+	omap_cma_device = &pdev->dev;
 
 	num_heaps = pdata->nr;
 
