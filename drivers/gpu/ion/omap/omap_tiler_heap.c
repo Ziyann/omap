@@ -35,9 +35,61 @@
 #include "omap_ion_priv.h"
 #include <asm/cacheflush.h>
 
+#include <linux/sysfs.h>
+
 extern struct device *omap_cma_device;
 
 bool use_dynamic_pages;
+
+static struct kobject *omap_tiler_heap_kobj;
+
+static struct allocs {
+	void *ptr;
+	u32 size;
+} e_allocs[5];
+static int e_allocs_num = 0;
+
+/* ********************************* */
+
+#include <linux/fs.h>
+#include <asm/segment.h>
+#include <asm/uaccess.h>
+#include <linux/buffer_head.h>
+
+struct file* file_open(const char* path, int flags, int rights) {
+    struct file* filp = NULL;
+    mm_segment_t oldfs;
+    int err = 0;
+
+    oldfs = get_fs();
+    set_fs(get_ds());
+    filp = filp_open(path, flags, rights);
+    set_fs(oldfs);
+    if(IS_ERR(filp)) {
+        err = PTR_ERR(filp);
+        return NULL;
+    }
+    return filp;
+}
+
+int file_write(struct file* file, unsigned long long offset, unsigned char* data, unsigned int size) {
+    mm_segment_t oldfs;
+    int ret;
+
+    oldfs = get_fs();
+    set_fs(get_ds());
+
+    ret = vfs_write(file, data, size, &offset);
+
+    set_fs(oldfs);
+    return ret;
+}
+
+void file_close(struct file* file) {
+    filp_close(file, NULL);
+}
+
+/* ********************************* */
 
 struct omap_ion_heap {
 	struct ion_heap heap;
@@ -86,6 +138,14 @@ static int omap_tiler_alloc_carveout(struct ion_heap *heap,
 	addr = gen_pool_alloc(omap_heap->pool, info->n_phys_pages * PAGE_SIZE);
 	if (addr) {
 		info->lump = true;
+		if (info->fmt == TILER_PIXEL_FMT_8BIT) {
+			e_allocs[e_allocs_num].ptr = ioremap(addr, info->n_phys_pages * PAGE_SIZE);
+			e_allocs[e_allocs_num].size = info->n_phys_pages * PAGE_SIZE;
+			printk("%s: 8bit gen_pool_alloc returning lump phys_addr=%lx virt_addr=%p size=%lu\n",
+				__func__, addr, e_allocs[e_allocs_num].ptr, info->n_phys_pages * PAGE_SIZE);
+			memset_io(e_allocs[e_allocs_num].ptr, 0, e_allocs[e_allocs_num].size);
+			++e_allocs_num;
+		}
 		for (i = 0; i < info->n_phys_pages; i++)
 			info->phys_addrs[i] = addr + i * PAGE_SIZE;
 		return 0;
@@ -93,7 +153,8 @@ static int omap_tiler_alloc_carveout(struct ion_heap *heap,
 
 	for (i = 0; i < info->n_phys_pages; i++) {
 		addr = gen_pool_alloc(omap_heap->pool, PAGE_SIZE);
-
+		if (info->fmt == TILER_PIXEL_FMT_8BIT)
+			printk("%s: 8bit gen_pool_alloc returning non-lump addr=%lu\n", __func__, addr);
 		if (addr == 0) {
 			ret = -ENOMEM;
 			pr_err("%s: failed to allocate pages to back "
@@ -115,6 +176,8 @@ static void omap_tiler_free_carveout(struct ion_heap *heap,
 {
 	struct omap_ion_heap *omap_heap = (struct omap_ion_heap *)heap;
 	int i;
+
+	--e_allocs_num;
 
 	if (info->lump) {
 		gen_pool_free(omap_heap->pool,
@@ -265,10 +328,8 @@ int omap_tiler_alloc(struct ion_heap *heap,
 		n_tiler_pages = n_phys_pages;
 	} else {
 		/* call APIs to calculate 2D buffer page requirements */
-		n_phys_pages = tiler_size(data->fmt, data->w, data->h) >>
-				PAGE_SHIFT;
-		n_tiler_pages = tiler_vsize(data->fmt, data->w, data->h) >>
-					PAGE_SHIFT;
+		n_phys_pages = tiler_vsize(data->fmt, data->w, data->h) >> PAGE_SHIFT;
+		n_tiler_pages = n_phys_pages;
 	}
 
 	info = kzalloc(sizeof(struct omap_tiler_info) +
@@ -534,6 +595,59 @@ static struct ion_heap_ops omap_tiler_ops = {
 	.map_user = omap_tiler_heap_map_user,
 };
 
+static ssize_t show_tiler(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct file* file;
+	int i, width, height;
+	const char *paths[] = {
+		"/sdcard/tiler/tiler_8bit_0.tga",
+		"/sdcard/tiler/tiler_8bit_1.tga",
+		"/sdcard/tiler/tiler_8bit_2.tga",
+		"/sdcard/tiler/tiler_8bit_3.tga",
+		"/sdcard/tiler/tiler_8bit_4.tga"
+	};
+	char header[18];
+
+	memset(header, 0, 18);
+	header[0x02] = 3; /* uncompressed black and white image */
+	width = 640;
+	height = 512;
+	header[0x0C] = (char) (width & 0xFF);
+	header[0x0D] = (char) (width >> 8 & 0xFF);
+	header[0x0E] = (char) (height & 0xFF);
+	header[0x0F] = (char) (height >> 8 & 0xFF);
+	header[0x10] = 8; /* bpp */
+	header[0x11] = 0x20;
+
+	for(i = 0; i < e_allocs_num; ++i) {
+		file = file_open(paths[i], O_WRONLY, 0);
+		if (file) {
+			u8 *tiler_buf = kzalloc(e_allocs[i].size, GFP_KERNEL);
+			memcpy_fromio(tiler_buf, e_allocs[i].ptr, e_allocs[i].size);
+			file_write(file, 0, header, 18);
+			file_write(file, 18, tiler_buf, e_allocs[i].size);
+			kfree(tiler_buf);
+			file_close(file);
+		} else {
+			printk("failed to dump tiler data\n");
+			return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+		}
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", 1);
+}
+static DEVICE_ATTR(tiler, S_IRUGO, show_tiler, NULL);
+
+static struct attribute *tiler_attributes[] = {
+	&dev_attr_tiler.attr,
+	NULL,
+};
+
+static struct attribute_group omap_tiler_heap_group = {
+	.attrs = tiler_attributes,
+};
+
 struct ion_heap *omap_tiler_heap_create(struct ion_platform_heap *data)
 {
 	struct omap_ion_heap *heap;
@@ -556,6 +670,11 @@ struct ion_heap *omap_tiler_heap_create(struct ion_platform_heap *data)
 	heap->heap.type = OMAP_ION_HEAP_TILER;
 	heap->heap.name = data->name;
 	heap->heap.id = data->id;
+
+	if (!omap_tiler_heap_kobj) {
+		omap_tiler_heap_kobj = kobject_create_and_add("omap_tiler_heap", NULL);
+		sysfs_create_group(omap_tiler_heap_kobj, &omap_tiler_heap_group);
+	}
 
 #ifdef CONFIG_ION_OMAP_TILER_DYNAMIC_ALLOC
 	use_dynamic_pages = true;
