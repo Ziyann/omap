@@ -111,11 +111,10 @@ struct ipv6_txoptions *ipv6_update_options(struct sock *sk,
 			icsk->icsk_sync_mss(sk, icsk->icsk_pmtu_cookie);
 		}
 		opt = xchg((__force struct ipv6_txoptions **)&inet6_sk(sk)->opt,
-			   opt);
+				   opt);
 	} else {
 		spin_lock(&sk->sk_dst_lock);
-		opt = xchg((__force struct ipv6_txoptions **)&inet6_sk(sk)->opt,
-			   opt);
+		opt = xchg(&inet6_sk(sk)->opt, opt);
 		spin_unlock(&sk->sk_dst_lock);
 	}
 	sk_dst_reset(sk);
@@ -389,7 +388,8 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		if (optname != IPV6_RTHDR && !capable(CAP_NET_RAW))
 			break;
 
-		opt = rcu_dereference_protected(np->opt, sock_owned_by_user(sk));
+		opt = rcu_dereference_protected(np->opt,
+			sock_owned_by_user(sk));
 		opt = ipv6_renew_options(sk, opt, optname,
 					 (struct ipv6_opt_hdr __user *)optval,
 					 optlen);
@@ -1099,7 +1099,8 @@ static int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 		struct ipv6_txoptions *opt;
 
 		lock_sock(sk);
-		opt = rcu_dereference_protected(np->opt, sock_owned_by_user(sk));
+		opt = rcu_dereference_protected(np->opt,
+			sock_owned_by_user(sk));
 		len = ipv6_getsockopt_sticky(sk, opt, optname, optval, len);
 		release_sock(sk);
 		/* check if ipv6_getsockopt_sticky() returns err code */

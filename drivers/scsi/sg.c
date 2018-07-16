@@ -1687,7 +1687,7 @@ static int sg_start_req(Sg_request *srp, unsigned char *cmd)
 			md->from_user = 0;
 	}
 
-	if (unlikely(iov_count > UIO_MAXIOV))
+	if (unlikely(iov_count > MAX_UIOVEC))
 		return -EINVAL;
 
 	if (iov_count) {

@@ -253,6 +253,8 @@ static int dccp_v6_send_response(struct sock *sk, struct request_sock *req,
 	fl6.fl6_sport = inet_rsk(req)->loc_port;
 	security_req_classify_flow(req, flowi6_to_flowi(&fl6));
 
+	opt = np->opt;
+
 	rcu_read_lock();
 	final_p = fl6_update_dst(&fl6, rcu_dereference(np->opt), &final);
 	rcu_read_unlock();
@@ -273,13 +275,14 @@ static int dccp_v6_send_response(struct sock *sk, struct request_sock *req,
 							 &ireq6->rmt_addr);
 		fl6.daddr = ireq6->rmt_addr;
 		rcu_read_lock();
-		err = ip6_xmit(sk, skb, &fl6, rcu_dereference(np->opt),
-			       np->tclass);
+		err = ip6_xmit(sk, skb, &fl6, rcu_dereference(opt), np->tclass);
 		rcu_read_unlock();
 		err = net_xmit_eval(err);
 	}
 
 done:
+	if (opt != NULL && opt != np->opt)
+		sock_kfree_s(sk, opt, opt->tot_len);
 	dst_release(dst);
 	return err;
 }
@@ -470,7 +473,6 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 {
 	struct inet6_request_sock *ireq6 = inet6_rsk(req);
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
-	struct ipv6_txoptions *opt;
 	struct inet_sock *newinet;
 	struct dccp6_sock *newdp6;
 	struct sock *newsk;
@@ -596,16 +598,16 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 	 * Yes, keeping reference count would be much more clever, but we make
 	 * one more one thing there: reattach optmem to newsk.
 	 */
-
-	opt = rcu_dereference(np->opt);
+	opt = rcu_dereference(np->opt)
 	if (opt) {
 		opt = ipv6_dup_options(newsk, opt);
 		RCU_INIT_POINTER(newnp->opt, opt);
 	}
+
 	inet_csk(newsk)->icsk_ext_hdr_len = 0;
 	if (opt)
-		inet_csk(newsk)->icsk_ext_hdr_len = opt->opt_nflen +
-						    opt->opt_flen;
+		inet_csk(newsk)->icsk_ext_hdr_len = \
+		opt->opt_nflen + opt->opt_flen;
 
 	dccp_sync_mss(newsk, dst_mtu(dst));
 

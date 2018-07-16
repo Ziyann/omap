@@ -298,7 +298,7 @@ void ion_heap_destroy(struct ion_heap *heap)
 	switch (heap->type) {
 	case ION_HEAP_TYPE_SYSTEM_CONTIG:
 		pr_err("%s: Heap type is disabled: %d\n", __func__,
-		       heap->type);
+			   heap->type);
 		break;
 	case ION_HEAP_TYPE_SYSTEM:
 		ion_system_heap_destroy(heap);
